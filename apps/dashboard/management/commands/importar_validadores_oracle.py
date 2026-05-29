@@ -4,9 +4,8 @@ from decimal import Decimal, InvalidOperation
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.models import EstadoValidador
+from apps.dashboard.models import EstadoValidador, LogImportacion
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
-
 
 class Command(BaseCommand):
     help = "Importa datos de validadores desde Oracle hacia SQLite"
@@ -19,8 +18,21 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        fecha_inicio = timezone.now()
+
+        log = LogImportacion.objects.create(
+            origen="ORACLE",
+            estado="OK",
+            fecha_inicio=fecha_inicio,
+            mensaje="Importación Oracle iniciada",
+        )
+        
+        filas_eliminadas = 0
+
         if options["limpiar"]:
             total_eliminados, _ = EstadoValidador.objects.all().delete()
+            filas_eliminadas = total_eliminados
+
             self.stdout.write(
                 self.style.WARNING(f"Registros eliminados: {total_eliminados}")
             )
@@ -38,6 +50,12 @@ class Command(BaseCommand):
             )
 
         except Exception as error:
+            log.estado = "ERROR"
+            log.fecha_fin = timezone.now()
+            log.mensaje = f"Error consultando Oracle: {error}"
+            log.filas_eliminadas = filas_eliminadas
+            log.save()
+
             self.stderr.write(
                 self.style.ERROR(f"Error consultando Oracle: {error}")
             )
@@ -88,6 +106,14 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"Importación Oracle completada. Registros creados: {len(registros)}")
         )
+        
+        log.estado = "OK"
+        log.fecha_fin = timezone.now()
+        log.filas_obtenidas = len(df)
+        log.filas_creadas = len(registros)
+        log.filas_eliminadas = filas_eliminadas
+        log.mensaje = "Importación Oracle completada correctamente"
+        log.save()
 
     def obtener_query(self):
         return """

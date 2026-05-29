@@ -1,6 +1,5 @@
 from django.db import models
 
-
 class EstadoValidador(models.Model):
     amid = models.BigIntegerField()
 
@@ -46,3 +45,29 @@ class EstadoValidador(models.Model):
 
     def __str__(self):
         return f"{self.amid} - {self.porcentaje_bateria}"
+
+class LogImportacion(models.Model):
+    ORIGEN_CHOICES = [
+        ("CSV", "CSV"),
+        ("ORACLE", "Oracle"),
+    ]
+
+    ESTADO_CHOICES = [
+        ("OK", "OK"),
+        ("ERROR", "Error"),
+    ]
+
+    origen = models.CharField(max_length=20, choices=ORIGEN_CHOICES)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+
+    fecha_inicio = models.DateTimeField()
+    fecha_fin = models.DateTimeField(null=True, blank=True)
+
+    filas_obtenidas = models.IntegerField(default=0)
+    filas_creadas = models.IntegerField(default=0)
+    filas_eliminadas = models.IntegerField(default=0)
+
+    mensaje = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.origen} - {self.estado} - {self.fecha_inicio}"
