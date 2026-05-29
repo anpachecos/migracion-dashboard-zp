@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Static and media generated files
+media/*
+!media/.gitkeep
+
+staticfiles/
+static_collected/
+
+# Uploaded/generated files
+uploads/
+outputs/
+exports/
+reportes_generados/
+archivos_temporales/
+
+# Excel / data files
+*.xlsx
+*.xls
+*.csv
+*.xlsm
+
+# Except example files if needed
+!*.example.xlsx
+!*.example.csv
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Tests / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build files
+dist/
+build/
+*.egg-info/
