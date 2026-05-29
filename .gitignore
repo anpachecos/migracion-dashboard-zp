@@ -44,6 +44,7 @@ archivos_temporales/
 # Except example files if needed
 !*.example.xlsx
 !*.example.csv
+datos_query_prueba.csv
 
 # OS files
 .DS_Store
