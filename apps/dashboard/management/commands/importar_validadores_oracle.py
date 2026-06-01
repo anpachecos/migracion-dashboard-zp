@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.models import EstadoValidador, LogImportacion
+from apps.dashboard.models import EstadoValidadorRaw, LogImportacion
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 class Command(BaseCommand):
@@ -30,7 +30,7 @@ class Command(BaseCommand):
         filas_eliminadas = 0
 
         if options["limpiar"]:
-            total_eliminados, _ = EstadoValidador.objects.all().delete()
+            total_eliminados, _ = EstadoValidadorRaw.objects.all().delete()
             filas_eliminadas = total_eliminados
 
             self.stdout.write(
@@ -64,7 +64,7 @@ class Command(BaseCommand):
         registros = []
 
         for _, fila in df.iterrows():
-            registro = EstadoValidador(
+            registro = EstadoValidadorRaw(
                 amid=self.valor_entero(fila.get("AMID")),
 
                 fec_descarga=self.valor_fecha(fila.get("FEC_DESCARGA"), dayfirst=True),
@@ -101,25 +101,40 @@ class Command(BaseCommand):
 
             registros.append(registro)
 
-        EstadoValidador.objects.bulk_create(registros, batch_size=500)
+        cantidad_antes = EstadoValidadorRaw.objects.count()
+
+        EstadoValidadorRaw.objects.bulk_create(
+            registros,
+            batch_size=500,
+            ignore_conflicts=True
+        )
+
+        cantidad_despues = EstadoValidadorRaw.objects.count()
+        filas_creadas = cantidad_despues - cantidad_antes
+        filas_duplicadas = len(registros) - filas_creadas
 
         self.stdout.write(
-            self.style.SUCCESS(f"Importación Oracle completada. Registros creados: {len(registros)}")
+            self.style.SUCCESS(
+                f"Importación Oracle a RAW completada. "
+                f"Obtenidos: {len(df)} | "
+                f"Creados: {filas_creadas} | "
+                f"Duplicados ignorados: {filas_duplicadas}"
+            )
         )
         
-        log.estado = "OK"
-        log.fecha_fin = timezone.now()
         log.filas_obtenidas = len(df)
-        log.filas_creadas = len(registros)
+        log.filas_creadas = filas_creadas
         log.filas_eliminadas = filas_eliminadas
-        log.mensaje = "Importación Oracle completada correctamente"
+        log.mensaje = (
+            "Importación Oracle a RAW completada correctamente. "
+            f"Duplicados ignorados: {filas_duplicadas}"
+        )
         log.save()
 
     def obtener_query(self):
         return """
         SELECT
             datos.AMID,
-
             MAX(datos.FEC_DESCARGA) AS FEC_DESCARGA,
             MAX(datos.FEC_ESTADO) AS FEC_ESTADO,
             MAX(datos.BUSID) AS BUSID,
@@ -130,27 +145,21 @@ class Command(BaseCommand):
             MAX(datos.TD04) AS TD04,
             MAX(datos.TABLA) AS TABLA,
             MAX(datos.VER_TABLA) AS VER_TABLA,
-            MAX(datos.FECHA_HORA) AS FECHA_HORA,
-
+            TO_CHAR(datos.FECHA_HORA_REAL, 'DD-MM-YYYY HH24:MI:SS') AS FECHA_HORA,
             MAX(CASE WHEN datos.CLAVE = 'isContieneBateria' THEN datos.VALOR END) AS IS_CONTIENE_BATERIA,
             MAX(CASE WHEN datos.CLAVE = 'isContieneGps' THEN datos.VALOR END) AS IS_CONTIENE_GPS,
             MAX(CASE WHEN datos.CLAVE = 'isContieneTiempoVida' THEN datos.VALOR END) AS IS_CONTIENE_TIEMPO_VIDA,
-
             MAX(CASE WHEN datos.CLAVE = 'isErrorObtenerBateria' THEN datos.VALOR END) AS IS_ERROR_OBTENER_BATERIA,
             MAX(CASE WHEN datos.CLAVE = 'isErrorObtenerGps' THEN datos.VALOR END) AS IS_ERROR_OBTENER_GPS,
             MAX(CASE WHEN datos.CLAVE = 'isErrorObtenerTiempoVida' THEN datos.VALOR END) AS IS_ERROR_OBTENER_TIEMPO_VIDA,
-
             MAX(CASE WHEN datos.CLAVE = 'latitud' THEN datos.VALOR END) AS LATITUD,
             MAX(CASE WHEN datos.CLAVE = 'longitud' THEN datos.VALOR END) AS LONGITUD,
             MAX(CASE WHEN datos.CLAVE = 'porcentajeBateria' THEN datos.VALOR END) AS PORCENTAJE_BATERIA,
             MAX(CASE WHEN datos.CLAVE = 'tiempoVida' THEN datos.VALOR END) AS TIEMPO_VIDA,
-
             SYSDATE AS FECHA_REGISTRO
-
         FROM (
-            SELECT 
+            SELECT
                 a.ata_nidas AS AMID,
-
                 TO_CHAR(a.ata_dfecultdescarga, 'dd/mm/yyyy hh24:mi:ss') AS FEC_DESCARGA,
                 TO_CHAR(a.ata_dfecultestado, 'dd/mm/yyyy hh24:mi:ss') AS FEC_ESTADO,
                 a.ata_nidsitio AS BUSID,
@@ -161,44 +170,18 @@ class Command(BaseCommand):
                 a.ata_nidversiontd4 AS TD04,
                 e.edt_ntabladifusion AS TABLA,
                 e.edt_sversiontabla AS VER_TABLA,
-                TO_CHAR(e.edt_dfechastatus, 'DD-MM-YYYY HH24:MI:SS') AS FECHA_HORA,
-
-                SUBSTR(
-                    e.edt_snombrecomponente,
-                    2,
-                    INSTR(e.edt_snombrecomponente, '":') - 2
-                ) AS CLAVE,
-
-                REPLACE(
-                    REPLACE(
-                        REPLACE(
-                            REPLACE(
-                                SUBSTR(
-                                    e.edt_snombrecomponente,
-                                    INSTR(e.edt_snombrecomponente, ':') + 1
-                                ),
-                                '"',
-                                ''
-                            ),
-                            '}',
-                            ''
-                        ),
-                        'T',
-                        ' '
-                    ),
-                    'Z',
-                    ''
-                ) AS VALOR
-
+                e.edt_dfechastatus AS FECHA_HORA_REAL,
+                SUBSTR(e.edt_snombrecomponente, 2, INSTR(e.edt_snombrecomponente, '":') - 2) AS CLAVE,
+                REPLACE(REPLACE(REPLACE(REPLACE(SUBSTR(e.edt_snombrecomponente, INSTR(e.edt_snombrecomponente, ':') + 1), '"', ''), '}', ''), 'T', ' '), 'Z', '') AS VALOR
             FROM dbtablero.antena_tablero a
             LEFT JOIN dbtablero.estado_ds_tablero e
-                   ON a.ata_nidas = e.edt_nidval
+                ON a.ata_nidas = e.edt_nidval
             WHERE a.ata_nidas > 7500000
-              AND e.edt_ntabladifusion = 16
-              AND e.edt_snombrecomponente IS NOT NULL
-              AND e.edt_dfechastatus >= TRUNC(SYSDATE) - 14
-              AND (
-                   e.edt_snombrecomponente LIKE '%"isContieneBateria":%'
+            AND e.edt_ntabladifusion = 16
+            AND e.edt_snombrecomponente IS NOT NULL
+            AND e.edt_dfechastatus >= TRUNC(SYSDATE) - 14
+            AND (
+                e.edt_snombrecomponente LIKE '%"isContieneBateria":%'
                 OR e.edt_snombrecomponente LIKE '%"isContieneGps":%'
                 OR e.edt_snombrecomponente LIKE '%"isContieneTiempoVida":%'
                 OR e.edt_snombrecomponente LIKE '%"isErrorObtenerBateria":%'
@@ -208,11 +191,10 @@ class Command(BaseCommand):
                 OR e.edt_snombrecomponente LIKE '%"longitud":%'
                 OR e.edt_snombrecomponente LIKE '%"porcentajeBateria":%'
                 OR e.edt_snombrecomponente LIKE '%"tiempoVida":%'
-              )
+            )
         ) datos
-
-        GROUP BY datos.AMID
-        ORDER BY datos.AMID
+        GROUP BY datos.AMID, datos.FECHA_HORA_REAL
+        ORDER BY datos.AMID, datos.FECHA_HORA_REAL
         """
 
     def valor_texto(self, valor):
