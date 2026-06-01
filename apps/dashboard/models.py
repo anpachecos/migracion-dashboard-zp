@@ -163,15 +163,6 @@ class EstadoValidadorLimpio(models.Model):
     tiempo_vida = models.DateTimeField(null=True, blank=True)
     fecha_registro = models.DateTimeField(null=True, blank=True)
 
-    coordenadas_validas = models.BooleanField(default=False)
-    bateria_valida = models.BooleanField(default=False)
-    gps_valido = models.BooleanField(default=False)
-    tiene_error = models.BooleanField(default=False)
-
-    estado_bateria = models.CharField(max_length=30, null=True, blank=True)
-    estado_gps = models.CharField(max_length=30, null=True, blank=True)
-    estado_general = models.CharField(max_length=30, null=True, blank=True)
-
     fecha_importacion = models.DateTimeField(null=True, blank=True)
     fecha_limpieza = models.DateTimeField(auto_now=True)
 
@@ -186,7 +177,6 @@ class EstadoValidadorLimpio(models.Model):
             models.Index(fields=["amid"]),
             models.Index(fields=["fecha_hora"]),
             models.Index(fields=["porcentaje_bateria"]),
-            models.Index(fields=["estado_general"]),
         ]
 
     def __str__(self):
