@@ -1,0 +1,416 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+    color: #222;
+}
+
+.contenedor {
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.encabezado {
+    margin-bottom: 20px;
+}
+
+.encabezado h1 {
+    margin-bottom: 6px;
+}
+
+.encabezado p {
+    color: #666;
+    margin-top: 0;
+}
+
+/* =========================
+   Buscador y filtros
+========================= */
+
+.buscador {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.form-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: end;
+}
+
+.grupo-filtro {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.grupo-filtro label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #444;
+}
+
+.grupo-filtro input,
+.grupo-filtro select {
+    padding: 9px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    min-width: 130px;
+    height: 38px;
+}
+
+.grupo-amid input {
+    min-width: 240px;
+}
+
+.boton-filtro button {
+    height: 38px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 8px;
+    background-color: #1f6feb;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.boton-filtro button:hover {
+    background-color: #1557b0;
+}
+
+/* =========================
+   Mensajes
+========================= */
+
+.mensaje {
+    padding: 15px;
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* =========================
+   Tarjetas resumen
+========================= */
+
+.tarjetas {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.tarjeta {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.tarjeta .titulo {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.tarjeta .valor {
+    font-size: 20px;
+    font-weight: bold;
+    color: #222;
+    word-break: break-word;
+}
+
+.tarjeta .valor-pequeno {
+    font-size: 15px;
+}
+
+/* =========================
+   Secciones
+========================= */
+
+.seccion {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.seccion h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.texto-ayuda {
+    color: #666;
+    font-size: 14px;
+    margin-top: 0;
+}
+
+.estado-inicial {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+/* =========================
+   Sugerencias de horarios
+========================= */
+
+.chips-horarios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.chip-horario {
+    background-color: #e7f1ff;
+    color: #084298;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* =========================
+   Placeholder gráfico
+========================= */
+
+.placeholder-grafico {
+    height: 260px;
+    border: 2px dashed #ccc;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+    background: #fafafa;
+    text-align: center;
+    padding: 20px;
+}
+
+/* =========================
+   Tabla batería compacta
+========================= */
+
+.titulo-tabla {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.tabla-scroll {
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding-bottom: 8px;
+}
+
+/* La tabla ahora se adapta al ancho de pantalla */
+.tabla-bateria {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 9px;
+}
+
+/* Celdas generales */
+.tabla-bateria th,
+.tabla-bateria td {
+    border: 1px solid #ddd;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Celdas de datos */
+.tabla-bateria td {
+    padding: 2px 1px;
+    height: 24px;
+    line-height: 1;
+}
+
+/* Encabezado general */
+.tabla-bateria th {
+    background-color: #f1f3f5;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* Primera columna fija, pero más angosta */
+.col-fecha {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+    background-color: #f1f3f5;
+    z-index: 4;
+    font-weight: bold;
+    font-size: 9px;
+}
+
+td.col-fecha {
+    background-color: white;
+}
+
+/* Encabezados de hora compactos y diagonales */
+th.hora-diagonal {
+    height: 54px;
+    padding: 0;
+    vertical-align: bottom;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+th.hora-diagonal > span {
+    display: inline-block;
+    transform: rotate(-65deg);
+    transform-origin: left bottom;
+    font-size: 8px;
+    white-space: nowrap;
+    margin-bottom: 6px;
+    margin-left: 5px;
+}
+
+/* Valores dentro de la tabla */
+.tabla-bateria td:not(.col-fecha) {
+    font-size: 8px;
+    font-weight: bold;
+}
+
+/* =========================
+   Colores batería
+========================= */
+
+.bateria-alta {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    font-weight: bold;
+}
+
+.bateria-media {
+    background-color: #fff3cd;
+    color: #664d03;
+    font-weight: bold;
+}
+
+.bateria-baja {
+    background-color: #ffe5d0;
+    color: #8a3b00;
+    font-weight: bold;
+}
+
+.bateria-critica {
+    background-color: #f8d7da;
+    color: #842029;
+    font-weight: bold;
+}
+
+.bateria-sin-dato {
+    background-color: #f1f3f5;
+    color: #aaa;
+}
+
+/* =========================
+   Botón Secundario
+========================= */
+.boton-secundario button {
+    background-color: #6c757d;
+}
+
+.boton-secundario button:hover {
+    background-color: #565e64;
+}
+
+.mensaje-info {
+    background: #e7f1ff;
+    border: 1px solid #b6d4fe;
+    color: #084298;
+}
+
+/* =========================
+   Botón Limpiar
+========================= */
+
+.btn-limpiar {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid #d0d7de;
+    background-color: #ffffff;
+    color: #57606a;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 13px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    transition: all 0.2s ease;
+}
+
+.btn-limpiar:hover {
+    background-color: #f6f8fa;
+    color: #24292f;
+    border-color: #afb8c1;
+    transform: translateY(-1px);
+}
+
+.btn-limpiar:active {
+    transform: translateY(0);
+}
+
+/* =========================
+   Responsive
+========================= */
+
+@media (max-width: 1000px) {
+    .tarjetas {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grupo-amid input {
+        min-width: 200px;
+    }
+}
+
+@media (max-width: 700px) {
+    body {
+        padding: 12px;
+    }
+
+    .tarjetas {
+        grid-template-columns: 1fr;
+    }
+
+    .form-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .grupo-filtro input,
+    .grupo-filtro select,
+    .boton-filtro button {
+        width: 100%;
+    }
+
+    .grupo-amid input {
+        min-width: 100%;
+    }
+
+    
+}

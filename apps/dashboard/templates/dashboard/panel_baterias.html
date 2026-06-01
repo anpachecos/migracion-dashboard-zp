@@ -1,0 +1,229 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de baterías</title>
+
+    <link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}">
+</head>
+<body>
+
+<div class="contenedor">
+
+    <header class="encabezado">
+        <h1>Panel de evolución de batería</h1>
+        <p>
+            Consulta manual por AMID para revisar el comportamiento de batería en bloques de media hora.
+        </p>
+    </header>
+
+    <section class="buscador">
+        <form method="get" class="form-filtros" id="form-filtros-bateria">
+
+            <div class="grupo-filtro grupo-amid">
+                <label for="amid">Buscar AMID</label>
+                <input 
+                    type="text" 
+                    id="amid" 
+                    name="amid" 
+                    value="{{ amid }}" 
+                    placeholder="Ej: 7500123"
+                >
+            </div>
+
+            <div class="grupo-filtro">
+                <label for="dias">Días</label>
+                <select id="dias" name="dias">
+                    <option value="1" {% if dias == 1 %}selected{% endif %}>1 día</option>
+                    <option value="3" {% if dias == 3 %}selected{% endif %}>3 días</option>
+                    <option value="7" {% if dias == 7 %}selected{% endif %}>7 días</option>
+                    <option value="14" {% if dias == 14 %}selected{% endif %}>14 días</option>
+                </select>
+            </div>
+
+            <div class="grupo-filtro">
+                <label for="hora_inicio">Desde</label>
+                <input 
+                    type="time" 
+                    id="hora_inicio" 
+                    name="hora_inicio" 
+                    step="1800"
+                    value="{{ hora_inicio }}"
+                >
+            </div>
+
+            <div class="grupo-filtro">
+                <label for="hora_fin">Hasta</label>
+                <input 
+                    type="time" 
+                    id="hora_fin" 
+                    name="hora_fin" 
+                    step="1800"
+                    value="{{ hora_fin }}"
+                >
+            </div>
+
+            <div class="grupo-filtro boton-filtro">
+                <button type="submit">Aplicar filtros</button>
+            </div>
+
+            <div class="grupo-filtro boton-filtro boton-secundario">
+                <button type="submit" name="usar_sugerido" value="1">
+                    Usar horario sugerido
+                </button>
+            </div>
+
+            <div class="grupo-filtro boton-filtro boton-limpiar">
+                {% if amid %}
+                    <a class="btn-limpiar" href="{% url 'dashboard:panel_baterias' %}?amid={{ amid }}&dias=14&hora_inicio=00:00&hora_fin=23:30">
+                        Borrar filtros
+                    </a>
+                {% else %}
+                    <a class="btn-limpiar" href="{% url 'dashboard:panel_baterias' %}">
+                        Borrar filtros
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+
+    {% if mensaje %}
+        <section class="mensaje">
+            {{ mensaje }}
+        </section>
+    {% endif %}
+
+    {% if ultimo_registro %}
+
+        <section class="tarjetas">
+
+            <article class="tarjeta">
+                <div class="titulo">Última fecha de descarga</div>
+                <div class="valor">
+                    {% if ultimo_registro.fec_descarga %}
+                        {{ ultimo_registro.fec_descarga|date:"d-m-Y H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="tarjeta">
+                <div class="titulo">Última fecha de estado</div>
+                <div class="valor">
+                    {% if ultimo_registro.fec_estado %}
+                        {{ ultimo_registro.fec_estado|date:"d-m-Y H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="tarjeta">
+                <div class="titulo">Última batería</div>
+                <div class="valor">
+                    {% if ultimo_registro.porcentaje_bateria %}
+                        {{ ultimo_registro.porcentaje_bateria }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="tarjeta">
+                <div class="titulo">Duración tiempo de vida</div>
+                <div class="valor valor-pequeno">
+                    {% if ultimo_registro.tiempo_vida %}
+                        {{ ultimo_registro.tiempo_vida }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </article>
+
+        </section>
+
+        <section class="seccion">
+            <h2>Gráfico batería día actual</h2>
+
+            <div class="placeholder-grafico">
+                Aquí irá el gráfico de batería real vs batería esperada.
+            </div>
+        </section>
+
+        {% if horario_sugerido_aplicado %}
+            <section class="mensaje mensaje-info">
+                Se aplicó automáticamente el horario sugerido:
+                <strong>{{ hora_inicio }}</strong> a <strong>{{ hora_fin }}</strong>.
+            </section>
+        {% endif %}
+
+        <section class="seccion">
+            <div class="titulo-tabla">
+                <div>
+                    <h2>Tabla detalle de batería</h2>
+                    <p class="texto-ayuda">
+                        Período seleccionado: últimos {{ dias }} día{% if dias != 1 %}s{% endif %},
+                        desde {{ hora_inicio }} hasta {{ hora_fin }}.
+                    </p>
+                </div>
+            </div>
+
+            <div class="tabla-scroll">
+                <table class="tabla-bateria">
+                    <thead>
+                        <tr>
+                            <th class="col-fecha">Fecha</th>
+
+                            {% for hora in columnas_horas %}
+                                <th class="hora-diagonal">
+                                    <span>{{ hora }}</span>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for fila in tabla_bateria %}
+                            <tr>
+                                <td class="col-fecha">{{ fila.fecha }}</td>
+
+                                {% for celda in fila.valores %}
+                                    <td class="{{ celda.clase }}">
+                                        {% if celda.valor != "" %}
+                                            {{ celda.valor }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    {% elif amid and not mensaje %}
+
+        <section class="mensaje">
+            No se encontraron registros para el AMID ingresado.
+        </section>
+
+    {% else %}
+
+        <section class="seccion estado-inicial">
+            <h2>Busca un validador</h2>
+            <p>
+                Ingresa un AMID para visualizar su evolución de batería, tabla por media hora y resumen de estado.
+            </p>
+        </section>
+
+    {% endif %}
+
+</div>
+<script src="{% static 'dashboard/js/panel_baterias.js' %}"></script>
+</body>
+</html>
