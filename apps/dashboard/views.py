@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta, time
-
 from django.shortcuts import render
 from django.utils import timezone
-
 from .models import EstadoValidadorLimpio
 
 
@@ -29,7 +27,6 @@ def generar_columnas_media_hora(hora_inicio="00:00", hora_fin="23:30"):
 
     return columnas
 
-
 def generar_fechas_ultimos_dias(cantidad_dias=14):
     """
     Genera una lista de fechas desde hoy hacia atrás.
@@ -42,7 +39,6 @@ def generar_fechas_ultimos_dias(cantidad_dias=14):
         fechas.append(hoy - timedelta(days=i))
 
     return fechas
-
 
 def obtener_registro_mas_cercano(registros_por_fecha, fecha, hora_texto, tolerancia_minutos=15):
     """
@@ -74,7 +70,6 @@ def obtener_registro_mas_cercano(registros_por_fecha, fecha, hora_texto, toleran
                 mejor_registro = registro
 
     return mejor_registro
-
 
 def construir_tabla_bateria(registros, cantidad_dias=14, hora_inicio="00:00", hora_fin="23:30"):
     """
@@ -246,13 +241,18 @@ def obtener_clase_bateria(valor):
 def construir_datos_grafico_dia(registros, fecha_objetivo=None):
     """
     Prepara datos para el gráfico del día actual.
-    Todavía no dibuja el gráfico, solo arma la data.
+
+    El gráfico se ajusta automáticamente:
+    - empieza en la primera marca real de batería mayor a 0
+    - termina en la última marca real de batería mayor a 0
+    - la curva esperada parte desde esa primera batería real
+    - la curva esperada baja 4 puntos porcentuales por cada media hora
     """
 
     if fecha_objetivo is None:
         fecha_objetivo = timezone.localdate()
 
-    columnas_horas = generar_columnas_media_hora()
+    columnas_horas = generar_columnas_media_hora("00:00", "23:30")
 
     registros_por_fecha = {}
 
@@ -269,7 +269,8 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
 
     datos = []
 
-    for indice, hora_texto in enumerate(columnas_horas):
+    # Armamos todos los puntos reales del día
+    for hora_texto in columnas_horas:
         registro_cercano = obtener_registro_mas_cercano(
             registros_por_fecha=registros_por_fecha,
             fecha=fecha_objetivo,
@@ -285,15 +286,42 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
             except ValueError:
                 bateria_real = None
 
-        bateria_esperada = max(100 - indice * 4, 0)
-
         datos.append({
             "hora": hora_texto,
             "bateria_real": bateria_real,
-            "bateria_esperada": bateria_esperada,
+            "bateria_esperada": None,
         })
 
-    return datos
+    # Buscar primera y última marca real válida mayor a 0
+    indices_validos = []
+
+    for indice, punto in enumerate(datos):
+        bateria_real = punto["bateria_real"]
+
+        if bateria_real is not None and bateria_real > 0:
+            indices_validos.append(indice)
+
+    # Si no hay datos válidos, no graficamos nada
+    if not indices_validos:
+        return []
+
+    indice_inicio = indices_validos[0]
+    indice_fin = indices_validos[-1]
+
+    bateria_inicio = datos[indice_inicio]["bateria_real"]
+
+    # Calcular curva esperada desde la primera marca real
+    for indice in range(indice_inicio, indice_fin + 1):
+        bloques_transcurridos = indice - indice_inicio
+        datos[indice]["bateria_esperada"] = max(
+            bateria_inicio - bloques_transcurridos * 4,
+            0
+        )
+
+    # Recortar el gráfico para mostrar solo donde hay datos del día
+    datos_recortados = datos[indice_inicio:indice_fin + 1]
+
+    return datos_recortados
 
 def panel_baterias(request):
     amid = request.GET.get("amid", "").strip()
