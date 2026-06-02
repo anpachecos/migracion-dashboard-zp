@@ -90,6 +90,10 @@
                             {% endif %}
                         </strong>
                     </div>
+                    <div class="gps-dato">
+                        <span>Registros GPS del día</span>
+                        <strong>{{ ubicaciones_gps|length }}</strong>
+                    </div>
                 </div>
 
             {% else %}
@@ -116,6 +120,7 @@
 {{ latitud|json_script:"gps-latitud" }}
 {{ longitud|json_script:"gps-longitud" }}
 {{ amid|json_script:"gps-amid" }}
+{{ ubicaciones_gps|json_script:"gps-ubicaciones" }}
 
 {% endblock %}
 
