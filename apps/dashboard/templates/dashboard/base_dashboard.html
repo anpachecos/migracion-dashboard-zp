@@ -1,0 +1,54 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Dashboard Zonas Pagas{% endblock %}</title>
+
+    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+<div class="dashboard-layout">
+
+    <main class="dashboard-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <aside class="dashboard-sidebar">
+        <div class="sidebar-brand">
+            <h2>Dashboard ZP</h2>
+            <p>Validadores MK 2.0</p>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="{% url 'dashboard:panel_baterias' %}" class="sidebar-link {% if active_page == 'baterias' %}active{% endif %}">
+                Baterías
+            </a>
+
+            <a href="{% url 'dashboard:panel_gps' %}" class="sidebar-link {% if active_page == 'gps' %}active{% endif %}">
+                Ubicación GPS
+            </a>
+
+            <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}">
+                Alertas
+            </a>
+
+            <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}">
+                Perfil
+            </a>
+        </nav>
+    </aside>
+
+</div>
+
+<script src="{% static 'dashboard/js/base_dashboard.js' %}"></script>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Ubicación GPS | Dashboard ZP{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="panel-gps">
+    <header class="panel-header">
+        <h1>Ubicación GPS</h1>
+        <p>Busca un AMID para revisar su última ubicación registrada.</p>
+    </header>
+
+    <div class="placeholder-card">
+        <p>Próximamente: buscador por AMID, coordenadas, estado GPS y mapa.</p>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'dashboard/js/panel_gps.js' %}"></script>
+{% endblock %}

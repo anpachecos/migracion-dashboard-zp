@@ -1,14 +1,13 @@
+{% extends 'dashboard/base_dashboard.html' %}
 {% load static %}
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Panel de baterías</title>
+{% block title %}Baterías | Dashboard ZP{% endblock %}
 
-    <link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}">
-</head>
-<body>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}">
+{% endblock %}
+
+{% block content %}
 
 <div class="contenedor">
 
@@ -242,8 +241,9 @@
 {{ datos_grafico_dia|json_script:"datos-grafico-dia" }}
 {{ datos_grafico_periodo|json_script:"datos-grafico-periodo" }}
 
+{% endblock %}
+
+{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'dashboard/js/panel_baterias.js' %}"></script>
-
-</body>
-</html>
+{% endblock %}

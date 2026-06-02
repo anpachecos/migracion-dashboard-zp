@@ -1,0 +1,27 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Alertas | Dashboard ZP{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="panel-alertas">
+    <header class="panel-header">
+        <h1>Alertas</h1>
+        <p>Validadores que requieren revisión o seguimiento.</p>
+    </header>
+
+    <div class="placeholder-card">
+        <p>Próximamente: validadores con batería baja, sin GPS o sin actualización reciente.</p>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'dashboard/js/panel_alertas.js' %}"></script>
+{% endblock %}

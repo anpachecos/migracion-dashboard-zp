@@ -3,6 +3,24 @@ from django.shortcuts import render
 from django.utils import timezone
 from .models import EstadoValidadorLimpio
 
+from django.shortcuts import render
+
+def panel_gps(request):
+    return render(request, "dashboard/panel_gps.html", {
+        "active_page": "gps"
+    })
+
+def panel_alertas(request):
+    return render(request, "dashboard/panel_alertas.html", {
+        "active_page": "alertas"
+    })
+
+def panel_perfil(request):
+    return render(request, "dashboard/panel_perfil.html", {
+        "active_page": "perfil"
+    })
+
+
 
 def generar_columnas_media_hora(hora_inicio="00:00", hora_fin="23:30"):
     """

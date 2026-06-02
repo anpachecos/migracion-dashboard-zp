@@ -1,0 +1,27 @@
+{% extends 'dashboard/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Perfil | Dashboard ZP{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<section class="panel-perfil">
+    <header class="panel-header">
+        <h1>Perfil</h1>
+        <p>Configuración del usuario y futuras opciones administrativas.</p>
+    </header>
+
+    <div class="placeholder-card">
+        <p>Próximamente: cambio de contraseña, datos del usuario y opciones administrativas.</p>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'dashboard/js/panel_perfil.js' %}"></script>
+{% endblock %}
