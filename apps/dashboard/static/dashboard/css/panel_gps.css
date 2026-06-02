@@ -1,0 +1,129 @@
+.panel-gps {
+    width: 100%;
+}
+
+.gps-layout {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    gap: 24px;
+    min-height: calc(100vh - 150px);
+}
+
+.gps-panel-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.gps-formulario,
+.gps-card,
+.gps-mensaje {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.gps-formulario label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.gps-buscador {
+    display: flex;
+    gap: 8px;
+}
+
+.gps-buscador input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.gps-buscador button {
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gps-buscador button:hover {
+    background: #1d4ed8;
+}
+
+.gps-mensaje {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+}
+
+.gps-card h2 {
+    margin: 0 0 16px;
+    font-size: 20px;
+    color: #111827;
+}
+
+.gps-dato {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.gps-dato:last-child {
+    border-bottom: none;
+}
+
+.gps-dato span {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.gps-dato strong {
+    font-size: 15px;
+    color: #111827;
+    word-break: break-word;
+}
+
+.gps-card-vacia p {
+    margin: 0;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.gps-panel-mapa {
+    background: #ffffff;
+    padding: 12px;
+    border-radius: 18px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    min-height: 600px;
+}
+
+#mapa-gps {
+    width: 100%;
+    height: 100%;
+    min-height: 600px;
+    border-radius: 14px;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+    .gps-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .gps-panel-mapa,
+    #mapa-gps {
+        min-height: 420px;
+    }
+}

@@ -4,24 +4,122 @@
 {% block title %}Ubicación GPS | Dashboard ZP{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}">
 {% endblock %}
 
 {% block content %}
 
 <section class="panel-gps">
+
     <header class="panel-header">
         <h1>Ubicación GPS</h1>
-        <p>Busca un AMID para revisar su última ubicación registrada.</p>
+        <p>
+            Busca un AMID para revisar la última ubicación GPS registrada por el validador.
+        </p>
     </header>
 
-    <div class="placeholder-card">
-        <p>Próximamente: buscador por AMID, coordenadas, estado GPS y mapa.</p>
+    <div class="gps-layout">
+
+        <aside class="gps-panel-datos">
+
+            <form method="get" class="gps-formulario">
+
+                <label for="amid">Buscar AMID</label>
+
+                <div class="gps-buscador">
+                    <input 
+                        type="text" 
+                        id="amid" 
+                        name="amid" 
+                        value="{{ amid }}" 
+                        placeholder="Ej: 7500123"
+                    >
+
+                    <button type="submit">
+                        Buscar
+                    </button>
+                </div>
+
+            </form>
+
+            {% if mensaje %}
+                <div class="gps-mensaje">
+                    {{ mensaje }}
+                </div>
+            {% endif %}
+
+            {% if ultimo_registro %}
+
+                <div class="gps-card">
+                    <h2>Última ubicación</h2>
+
+                    <div class="gps-dato">
+                        <span>AMID</span>
+                        <strong>{{ ultimo_registro.amid }}</strong>
+                    </div>
+
+                    <div class="gps-dato">
+                        <span>Latitud</span>
+                        <strong>{{ ultimo_registro.latitud }}</strong>
+                    </div>
+
+                    <div class="gps-dato">
+                        <span>Longitud</span>
+                        <strong>{{ ultimo_registro.longitud }}</strong>
+                    </div>
+
+                    <div class="gps-dato">
+                        <span>Fecha última notificación</span>
+                        <strong>
+                            {% if ultimo_registro.fecha_hora %}
+                                {{ ultimo_registro.fecha_hora|date:"d-m-Y H:i" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </strong>
+                    </div>
+
+                    <div class="gps-dato">
+                        <span>Batería</span>
+                        <strong>
+                            {% if ultimo_registro.porcentaje_bateria %}
+                                {{ ultimo_registro.porcentaje_bateria }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+
+            {% else %}
+
+                <div class="gps-card gps-card-vacia">
+                    <h2>Sin búsqueda activa</h2>
+                    <p>
+                        Ingresa un AMID para mostrar su última coordenada GPS en el mapa.
+                    </p>
+                </div>
+
+            {% endif %}
+
+        </aside>
+
+        <section class="gps-panel-mapa">
+            <div id="mapa-gps"></div>
+        </section>
+
     </div>
+
 </section>
+
+{{ latitud|json_script:"gps-latitud" }}
+{{ longitud|json_script:"gps-longitud" }}
+{{ amid|json_script:"gps-amid" }}
 
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{% static 'dashboard/js/panel_gps.js' %}"></script>
 {% endblock %}
