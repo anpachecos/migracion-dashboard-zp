@@ -411,13 +411,10 @@ def construir_datos_grafico_periodo(tabla_bateria):
     """
     Construye datos para graficar la evolución de batería
     en el período seleccionado.
-    Usa la misma tabla ya calculada, por lo tanto respeta filtros de días y horas.
     """
 
     datos = []
 
-    # La tabla viene desde hoy hacia atrás.
-    # Para el gráfico conviene mostrar desde el día más antiguo al más reciente.
     tabla_ordenada = list(reversed(tabla_bateria))
 
     for fila in tabla_ordenada:
@@ -435,8 +432,53 @@ def construir_datos_grafico_periodo(tabla_bateria):
                     bateria_real = None
 
             datos.append({
+                "fecha": fecha,
+                "hora": celda["hora"],
                 "momento": f"{fecha} {celda['hora']}",
                 "bateria_real": bateria_real,
             })
+
+    return datos
+    """
+    Construye datos para graficar la evolución de batería
+    en el período seleccionado.
+    
+    Agrega los valores por día (promedio) para mostrar
+    una vista resumida por cada día en el eje X.
+    """
+
+    datos_por_dia = {}
+
+    # La tabla viene desde hoy hacia atrás.
+    # Para el gráfico conviene mostrar desde el día más antiguo al más reciente.
+    tabla_ordenada = list(reversed(tabla_bateria))
+
+    # Agrupa los valores por fecha y calcula el promedio
+    for fila in tabla_ordenada:
+        fecha = fila["fecha"]
+
+        valores_del_dia = []
+        for celda in fila["valores"]:
+            valor = celda["valor"]
+
+            if valor != "" and valor is not None:
+                try:
+                    valores_del_dia.append(float(valor))
+                except ValueError:
+                    pass
+
+        if valores_del_dia:
+            promedio = sum(valores_del_dia) / len(valores_del_dia)
+            datos_por_dia[fecha] = promedio
+        else:
+            datos_por_dia[fecha] = None
+
+    # Convierte a lista de datos para el gráfico
+    datos = []
+    for fecha, bateria_promedio in datos_por_dia.items():
+        datos.append({
+            "fecha": fecha,
+            "bateria_real": bateria_promedio,
+        })
 
     return datos

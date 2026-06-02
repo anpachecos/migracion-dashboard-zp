@@ -165,7 +165,12 @@ function crearGraficoBateriaPeriodo() {
         return;
     }
 
-    const labels = datos.map(item => item.momento);
+    /*
+        IMPORTANTE:
+        Usamos índices numéricos como labels.
+        Así el eje X no recibe textos largos tipo "31-05-2026 00:00".
+    */
+    const labels = datos.map((item, index) => index);
     const bateriaReal = datos.map(item => item.bateria_real);
 
     new Chart(canvas, {
@@ -178,7 +183,8 @@ function crearGraficoBateriaPeriodo() {
                     data: bateriaReal,
                     tension: 0.25,
                     spanGaps: true,
-                    pointRadius: 2
+                    pointRadius: 1,
+                    pointHoverRadius: 5
                 }
             ]
         },
@@ -195,6 +201,16 @@ function crearGraficoBateriaPeriodo() {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function (tooltipItems) {
+                            const index = tooltipItems[0].dataIndex;
+                            const punto = datos[index];
+
+                            if (!punto) {
+                                return "";
+                            }
+
+                            return punto.fecha + " " + punto.hora;
+                        },
                         label: function (context) {
                             const valor = context.parsed.y;
 
@@ -219,13 +235,38 @@ function crearGraficoBateriaPeriodo() {
                 x: {
                     title: {
                         display: true,
-                        text: "Fecha y hora"
+                        text: "Día"
                     },
                     ticks: {
-                        autoSkip: true,
-                        maxTicksLimit: 12,
+                        autoSkip: false,
                         maxRotation: 45,
-                        minRotation: 45
+                        minRotation: 45,
+                        callback: function (value, index) {
+                            const puntoActual = datos[index];
+
+                            if (!puntoActual) {
+                                return "";
+                            }
+
+                            if (index === 0) {
+                                return puntoActual.fecha;
+                            }
+
+                            const puntoAnterior = datos[index - 1];
+
+                            if (!puntoAnterior) {
+                                return puntoActual.fecha;
+                            }
+
+                            if (puntoActual.fecha !== puntoAnterior.fecha) {
+                                return puntoActual.fecha;
+                            }
+
+                            return "";
+                        }
+                    },
+                    grid: {
+                        display: false
                     }
                 }
             }
