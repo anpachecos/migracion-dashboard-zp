@@ -295,7 +295,6 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
 
     return datos
 
-
 def panel_baterias(request):
     amid = request.GET.get("amid", "").strip()
 
@@ -328,6 +327,7 @@ def panel_baterias(request):
     datos_grafico_dia = []
     mensaje = ""
     horario_sugerido_aplicado = False
+    datos_grafico_periodo = []
 
     if amid:
         fecha_inicio = timezone.now() - timedelta(days=dias)
@@ -354,7 +354,8 @@ def panel_baterias(request):
                 hora_inicio=hora_inicio,
                 hora_fin=hora_fin
             )
-
+            
+            datos_grafico_periodo = construir_datos_grafico_periodo(tabla_bateria)
             datos_grafico_dia = construir_datos_grafico_dia(registros)
 
         else:
@@ -371,6 +372,43 @@ def panel_baterias(request):
         "datos_grafico_dia": datos_grafico_dia,
         "mensaje": mensaje,
         "horario_sugerido_aplicado": horario_sugerido_aplicado,
+        "datos_grafico_periodo": datos_grafico_periodo,
+        "datos_grafico_dia": datos_grafico_dia,
+
     }
 
     return render(request, "dashboard/panel_baterias.html", context)
+
+def construir_datos_grafico_periodo(tabla_bateria):
+    """
+    Construye datos para graficar la evolución de batería
+    en el período seleccionado.
+    Usa la misma tabla ya calculada, por lo tanto respeta filtros de días y horas.
+    """
+
+    datos = []
+
+    # La tabla viene desde hoy hacia atrás.
+    # Para el gráfico conviene mostrar desde el día más antiguo al más reciente.
+    tabla_ordenada = list(reversed(tabla_bateria))
+
+    for fila in tabla_ordenada:
+        fecha = fila["fecha"]
+
+        for celda in fila["valores"]:
+            valor = celda["valor"]
+
+            if valor == "" or valor is None:
+                bateria_real = None
+            else:
+                try:
+                    bateria_real = float(valor)
+                except ValueError:
+                    bateria_real = None
+
+            datos.append({
+                "momento": f"{fecha} {celda['hora']}",
+                "bateria_real": bateria_real,
+            })
+
+    return datos

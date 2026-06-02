@@ -147,9 +147,23 @@
 
         <section class="seccion">
             <h2>Gráfico batería día actual</h2>
+            <p class="texto-ayuda">
+                Comparación entre la batería registrada y la curva esperada de descarga.
+            </p>
 
-            <div class="placeholder-grafico">
-                Aquí irá el gráfico de batería real vs batería esperada.
+            <div class="contenedor-grafico">
+                <canvas id="grafico-bateria-dia"></canvas>
+            </div>
+        </section>
+
+        <section class="seccion">
+            <h2>Gráfico batería período seleccionado</h2>
+            <p class="texto-ayuda">
+                Evolución de batería según los días y horarios filtrados.
+            </p>
+
+            <div class="contenedor-grafico">
+                <canvas id="grafico-bateria-periodo"></canvas>
             </div>
         </section>
 
@@ -224,6 +238,12 @@
     {% endif %}
 
 </div>
+
+{{ datos_grafico_dia|json_script:"datos-grafico-dia" }}
+{{ datos_grafico_periodo|json_script:"datos-grafico-periodo" }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'dashboard/js/panel_baterias.js' %}"></script>
+
 </body>
 </html>

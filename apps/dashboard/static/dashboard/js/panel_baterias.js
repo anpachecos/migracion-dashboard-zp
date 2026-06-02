@@ -1,4 +1,12 @@
+console.log("✅ panel_baterias.js cargado correctamente");
+
 document.addEventListener("DOMContentLoaded", function () {
+    configurarFiltrosAutomaticos();
+    crearGraficoBateriaDia();
+    crearGraficoBateriaPeriodo();
+});
+
+function configurarFiltrosAutomaticos() {
     const form = document.getElementById("form-filtros-bateria");
 
     const filtroDias = document.getElementById("dias");
@@ -24,4 +32,203 @@ document.addEventListener("DOMContentLoaded", function () {
     if (filtroHoraFin) {
         filtroHoraFin.addEventListener("change", enviarFormularioAutomatico);
     }
-});
+}
+
+function obtenerDatosJsonScript(id) {
+    const elemento = document.getElementById(id);
+
+    if (!elemento) {
+        console.warn("No se encontró el script JSON:", id);
+        return [];
+    }
+
+    try {
+        return JSON.parse(elemento.textContent);
+    } catch (error) {
+        console.error("Error leyendo datos del gráfico:", error);
+        return [];
+    }
+}
+
+function crearGraficoBateriaDia() {
+    const canvas = document.getElementById("grafico-bateria-dia");
+
+    if (!canvas) {
+        console.warn("No se encontró el canvas grafico-bateria-dia");
+        return;
+    }
+
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js no está cargado.");
+        return;
+    }
+
+    const datos = obtenerDatosJsonScript("datos-grafico-dia");
+    console.log("Datos gráfico día:", datos);
+
+    if (!datos || datos.length === 0) {
+        return;
+    }
+
+    const labels = datos.map(item => item.hora);
+    const bateriaReal = datos.map(item => item.bateria_real);
+    const bateriaEsperada = datos.map(item => item.bateria_esperada);
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Batería real",
+                    data: bateriaReal,
+                    tension: 0.3,
+                    spanGaps: true
+                },
+                {
+                    label: "Batería esperada",
+                    data: bateriaEsperada,
+                    tension: 0.3,
+                    borderDash: [6, 6],
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: "bottom"
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const valor = context.parsed.y;
+
+                            if (valor === null || valor === undefined) {
+                                return context.dataset.label + ": sin dato";
+                            }
+
+                            return context.dataset.label + ": " + valor + "%";
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: "Batería (%)"
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: "Hora"
+                    },
+                    ticks: {
+                        maxRotation: 60,
+                        minRotation: 60,
+                        autoSkip: true,
+                        maxTicksLimit: 16
+                    }
+                }
+            }
+        }
+    });
+}
+
+function crearGraficoBateriaPeriodo() {
+    const canvas = document.getElementById("grafico-bateria-periodo");
+
+    if (!canvas) {
+        console.warn("No se encontró el canvas grafico-bateria-periodo");
+        return;
+    }
+
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js no está cargado.");
+        return;
+    }
+
+    const datos = obtenerDatosJsonScript("datos-grafico-periodo");
+    console.log("Datos gráfico período:", datos);
+
+    if (!datos || datos.length === 0) {
+        return;
+    }
+
+    const labels = datos.map(item => item.momento);
+    const bateriaReal = datos.map(item => item.bateria_real);
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Batería real",
+                    data: bateriaReal,
+                    tension: 0.25,
+                    spanGaps: true,
+                    pointRadius: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: "bottom"
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const valor = context.parsed.y;
+
+                            if (valor === null || valor === undefined) {
+                                return "Batería real: sin dato";
+                            }
+
+                            return "Batería real: " + valor + "%";
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: "Batería (%)"
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: "Fecha y hora"
+                    },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+}
