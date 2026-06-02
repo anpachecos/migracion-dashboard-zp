@@ -115,6 +115,55 @@
     min-height: 600px;
     border-radius: 14px;
 }
+.gps-filtro-dias {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gps-filtro-label {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.gps-botones-dias {
+    display: flex;
+    gap: 6px;
+}
+
+.gps-btn-dia {
+    width: 36px;
+    height: 32px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.gps-btn-dia:hover {
+    background: #f9fafb;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.gps-btn-dia.activo {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+}
 
 /* Responsive */
 @media (max-width: 1000px) {

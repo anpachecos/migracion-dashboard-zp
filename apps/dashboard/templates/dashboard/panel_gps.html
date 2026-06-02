@@ -40,7 +40,47 @@
                         Buscar
                     </button>
                 </div>
+                <div class="gps-filtro-dias">
+                    <span class="gps-filtro-label">Días</span>
 
+                    <div class="gps-botones-dias">
+                        <button 
+                            type="submit" 
+                            name="dias" 
+                            value="1"
+                            class="gps-btn-dia {% if dias == 1 %}activo{% endif %}"
+                        >
+                            1
+                        </button>
+
+                        <button 
+                            type="submit" 
+                            name="dias" 
+                            value="3"
+                            class="gps-btn-dia {% if dias == 3 %}activo{% endif %}"
+                        >
+                            3
+                        </button>
+
+                        <button 
+                            type="submit" 
+                            name="dias" 
+                            value="7"
+                            class="gps-btn-dia {% if dias == 7 %}activo{% endif %}"
+                        >
+                            7
+                        </button>
+
+                        <button 
+                            type="submit" 
+                            name="dias" 
+                            value="14"
+                            class="gps-btn-dia {% if dias == 14 %}activo{% endif %}"
+                        >
+                            14
+                        </button>
+                    </div>
+                </div>
             </form>
 
             {% if mensaje %}
@@ -91,7 +131,14 @@
                         </strong>
                     </div>
                     <div class="gps-dato">
-                        <span>Registros GPS del día</span>
+                        <span>Período consultado</span>
+                        <strong>
+                            Últimos {{ dias }} día{% if dias != 1 %}s{% endif %}
+                        </strong>
+                    </div>
+
+                    <div class="gps-dato">
+                        <span>Registros GPS encontrados</span>
                         <strong>{{ ubicaciones_gps|length }}</strong>
                     </div>
                 </div>
