@@ -3,6 +3,11 @@ from django.utils import timezone
 from ..models import EstadoValidadorLimpio, UbicacionEsperadaValidador
 import math
 
+LATITUD_LABORATORIO_ZP = -33.437191
+LONGITUD_LABORATORIO_ZP = -70.656102
+RADIO_LABORATORIO_ZP = 70
+NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
+
 def calcular_distancia_metros(lat1, lon1, lat2, lon2):
     radio_tierra = 6371000
 
@@ -74,31 +79,47 @@ def obtener_contexto_gps(request):
             ultimo_registro = registros.last()
 
             # Solo validamos ubicación esperada cuando el filtro es "Hoy"
-            if dias == 1:
-                parada_esperada = (
-                    UbicacionEsperadaValidador.objects
-                    .filter(amid=amid, operativa=True)
-                    .first()
-                )
+        if dias == 1:
+            parada_esperada = (
+                UbicacionEsperadaValidador.objects
+                .filter(amid=amid)
+                .first()
+            )
 
-                if parada_esperada:
-                    distancia = calcular_distancia_metros(
-                        latitud,
-                        longitud,
-                        parada_esperada.latitud_esperada,
-                        parada_esperada.longitud_esperada,
-                    )
+            if parada_esperada:
+                nombre_esperado = parada_esperada.nombre
+                latitud_esperada = parada_esperada.latitud_esperada
+                longitud_esperada = parada_esperada.longitud_esperada
+                radio_metros = parada_esperada.radio_metros
+                operativa = parada_esperada.operativa
+                origen_ubicacion = "excel"
+            else:
+                nombre_esperado = NOMBRE_LABORATORIO_ZP
+                latitud_esperada = LATITUD_LABORATORIO_ZP
+                longitud_esperada = LONGITUD_LABORATORIO_ZP
+                radio_metros = RADIO_LABORATORIO_ZP
+                operativa = False
+                origen_ubicacion = "laboratorio_default"
 
-                    dentro_radio = distancia <= parada_esperada.radio_metros
+            distancia = calcular_distancia_metros(
+                latitud,
+                longitud,
+                latitud_esperada,
+                longitud_esperada,
+            )
 
-                    ubicacion_esperada = {
-                        "nombre": parada_esperada.nombre,
-                        "latitud": parada_esperada.latitud_esperada,
-                        "longitud": parada_esperada.longitud_esperada,
-                        "radio_metros": parada_esperada.radio_metros,
-                        "distancia_metros": round(distancia, 2),
-                        "dentro_radio": dentro_radio,
-                    }
+            dentro_radio = distancia <= radio_metros
+
+            ubicacion_esperada = {
+                "nombre": nombre_esperado,
+                "latitud": latitud_esperada,
+                "longitud": longitud_esperada,
+                "radio_metros": radio_metros,
+                "distancia_metros": round(distancia, 2),
+                "dentro_radio": dentro_radio,
+                "operativa": operativa,
+                "origen_ubicacion": origen_ubicacion,
+            }
         else:
             mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el período seleccionado."
 

@@ -165,6 +165,25 @@
     color: #ffffff;
 }
 
+.gps-separador {
+    margin: 18px 0;
+    border-top: 1px solid #e5e7eb;
+}
+
+.gps-subtitulo {
+    margin: 0 0 10px;
+    font-size: 18px;
+    color: #111827;
+}
+
+.gps-estado-ok {
+    color: #15803d;
+}
+
+.gps-estado-alerta {
+    color: #dc2626;
+}
+
 /* Responsive */
 @media (max-width: 1000px) {
     .gps-layout {

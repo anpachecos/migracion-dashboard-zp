@@ -145,6 +145,53 @@
                         <span>Registros GPS encontrados</span>
                         <strong>{{ ubicaciones_gps|length }}</strong>
                     </div>
+                    {% if ubicacion_esperada %}
+                        <div class="gps-separador"></div>
+
+                        <h2 class="gps-subtitulo">Ubicación esperada</h2>
+
+                        <div class="gps-dato">
+                            <span>Lugar esperado</span>
+                            <strong>{{ ubicacion_esperada.nombre }}</strong>
+                        </div>
+                            {% if ubicacion_esperada.origen_ubicacion == "laboratorio_default" %}
+                                <div class="gps-dato">
+                                    <span>Origen ubicación esperada</span>
+                                    <strong>Laboratorio por defecto</strong>
+                                </div>
+                            {% endif %}
+                        <div class="gps-dato">
+                            <span>Estado operativo</span>
+                            <strong>
+                                {% if ubicacion_esperada.operativa %}
+                                    Operativo
+                                {% else %}
+                                    No operativo
+                                {% endif %}
+                            </strong>
+                        </div>
+
+                        <div class="gps-dato">
+                            <span>Radio esperado</span>
+                            <strong>{{ ubicacion_esperada.radio_metros }} m</strong>
+                        </div>
+
+                        <div class="gps-dato">
+                            <span>Distancia al punto esperado</span>
+                            <strong>{{ ubicacion_esperada.distancia_metros }} m</strong>
+                        </div>
+
+                        <div class="gps-dato">
+                            <span>Validación ubicación</span>
+                            <strong class="{% if ubicacion_esperada.dentro_radio %}gps-estado-ok{% else %}gps-estado-alerta{% endif %}">
+                                {% if ubicacion_esperada.dentro_radio %}
+                                    Dentro del radio
+                                {% else %}
+                                    Fuera del radio
+                                {% endif %}
+                            </strong>
+                        </div>
+                    {% endif %}
                 </div>
 
             {% else %}

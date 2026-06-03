@@ -5,6 +5,10 @@ from django.utils import timezone
 
 from apps.dashboard.models import UbicacionEsperadaValidador
 
+LATITUD_LABORATORIO_ZP = -33.437191
+LONGITUD_LABORATORIO_ZP = -70.656102
+RADIO_LABORATORIO_ZP = 150
+NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
 
 class Command(BaseCommand):
     help = "Importa ubicaciones esperadas de validadores desde Excel de Zonas Pagas."
@@ -41,7 +45,6 @@ class Command(BaseCommand):
             )
             return
 
-        df = df[df["Operativa"].astype(str).str.upper().str.strip() == "SI"]
 
         creados = 0
         actualizados = 0
@@ -50,22 +53,37 @@ class Command(BaseCommand):
         amids_excel = set()
 
         for _, fila in df.iterrows():
+            operativa_texto = str(fila["Operativa"]).strip().upper()
+            if operativa_texto not in ["SI", "NO"]:
+                omitidos += 1
+                continue
+
             try:
                 amid = str(int(fila["IDDS"])).strip()
             except (ValueError, TypeError):
                 omitidos += 1
                 continue
 
-            try:
-                latitud = float(fila["Latitud"])
-                longitud = float(fila["Longitud"])
-                radio = float(fila["Radio"])
-            except (ValueError, TypeError):
-                omitidos += 1
-                continue
-
-            nombre = str(fila["Nombre"]).strip() if pd.notna(fila["Nombre"]) else ""
             serie_validador = str(fila["Serie Val."]).strip() if pd.notna(fila["Serie Val."]) else ""
+
+            if operativa_texto == "SI":
+                try:
+                    latitud = float(fila["Latitud"])
+                    longitud = float(fila["Longitud"])
+                    radio = float(fila["Radio"])
+                except (ValueError, TypeError):
+                    omitidos += 1
+                    continue
+
+                nombre = str(fila["Nombre"]).strip() if pd.notna(fila["Nombre"]) else ""
+                operativa = True
+
+            else:
+                latitud = LATITUD_LABORATORIO_ZP
+                longitud = LONGITUD_LABORATORIO_ZP
+                radio = RADIO_LABORATORIO_ZP
+                nombre = NOMBRE_LABORATORIO_ZP
+                operativa = False
 
             objeto, creado = UbicacionEsperadaValidador.objects.update_or_create(
                 amid=amid,
@@ -75,7 +93,7 @@ class Command(BaseCommand):
                     "latitud_esperada": latitud,
                     "longitud_esperada": longitud,
                     "radio_metros": radio,
-                    "operativa": True,
+                    "operativa": operativa,
                     "fecha_carga": timezone.now(),
                 }
             )
