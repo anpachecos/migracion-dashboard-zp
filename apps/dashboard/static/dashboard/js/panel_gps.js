@@ -25,6 +25,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const mapa = L.map("mapa-gps").setView(centroInicial, zoomInicial);
 
+    const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
+    const ubicacionEsperada = ubicacionEsperadaElemento
+        ? JSON.parse(ubicacionEsperadaElemento.textContent)
+        : null;
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
@@ -87,5 +92,31 @@ document.addEventListener("DOMContentLoaded", function () {
             padding: [40, 40],
             maxZoom: 17,
         });
+    }
+
+    if (ubicacionEsperada) {
+        L.circle([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
+            radius: ubicacionEsperada.radio_metros,
+            color: ubicacionEsperada.dentro_radio ? "#2563eb" : "#dc2626",
+            fillColor: ubicacionEsperada.dentro_radio ? "#2563eb" : "#dc2626",
+            fillOpacity: 0.12,
+            weight: 2,
+        }).addTo(mapa);
+
+        L.circleMarker([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
+            radius: 6,
+            color: "#111827",
+            fillColor: "#ffffff",
+            fillOpacity: 1,
+            weight: 2,
+        })
+            .addTo(mapa)
+            .bindPopup(`
+                <strong>Ubicación esperada</strong><br>
+                ${ubicacionEsperada.nombre || "-"}<br>
+                Radio: ${ubicacionEsperada.radio_metros} m<br>
+                Distancia al GPS real: ${ubicacionEsperada.distancia_metros} m<br>
+                Estado: ${ubicacionEsperada.dentro_radio ? "Dentro del radio" : "Fuera del radio"}
+            `);
     }
 });

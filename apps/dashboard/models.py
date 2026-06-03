@@ -181,3 +181,24 @@ class EstadoValidadorLimpio(models.Model):
 
     def __str__(self):
         return f"LIMPIO {self.amid} - {self.fecha_hora}"
+    
+class UbicacionEsperadaValidador(models.Model):
+    amid = models.CharField(max_length=20, unique=True)
+
+    nombre = models.CharField(max_length=255, blank=True, null=True)
+    serie_validador = models.CharField(max_length=100, blank=True, null=True)
+
+    latitud_esperada = models.FloatField(blank=True, null=True)
+    longitud_esperada = models.FloatField(blank=True, null=True)
+    radio_metros = models.FloatField(blank=True, null=True)
+
+    operativa = models.BooleanField(default=True)
+
+    fecha_carga = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ubicación esperada de validador"
+        verbose_name_plural = "Ubicaciones esperadas de validadores"
+
+    def __str__(self):
+        return f"{self.amid} - {self.nombre}"
