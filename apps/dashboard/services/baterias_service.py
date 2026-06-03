@@ -245,7 +245,7 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
     for indice in range(indice_inicio, indice_fin + 1):
         bloques_transcurridos = indice - indice_inicio
         datos[indice]["bateria_esperada"] = max(
-            bateria_inicio - bloques_transcurridos * 4,
+            bateria_inicio - bloques_transcurridos * 3,
             0
         )
 

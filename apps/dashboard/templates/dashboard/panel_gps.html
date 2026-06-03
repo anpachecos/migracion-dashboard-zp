@@ -133,7 +133,11 @@
                     <div class="gps-dato">
                         <span>Período consultado</span>
                         <strong>
-                            Últimos {{ dias }} día{% if dias != 1 %}s{% endif %}
+                            {% if dias == 1 %}
+                                Hoy
+                            {% else %}
+                                Últimos {{ dias }} días
+                            {% endif %}
                         </strong>
                     </div>
 

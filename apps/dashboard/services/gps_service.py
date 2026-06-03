@@ -24,13 +24,13 @@ def obtener_contexto_gps(request):
     ubicaciones_gps = []
 
     if amid:
-        fecha_inicio = timezone.now() - timedelta(days=dias)
+        fecha_inicio = timezone.localdate() - timedelta(days=dias - 1)
 
         registros = (
             EstadoValidadorLimpio.objects
             .filter(
                 amid=amid,
-                fecha_hora__gte=fecha_inicio,
+                fecha_hora__date__gte=fecha_inicio,
             )
             .exclude(latitud__isnull=True)
             .exclude(longitud__isnull=True)
