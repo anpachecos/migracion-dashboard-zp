@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=1">
+
 {% endblock %}
 
 {% block content %}
@@ -89,6 +90,26 @@
                     </a>
                 {% endif %}
             </div>
+
+            <div class="grupo-filtro boton-filtro boton-exportar">
+                {% if amid %}
+                    <a 
+                        class="btn-exportar" 
+                        href="{% url 'dashboard:exportar_baterias_excel' %}?amid={{ amid }}&dias={{ dias }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
+                        title="Exporta a Excel la tabla y los registros completos del AMID consultado."
+                    >
+                        Exportar Excel
+                    </a>
+                {% else %}
+                    <a 
+                        class="btn-exportar btn-deshabilitado" 
+                        href="#"
+                        title="Busca un AMID antes de exportar."
+                    >
+                        Exportar Excel
+                    </a>
+                {% endif %}
+            </div>
         </form>
     </section>
 
@@ -144,6 +165,16 @@
                 </div>
             </article>
 
+            <article class="tarjeta {{ clase_alertas_periodo }}">
+                <div class="titulo">Alertas período</div>
+                <div class="valor">
+                    {{ total_caidas_drasticas }}
+                </div>
+                <div class="detalle-tarjeta">
+                    caída{% if total_caidas_drasticas != 1 %}s{% endif %} drástica{% if total_caidas_drasticas != 1 %}s{% endif %}
+                </div>
+            </article>
+
             <article class="tarjeta">
                 <div class="titulo">Identificación</div>
                 <div class="detalle-identificacion">
@@ -165,18 +196,10 @@
                 </div>
             </article>
 
-            <article class="tarjeta {{ clase_alertas_periodo }}">
-                <div class="titulo">Alertas período</div>
-                <div class="valor">
-                    {{ total_caidas_drasticas }}
-                </div>
-                <div class="detalle-tarjeta">
-                    caída{% if total_caidas_drasticas != 1 %}s{% endif %} drástica{% if total_caidas_drasticas != 1 %}s{% endif %}
-                </div>
-            </article>
+            
 
         </section>
-
+        <!-- Alertas / ver como hacer que se oculte si no hay alertas-->
         <section class="seccion bloque-alertas">
             {% if total_caidas_drasticas > 0 %}
                 <h2>Alertas del período</h2>
@@ -199,6 +222,7 @@
                 </p>
             {% endif %}
         </section>
+        
         <!-- Tabla batería por media hora -->
         <section class="seccion">
             <div class="titulo-tabla">
@@ -210,7 +234,7 @@
                     </p>
                 </div>
             </div>
-
+            <!-- Buscar como hacer fuente más grande-->
             <div class="tabla-scroll">
                 <table class="tabla-bateria">
                     <thead>

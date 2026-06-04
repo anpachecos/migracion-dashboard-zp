@@ -421,7 +421,7 @@ body {
     background-color: #f1f3f5;
     z-index: 4;
     font-weight: bold;
-    font-size: 9px;
+    font-size: 10px;
 }
 
 td.col-fecha {
@@ -430,7 +430,7 @@ td.col-fecha {
 
 /* Horas en diagonal para ocupar menos espacio */
 th.hora-diagonal {
-    height: 54px;
+    height: 40px;
     padding: 0;
     vertical-align: bottom;
     position: sticky;
@@ -440,9 +440,9 @@ th.hora-diagonal {
 
 th.hora-diagonal > span {
     display: inline-block;
-    transform: rotate(-65deg);
+    transform: rotate(-45deg);
     transform-origin: left bottom;
-    font-size: 8px;
+    font-size: 10px;
     white-space: nowrap;
     margin-bottom: 6px;
     margin-left: 5px;
@@ -513,6 +513,33 @@ th.hora-diagonal > span {
 .contenedor-grafico canvas {
     width: 100% !important;
     height: 100% !important;
+}
+
+/*Boton Exportar Excel*/
+.btn-exportar {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 7px;
+    border: 1px solid #198754;
+    background-color: #198754;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.btn-exportar:hover {
+    background-color: #157347;
+    border-color: #146c43;
+    transform: translateY(-1px);
 }
 
 
