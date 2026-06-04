@@ -24,6 +24,22 @@
         <div class="sidebar-brand">
             <h2>Dashboard ZP</h2>
             <p>Validadores MK 2.0</p>
+
+            <p class="sidebar-update-line">
+                <span>Última actualización</span>
+                <strong>{{ ultima_actualizacion_dashboard|date:"d-m-Y H:i" }}</strong>
+            </p>
+
+            <p class="sidebar-update-line">
+                <span>Último dato recibido</span>
+                <strong>
+                    {% if ultima_carga_datos %}
+                        {{ ultima_carga_datos|date:"d-m-Y H:i" }}
+                    {% else %}
+                        Sin datos
+                    {% endif %}
+                </strong>
+            </p>
         </div>
 
         <nav class="sidebar-nav">
