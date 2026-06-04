@@ -4,7 +4,7 @@
 {% block title %}Baterías | Dashboard ZP{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=1">
 {% endblock %}
 
 {% block content %}
@@ -189,27 +189,32 @@
                 </table>
             </div>
         </section>
-
-        <!-- Gráfico batería actual-->
+        
+        <!-- Gráfico de Tendencia -->
         <section class="seccion">
-            <h2>Gráfico batería día actual</h2>
-            <p class="texto-ayuda">
-                Comparación entre la batería registrada y la curva esperada de descarga.
-            </p>
+            <div class="titulo-tabla">
+                <div>
+                    <h2>Análisis gráfico de batería</h2>
 
-            <div class="contenedor-grafico">
-                <canvas id="grafico-bateria-dia"></canvas>
+                    {% if dias == 1 %}
+                        <p class="texto-ayuda">
+                            Evolución del día seleccionado con comparación entre batería real y curva esperada.
+                        </p>
+                    {% else %}
+                        <p class="texto-ayuda">
+                            Evolución de batería del período seleccionado. El eje X muestra los días y el detalle de hora aparece al pasar el mouse.
+                        </p>
+                    {% endif %}
+                </div>
             </div>
-        </section>
-        <!-- Gráfico batería período seleccionado-->
-        <section class="seccion">
-            <h2>Gráfico batería período seleccionado</h2>
-            <p class="texto-ayuda">
-                Evolución de batería según los días y horarios filtrados.
-            </p>
 
-            <div class="contenedor-grafico">
-                <canvas id="grafico-bateria-periodo"></canvas>
+            <div class="grafico-card grafico-card-principal">
+                <div class="contenedor-grafico">
+                    <canvas 
+                        id="grafico-bateria-principal"
+                        data-dias="{{ dias }}"
+                    ></canvas>
+                </div>
             </div>
         </section>
 
@@ -247,4 +252,6 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'dashboard/js/panel_baterias.js' %}"></script>
+<script src="{% static 'dashboard/js/panel_baterias.js' %}?v=1"></script>
+
 {% endblock %}
