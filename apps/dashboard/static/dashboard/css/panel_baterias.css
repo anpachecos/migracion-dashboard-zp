@@ -1,3 +1,19 @@
+/* =========================================================
+   Panel Baterías - Dashboard ZP
+   Archivo: panel_baterias.css
+   Objetivo:
+   - Layout compacto del panel
+   - Filtros en una línea cuando haya espacio
+   - Tarjetas diagnóstico
+   - Tabla compacta por media hora
+   - Gráfico principal dinámico
+========================================================= */
+
+
+/* =========================================================
+   1. Base general
+========================================================= */
+
 * {
     box-sizing: border-box;
 }
@@ -14,318 +30,115 @@ body {
     margin: 0 auto;
 }
 
+
+/* =========================================================
+   2. Encabezado del panel
+========================================================= */
+
+.panel-header,
 .encabezado {
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
+.panel-header h1,
 .encabezado h1 {
     margin-bottom: 6px;
 }
 
+.panel-header p,
 .encabezado p {
     color: #666;
     margin-top: 0;
 }
 
-/* =========================
-   Buscador y filtros
-========================= */
+
+/* =========================================================
+   3. Buscador y filtros compactos
+========================================================= */
 
 .buscador {
     background: white;
-    padding: 20px;
+    padding: 12px 16px;
     border-radius: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .form-filtros {
     display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
+    flex-wrap: nowrap;
+    gap: 10px;
     align-items: end;
+    width: 100%;
 }
 
 .grupo-filtro {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
+    flex: 0 0 auto;
 }
 
 .grupo-filtro label {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: bold;
-    color: #444;
+    color: #555;
 }
 
+/* Inputs y selects generales */
 .grupo-filtro input,
 .grupo-filtro select {
-    padding: 9px;
+    height: 32px;
+    padding: 6px 8px;
     border: 1px solid #ccc;
-    border-radius: 8px;
-    min-width: 130px;
-    height: 38px;
+    border-radius: 7px;
+    font-size: 13px;
+    min-width: auto;
+}
+
+/* AMID compacto */
+.label-oculto {
+    display: none;
 }
 
 .grupo-amid input {
-    min-width: 240px;
+    width: 120px;
+    min-width: 120px;
 }
 
+/* Filtros específicos */
+#dias {
+    width: 86px;
+}
+
+#hora_inicio,
+#hora_fin {
+    width: 105px;
+}
+
+
+/* =========================================================
+   4. Botones de filtros
+========================================================= */
+
 .boton-filtro button {
-    height: 38px;
-    padding: 0 16px;
+    height: 32px;
+    padding: 0 12px;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     background-color: #1f6feb;
     color: white;
     cursor: pointer;
     font-weight: bold;
+    font-size: 12px;
+    white-space: nowrap;
 }
 
 .boton-filtro button:hover {
     background-color: #1557b0;
 }
 
-/* =========================
-   Mensajes
-========================= */
-
-.mensaje {
-    padding: 15px;
-    background: #fff3cd;
-    border: 1px solid #ffeeba;
-    color: #856404;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-/* =========================
-   Tarjetas resumen
-========================= */
-
-.tarjetas {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.tarjeta {
-    background: white;
-    padding: 18px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.tarjeta .titulo {
-    font-size: 13px;
-    color: #666;
-    margin-bottom: 8px;
-}
-
-.tarjeta .valor {
-    font-size: 20px;
-    font-weight: bold;
-    color: #222;
-    word-break: break-word;
-}
-
-.tarjeta .valor-pequeno {
-    font-size: 15px;
-}
-
-/* =========================
-   Secciones
-========================= */
-
-.seccion {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.seccion h2 {
-    margin-top: 0;
-    margin-bottom: 8px;
-}
-
-.texto-ayuda {
-    color: #666;
-    font-size: 14px;
-    margin-top: 0;
-}
-
-.estado-inicial {
-    text-align: center;
-    padding: 40px 20px;
-}
-
-/* =========================
-   Sugerencias de horarios
-========================= */
-
-.chips-horarios {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.chip-horario {
-    background-color: #e7f1ff;
-    color: #084298;
-    padding: 8px 12px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-/* =========================
-   Placeholder gráfico
-========================= */
-
-.placeholder-grafico {
-    height: 260px;
-    border: 2px dashed #ccc;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #777;
-    background: #fafafa;
-    text-align: center;
-    padding: 20px;
-}
-
-/* =========================
-   Tabla batería compacta
-========================= */
-
-.titulo-tabla {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
-}
-
-.tabla-scroll {
-    width: 100%;
-    overflow-x: hidden;
-    overflow-y: visible;
-    padding-bottom: 8px;
-}
-
-/* La tabla ahora se adapta al ancho de pantalla */
-.tabla-bateria {
-    border-collapse: collapse;
-    width: 100%;
-    table-layout: fixed;
-    font-size: 9px;
-}
-
-/* Celdas generales */
-.tabla-bateria th,
-.tabla-bateria td {
-    border: 1px solid #ddd;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-/* Celdas de datos */
-.tabla-bateria td {
-    padding: 2px 1px;
-    height: 24px;
-    line-height: 1;
-}
-
-/* Encabezado general */
-.tabla-bateria th {
-    background-color: #f1f3f5;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-
-/* Primera columna fija, pero más angosta */
-.col-fecha {
-    width: 76px;
-    min-width: 76px;
-    max-width: 76px;
-    background-color: #f1f3f5;
-    z-index: 4;
-    font-weight: bold;
-    font-size: 9px;
-}
-
-td.col-fecha {
-    background-color: white;
-}
-
-/* Encabezados de hora compactos y diagonales */
-th.hora-diagonal {
-    height: 54px;
-    padding: 0;
-    vertical-align: bottom;
-    position: sticky;
-    top: 0;
-    z-index: 3;
-}
-
-th.hora-diagonal > span {
-    display: inline-block;
-    transform: rotate(-65deg);
-    transform-origin: left bottom;
-    font-size: 8px;
-    white-space: nowrap;
-    margin-bottom: 6px;
-    margin-left: 5px;
-}
-
-/* Valores dentro de la tabla */
-.tabla-bateria td:not(.col-fecha) {
-    font-size: 8px;
-    font-weight: bold;
-}
-
-
-/* =========================
-   Colores batería
-========================= */
-
-.bateria-alta {
-    background-color: #d1e7dd;
-    color: #0f5132;
-    font-weight: bold;
-}
-
-.bateria-media {
-    background-color: #fff3cd;
-    color: #664d03;
-    font-weight: bold;
-}
-
-.bateria-baja {
-    background-color: #ffe5d0;
-    color: #8a3b00;
-    font-weight: bold;
-}
-
-.bateria-critica {
-    background-color: #f8d7da;
-    color: #842029;
-    font-weight: bold;
-}
-
-.bateria-sin-dato {
-    background-color: #f1f3f5;
-    color: #aaa;
-}
-
-/* =========================
-   Botón Secundario
-========================= */
+/* Botón horario sugerido */
 .boton-secundario button {
     background-color: #6c757d;
 }
@@ -334,26 +147,18 @@ th.hora-diagonal > span {
     background-color: #565e64;
 }
 
-.mensaje-info {
-    background: #e7f1ff;
-    border: 1px solid #b6d4fe;
-    color: #084298;
-}
-
-/* =========================
-   Botón Limpiar
-========================= */
-
+/* Botón limpiar filtros */
 .btn-limpiar {
-    height: 38px;
-    padding: 0 16px;
-    border-radius: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 7px;
     border: 1px solid #d0d7de;
     background-color: #ffffff;
     color: #57606a;
     text-decoration: none;
     font-weight: bold;
-    font-size: 13px;
+    font-size: 12px;
+    white-space: nowrap;
 
     display: flex;
     align-items: center;
@@ -374,46 +179,98 @@ th.hora-diagonal > span {
     transform: translateY(0);
 }
 
-/* =========================
-   Gráficos de batería
-========================= */
 
-.grafico-card {
-    min-width: 0;
-    width: 100%;
-    border: 1px solid #e5e7eb;
+/* =========================================================
+   5. Mensajes e información
+========================================================= */
+
+.mensaje {
+    padding: 15px;
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.mensaje-info {
+    background: #e7f1ff;
+    border: 1px solid #b6d4fe;
+    color: #084298;
+}
+
+.texto-ayuda {
+    color: #666;
+    font-size: 14px;
+    margin-top: 0;
+}
+
+
+/* =========================================================
+   6. Secciones generales
+========================================================= */
+
+.seccion {
+    background: white;
+    padding: 20px;
     border-radius: 12px;
-    padding: 14px;
-    background-color: #ffffff;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.grafico-card-principal {
-    margin-top: 12px;
+.seccion h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
 }
 
-.grafico-card .texto-ayuda {
-    font-size: 12px;
-    margin-bottom: 10px;
+.estado-inicial {
+    text-align: center;
+    padding: 40px 20px;
 }
 
-.contenedor-grafico {
-    position: relative;
-    width: 100%;
-    height: 280px;
+
+/* =========================================================
+   7. Tarjetas diagnóstico
+========================================================= */
+
+.tarjetas {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+/* Versión nueva: 6 tarjetas compactas */
+.tarjetas-diagnostico {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.tarjeta {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     min-width: 0;
 }
 
-.contenedor-grafico canvas {
-    width: 100% !important;
-    height: 100% !important;
+.tarjeta .titulo {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
 }
 
-.tarjetas-diagnostico {
-    grid-template-columns: repeat(6, 1fr);
+.tarjeta .valor {
+    font-size: 20px;
+    font-weight: bold;
+    color: #222;
+    word-break: break-word;
 }
 
 .valor-destacado {
     font-size: 28px;
+}
+
+.valor-pequeno {
+    font-size: 15px;
 }
 
 .detalle-tarjeta {
@@ -428,6 +285,29 @@ th.hora-diagonal > span {
     gap: 4px;
     font-size: 13px;
 }
+
+
+/* Colores laterales de tarjetas diagnóstico */
+.tarjeta-ok {
+    border-left: 5px solid #198754;
+}
+
+.tarjeta-warning {
+    border-left: 5px solid #ffc107;
+}
+
+.tarjeta-error {
+    border-left: 5px solid #dc3545;
+}
+
+.tarjeta-neutra {
+    border-left: 5px solid #adb5bd;
+}
+
+
+/* =========================================================
+   8. Chips de estado
+========================================================= */
 
 .chips-estado {
     display: flex;
@@ -460,21 +340,10 @@ th.hora-diagonal > span {
     color: #57606a;
 }
 
-.tarjeta-ok {
-    border-left: 5px solid #198754;
-}
 
-.tarjeta-warning {
-    border-left: 5px solid #ffc107;
-}
-
-.tarjeta-error {
-    border-left: 5px solid #dc3545;
-}
-
-.tarjeta-neutra {
-    border-left: 5px solid #adb5bd;
-}
+/* =========================================================
+   9. Bloque de alertas del período
+========================================================= */
 
 .bloque-alertas {
     border-left: 5px solid #adb5bd;
@@ -496,62 +365,208 @@ th.hora-diagonal > span {
     font-weight: bold;
 }
 
+
+/* =========================================================
+   10. Tabla batería compacta
+========================================================= */
+
+.titulo-tabla {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.tabla-scroll {
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding-bottom: 8px;
+}
+
+.tabla-bateria {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 9px;
+}
+
+.tabla-bateria th,
+.tabla-bateria td {
+    border: 1px solid #ddd;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.tabla-bateria td {
+    padding: 2px 1px;
+    height: 24px;
+    line-height: 1;
+}
+
+/* Encabezado fijo superior */
+.tabla-bateria th {
+    background-color: #f1f3f5;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+/* Primera columna fija */
+.col-fecha {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+    background-color: #f1f3f5;
+    z-index: 4;
+    font-weight: bold;
+    font-size: 9px;
+}
+
+td.col-fecha {
+    background-color: white;
+}
+
+/* Horas en diagonal para ocupar menos espacio */
+th.hora-diagonal {
+    height: 54px;
+    padding: 0;
+    vertical-align: bottom;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+th.hora-diagonal > span {
+    display: inline-block;
+    transform: rotate(-65deg);
+    transform-origin: left bottom;
+    font-size: 8px;
+    white-space: nowrap;
+    margin-bottom: 6px;
+    margin-left: 5px;
+}
+
+/* Valores pequeños dentro de la tabla */
+.tabla-bateria td:not(.col-fecha) {
+    font-size: 8px;
+    font-weight: bold;
+}
+
+
+/* Colores por nivel de batería */
+.bateria-alta {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    font-weight: bold;
+}
+
+.bateria-media {
+    background-color: #fff3cd;
+    color: #664d03;
+    font-weight: bold;
+}
+
+.bateria-baja {
+    background-color: #ffe5d0;
+    color: #8a3b00;
+    font-weight: bold;
+}
+
+.bateria-critica {
+    background-color: #f8d7da;
+    color: #842029;
+    font-weight: bold;
+}
+
+.bateria-sin-dato {
+    background-color: #f1f3f5;
+    color: #aaa;
+}
+
+
+/* =========================================================
+   11. Gráfico principal de batería
+========================================================= */
+
+.grafico-card {
+    min-width: 0;
+    width: 100%;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    background-color: #ffffff;
+}
+
+.grafico-card-principal {
+    margin-top: 12px;
+}
+
+.contenedor-grafico {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    min-width: 0;
+}
+
+.contenedor-grafico canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+
+/* =========================================================
+   12. Responsive
+========================================================= */
+
+/* Pantallas medianas: tarjetas pasan de 6 a 3 columnas */
 @media (max-width: 1300px) {
     .tarjetas-diagnostico {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
-@media (max-width: 700px) {
-    .tarjetas-diagnostico {
-        grid-template-columns: 1fr;
+/* Si no cabe la barra en una línea, permitimos salto ordenado */
+@media (max-width: 1150px) {
+    .form-filtros {
+        flex-wrap: wrap;
     }
 }
 
-/* Solo apilar en pantallas realmente pequeñas */
-@media (max-width: 750px) {
-    .contenedor-grafico {
-        height: 280px;
-    }
-}
-
-/* =========================
-   Responsive
-========================= */
-
-@media (max-width: 1000px) {
-    .tarjetas {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .grupo-amid input {
-        min-width: 200px;
-    }
-}
-
+/* Pantallas pequeñas */
 @media (max-width: 700px) {
     body {
         padding: 12px;
     }
 
-    .tarjetas {
+    .tarjetas,
+    .tarjetas-diagnostico {
         grid-template-columns: 1fr;
     }
 
     .form-filtros {
         flex-direction: column;
         align-items: stretch;
+        flex-wrap: wrap;
     }
 
     .grupo-filtro input,
     .grupo-filtro select,
-    .boton-filtro button {
+    .boton-filtro button,
+    .btn-limpiar {
         width: 100%;
     }
 
-    .grupo-amid input {
+    .grupo-amid input,
+    #dias,
+    #hora_inicio,
+    #hora_fin {
+        width: 100%;
         min-width: 100%;
     }
 
-    
+    .contenedor-grafico {
+        height: 280px;
+    }
 }
