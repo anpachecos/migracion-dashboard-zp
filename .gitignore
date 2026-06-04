@@ -45,6 +45,7 @@ archivos_temporales/
 !*.example.xlsx
 !*.example.csv
 datos_query_prueba.csv
+VERSION ZONA PAGA.xlsx
 
 # OS files
 .DS_Store

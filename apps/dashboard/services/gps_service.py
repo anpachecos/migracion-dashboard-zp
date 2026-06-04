@@ -9,6 +9,9 @@ RADIO_LABORATORIO_ZP = 70
 NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
 
 def calcular_distancia_metros(lat1, lon1, lat2, lon2):
+    if None in [lat1, lon1, lat2, lon2]:
+        return None
+    
     radio_tierra = 6371000
 
     phi1 = math.radians(lat1)
@@ -86,11 +89,16 @@ def obtener_contexto_gps(request):
                 .first()
             )
 
-            if parada_esperada:
+            if (
+                parada_esperada
+                and parada_esperada.latitud_esperada is not None
+                and parada_esperada.longitud_esperada is not None
+                and parada_esperada.radio_metros is not None
+            ):
                 nombre_esperado = parada_esperada.nombre
-                latitud_esperada = parada_esperada.latitud_esperada
-                longitud_esperada = parada_esperada.longitud_esperada
-                radio_metros = parada_esperada.radio_metros
+                latitud_esperada = float(parada_esperada.latitud_esperada)
+                longitud_esperada = float(parada_esperada.longitud_esperada)
+                radio_metros = float(parada_esperada.radio_metros)
                 operativa = parada_esperada.operativa
                 origen_ubicacion = "excel"
             else:
@@ -108,18 +116,19 @@ def obtener_contexto_gps(request):
                 longitud_esperada,
             )
 
-            dentro_radio = distancia <= radio_metros
+            if distancia is not None:
+                dentro_radio = distancia <= radio_metros
 
-            ubicacion_esperada = {
-                "nombre": nombre_esperado,
-                "latitud": latitud_esperada,
-                "longitud": longitud_esperada,
-                "radio_metros": radio_metros,
-                "distancia_metros": round(distancia, 2),
-                "dentro_radio": dentro_radio,
-                "operativa": operativa,
-                "origen_ubicacion": origen_ubicacion,
-            }
+                ubicacion_esperada = {
+                    "nombre": nombre_esperado,
+                    "latitud": latitud_esperada,
+                    "longitud": longitud_esperada,
+                    "radio_metros": radio_metros,
+                    "distancia_metros": round(distancia, 2),
+                    "dentro_radio": dentro_radio,
+                    "operativa": operativa,
+                    "origen_ubicacion": origen_ubicacion,
+                }
         else:
             mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el período seleccionado."
 
