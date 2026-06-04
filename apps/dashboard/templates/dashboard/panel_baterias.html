@@ -143,35 +143,7 @@
 
         </section>
 
-        <section class="seccion">
-            <h2>Gráfico batería día actual</h2>
-            <p class="texto-ayuda">
-                Comparación entre la batería registrada y la curva esperada de descarga.
-            </p>
-
-            <div class="contenedor-grafico">
-                <canvas id="grafico-bateria-dia"></canvas>
-            </div>
-        </section>
-
-        <section class="seccion">
-            <h2>Gráfico batería período seleccionado</h2>
-            <p class="texto-ayuda">
-                Evolución de batería según los días y horarios filtrados.
-            </p>
-
-            <div class="contenedor-grafico">
-                <canvas id="grafico-bateria-periodo"></canvas>
-            </div>
-        </section>
-
-        {% if horario_sugerido_aplicado %}
-            <section class="mensaje mensaje-info">
-                Se aplicó automáticamente el horario sugerido:
-                <strong>{{ hora_inicio }}</strong> a <strong>{{ hora_fin }}</strong>.
-            </section>
-        {% endif %}
-
+        <!-- Tabla batería por media hora -->
         <section class="seccion">
             <div class="titulo-tabla">
                 <div>
@@ -217,6 +189,36 @@
                 </table>
             </div>
         </section>
+
+        <!-- Gráfico batería actual-->
+        <section class="seccion">
+            <h2>Gráfico batería día actual</h2>
+            <p class="texto-ayuda">
+                Comparación entre la batería registrada y la curva esperada de descarga.
+            </p>
+
+            <div class="contenedor-grafico">
+                <canvas id="grafico-bateria-dia"></canvas>
+            </div>
+        </section>
+        <!-- Gráfico batería período seleccionado-->
+        <section class="seccion">
+            <h2>Gráfico batería período seleccionado</h2>
+            <p class="texto-ayuda">
+                Evolución de batería según los días y horarios filtrados.
+            </p>
+
+            <div class="contenedor-grafico">
+                <canvas id="grafico-bateria-periodo"></canvas>
+            </div>
+        </section>
+
+        {% if horario_sugerido_aplicado %}
+            <section class="mensaje mensaje-info">
+                Se aplicó automáticamente el horario sugerido:
+                <strong>{{ hora_inicio }}</strong> a <strong>{{ hora_fin }}</strong>.
+            </section>
+        {% endif %}
 
     {% elif amid and not mensaje %}
 
