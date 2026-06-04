@@ -4,6 +4,119 @@ from django.utils import timezone
 
 from ..models import EstadoValidadorLimpio
 
+def obtener_clase_tarjeta_bateria(valor):
+    if valor is None or valor == "":
+        return "tarjeta-neutra"
+
+    try:
+        valor = float(valor)
+    except (ValueError, TypeError):
+        return "tarjeta-neutra"
+
+    if valor >= 80:
+        return "tarjeta-ok"
+    elif valor >= 50:
+        return "tarjeta-warning"
+    elif valor >= 20:
+        return "tarjeta-warning"
+    else:
+        return "tarjeta-error"
+
+
+def evaluar_fecha_descarga(fecha_descarga):
+    if not fecha_descarga:
+        return "Sin dato", "tarjeta-neutra"
+
+    fecha_local = timezone.localtime(fecha_descarga)
+    hoy = timezone.localdate()
+
+    if fecha_local.date() == hoy:
+        return "Hoy", "tarjeta-ok"
+
+    return "No descargó hoy", "tarjeta-error"
+
+
+def evaluar_fecha_estatus(fecha_estado):
+    if not fecha_estado:
+        return "Sin dato", "tarjeta-neutra"
+
+    fecha_local = timezone.localtime(fecha_estado)
+    ahora = timezone.localtime(timezone.now())
+    hoy = timezone.localdate()
+
+    if fecha_local.date() != hoy:
+        return "Sin estatus hoy", "tarjeta-error"
+
+    diferencia_horas = (ahora - fecha_local).total_seconds() / 3600
+
+    if diferencia_horas <= 1:
+        return "Actualizado", "tarjeta-ok"
+
+    return "Hace más de 1 hora", "tarjeta-warning"
+
+
+def evaluar_chip_booleano(valor, texto_ok="Sí", texto_error="No"):
+    if valor in [True, "True", "true", "1", 1, "SI", "Sí", "S", "s", "si", "sí"]:
+        return texto_ok, "chip-ok"
+
+    if valor in [False, "False", "false", "0", 0, "NO", "No", "N", "n", "no"]:
+        return texto_error, "chip-error"
+
+    return "Sin dato", "chip-neutro"
+
+
+def evaluar_error_bateria(valor):
+    if valor in [True, "True", "true", "1", 1, "SI", "Sí", "S", "s", "si", "sí"]:
+        return "Sí", "chip-error"
+
+    if valor in [False, "False", "false", "0", 0, "NO", "No", "N", "n", "no"]:
+        return "No", "chip-ok"
+
+    return "Sin dato", "chip-neutro"
+
+
+def detectar_caidas_drasticas(registros):
+    """
+    Detecta caídas drásticas cuando la batería pasa desde 20% o más a 0%.
+    Solo considera valores reales, no nulos.
+    """
+
+    caidas = []
+    registros_validos = []
+
+    for registro in registros:
+        valor = registro.porcentaje_bateria
+
+        if valor is None or valor == "":
+            continue
+
+        try:
+            bateria = float(valor)
+        except (ValueError, TypeError):
+            continue
+
+        registros_validos.append({
+            "fecha_hora": registro.fecha_hora,
+            "bateria": bateria,
+        })
+
+    registros_validos = sorted(
+        registros_validos,
+        key=lambda item: item["fecha_hora"]
+    )
+
+    for anterior, actual in zip(registros_validos, registros_validos[1:]):
+        bateria_anterior = anterior["bateria"]
+        bateria_actual = actual["bateria"]
+
+        if bateria_anterior >= 20 and bateria_actual == 0:
+            caidas.append({
+                "fecha_hora": actual["fecha_hora"],
+                "bateria_anterior": bateria_anterior,
+                "bateria_actual": bateria_actual,
+            })
+
+    return caidas
 
 def obtener_contexto_baterias(request):
     amid = request.GET.get("amid", "").strip()
@@ -37,7 +150,25 @@ def obtener_contexto_baterias(request):
     mensaje = ""
     horario_sugerido_aplicado = False
     datos_grafico_periodo = []
+    
+    clase_bateria_actual = "tarjeta-neutra"
 
+    estado_descarga = "-"
+    clase_descarga = "tarjeta-neutra"
+
+    estado_estatus = "-"
+    clase_estado = "tarjeta-neutra"
+
+    texto_contiene_bateria = "Sin dato"
+    clase_contiene_bateria = "chip-neutro"
+
+    texto_error_bateria = "Sin dato"
+    clase_error_bateria = "chip-neutro"
+
+    total_caidas_drasticas = 0
+    clase_alertas_periodo = "tarjeta-neutra"
+    alertas_periodo = []
+    
     if amid:
         fecha_inicio = timezone.now() - timedelta(days=dias)
 
@@ -65,6 +196,33 @@ def obtener_contexto_baterias(request):
 
             datos_grafico_periodo = construir_datos_grafico_periodo(tabla_bateria)
             datos_grafico_dia = construir_datos_grafico_dia(registros)
+            clase_bateria_actual = obtener_clase_tarjeta_bateria(
+                ultimo_registro.porcentaje_bateria
+            )
+
+            estado_descarga, clase_descarga = evaluar_fecha_descarga(
+                ultimo_registro.fec_descarga
+            )
+
+            estado_estatus, clase_estado = evaluar_fecha_estatus(
+                ultimo_registro.fec_estado
+            )
+
+            texto_contiene_bateria, clase_contiene_bateria = evaluar_chip_booleano(
+                ultimo_registro.is_contiene_bateria
+            )
+
+            texto_error_bateria, clase_error_bateria = evaluar_error_bateria(
+                ultimo_registro.is_error_obtener_bateria
+            )
+
+            alertas_periodo = detectar_caidas_drasticas(registros)
+            total_caidas_drasticas = len(alertas_periodo)
+
+            if total_caidas_drasticas > 0:
+                clase_alertas_periodo = "tarjeta-error"
+            else:
+                clase_alertas_periodo = "tarjeta-ok"
         else:
             mensaje = "No se encontraron registros para el AMID ingresado en el rango seleccionado."
 
@@ -80,6 +238,23 @@ def obtener_contexto_baterias(request):
         "mensaje": mensaje,
         "horario_sugerido_aplicado": horario_sugerido_aplicado,
         "datos_grafico_periodo": datos_grafico_periodo,
+        "clase_bateria_actual": clase_bateria_actual,
+
+        "estado_descarga": estado_descarga,
+        "clase_descarga": clase_descarga,
+
+        "estado_estatus": estado_estatus,
+        "clase_estado": clase_estado,
+
+        "texto_contiene_bateria": texto_contiene_bateria,
+        "clase_contiene_bateria": clase_contiene_bateria,
+
+        "texto_error_bateria": texto_error_bateria,
+        "clase_error_bateria": clase_error_bateria,
+
+        "total_caidas_drasticas": total_caidas_drasticas,
+        "clase_alertas_periodo": clase_alertas_periodo,
+        "alertas_periodo": alertas_periodo,
     }
 
 
@@ -253,35 +428,32 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
 
 
 def construir_datos_grafico_periodo(tabla_bateria):
-    datos_por_dia = {}
+    datos = []
+
     tabla_ordenada = list(reversed(tabla_bateria))
 
     for fila in tabla_ordenada:
         fecha = fila["fecha"]
-        valores_del_dia = []
 
         for celda in fila["valores"]:
             valor = celda["valor"]
-            if valor != "" and valor is not None:
+
+            if valor == "" or valor is None:
+                bateria_real = None
+            else:
                 try:
-                    valores_del_dia.append(float(valor))
+                    bateria_real = float(valor)
                 except (ValueError, TypeError):
-                    pass
+                    bateria_real = None
 
-        if valores_del_dia:
-            datos_por_dia[fecha] = sum(valores_del_dia) / len(valores_del_dia)
-        else:
-            datos_por_dia[fecha] = None
-
-    datos = []
-    for fecha, bateria_promedio in datos_por_dia.items():
-        datos.append({
-            "fecha": fecha,
-            "bateria_real": bateria_promedio,
-        })
+            datos.append({
+                "fecha": fecha,
+                "hora": celda["hora"],
+                "momento": f"{fecha} {celda['hora']}",
+                "bateria_real": bateria_real,
+            })
 
     return datos
-
 
 def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
     columnas_horas = generar_columnas_media_hora("00:00", "23:30")

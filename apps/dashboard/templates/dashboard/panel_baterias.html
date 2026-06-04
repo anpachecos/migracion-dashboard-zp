@@ -68,8 +68,13 @@
             </div>
 
             <div class="grupo-filtro boton-filtro boton-secundario">
-                <button type="submit" name="usar_sugerido" value="1">
-                    Usar horario sugerido
+                <button 
+                    type="submit" 
+                    name="usar_sugerido" 
+                    value="1"
+                    title="Filtra automáticamente la tabla al tramo de 4 horas con mayor cantidad de datos registrados para este AMID."
+                >
+                    Horario sugerido ⓘ
                 </button>
             </div>
 
@@ -95,54 +100,105 @@
 
     {% if ultimo_registro %}
 
-        <section class="tarjetas">
-
-            <article class="tarjeta">
-                <div class="titulo">Última fecha de descarga</div>
-                <div class="valor">
-                    {% if ultimo_registro.fec_descarga %}
-                        {{ ultimo_registro.fec_descarga|date:"d-m-Y H:i" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </div>
-            </article>
-
-            <article class="tarjeta">
-                <div class="titulo">Última fecha de estado</div>
-                <div class="valor">
-                    {% if ultimo_registro.fec_estado %}
-                        {{ ultimo_registro.fec_estado|date:"d-m-Y H:i" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </div>
-            </article>
-
-            <article class="tarjeta">
-                <div class="titulo">Última batería</div>
-                <div class="valor">
+        <!-- Tarjetas resumen -->
+        <section class="tarjetas tarjetas-diagnostico">
+            <article class="tarjeta tarjeta-bateria {{ clase_bateria_actual }}">
+                <div class="titulo">Batería actual</div>
+                <div class="valor valor-destacado">
                     {% if ultimo_registro.porcentaje_bateria %}
                         {{ ultimo_registro.porcentaje_bateria }}%
                     {% else %}
                         -
                     {% endif %}
                 </div>
+                <div class="detalle-tarjeta">
+                    Última lectura disponible
+                </div>
+            </article>
+
+            <article class="tarjeta {{ clase_descarga }}">
+                <div class="titulo">Última descarga</div>
+                <div class="valor">
+                    {{ estado_descarga }}
+                </div>
+                <div class="detalle-tarjeta">
+                    {% if ultimo_registro.fec_descarga %}
+                        {{ ultimo_registro.fec_descarga|date:"H:i" }}
+                    {% else %}
+                        Sin dato
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="tarjeta {{ clase_estado }}">
+                <div class="titulo">Último estatus</div>
+                <div class="valor">
+                    {{ estado_estatus }}
+                </div>
+                <div class="detalle-tarjeta">
+                    {% if ultimo_registro.fec_estado %}
+                        {{ ultimo_registro.fec_estado|date:"d-m-Y H:i" }}
+                    {% else %}
+                        Sin dato
+                    {% endif %}
+                </div>
             </article>
 
             <article class="tarjeta">
-                <div class="titulo">Duración tiempo de vida</div>
-                <div class="valor valor-pequeno">
-                    {% if ultimo_registro.tiempo_vida %}
-                        {{ ultimo_registro.tiempo_vida }}
-                    {% else %}
-                        -
-                    {% endif %}
+                <div class="titulo">Identificación</div>
+                <div class="detalle-identificacion">
+                    <span><strong>BUSID:</strong> {{ ultimo_registro.busid|default:"-" }}</span>
+                    <span><strong>OP:</strong> {{ ultimo_registro.op|default:"-" }}</span>
+                    <span><strong>Patente:</strong> {{ ultimo_registro.patente|default:"-" }}</span>
+                </div>
+            </article>
+
+            <article class="tarjeta">
+                <div class="titulo">Sensor batería</div>
+                <div class="chips-estado">
+                    <span class="chip {{ clase_contiene_bateria }}">
+                        Señal batería: {{ texto_contiene_bateria }}
+                    </span>
+                    <span class="chip {{ clase_error_bateria }}">
+                        Error batería: {{ texto_error_bateria }}
+                    </span>
+                </div>
+            </article>
+
+            <article class="tarjeta {{ clase_alertas_periodo }}">
+                <div class="titulo">Alertas período</div>
+                <div class="valor">
+                    {{ total_caidas_drasticas }}
+                </div>
+                <div class="detalle-tarjeta">
+                    caída{% if total_caidas_drasticas != 1 %}s{% endif %} drástica{% if total_caidas_drasticas != 1 %}s{% endif %}
                 </div>
             </article>
 
         </section>
 
+        <section class="seccion bloque-alertas">
+            {% if total_caidas_drasticas > 0 %}
+                <h2>Alertas del período</h2>
+                <p class="alerta-texto">
+                    Se detectaron {{ total_caidas_drasticas }} caída{% if total_caidas_drasticas != 1 %}s{% endif %} drástica{% if total_caidas_drasticas != 1 %}s{% endif %} de batería.
+                </p>
+
+                <ul class="lista-alertas">
+                    {% for alerta in alertas_periodo %}
+                        <li>
+                            {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
+                            batería pasó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%.
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <h2>Alertas del período</h2>
+                <p class="sin-alertas">
+                    No se detectaron caídas drásticas de batería en el período seleccionado.
+                </p>
+            {% endif %}
+        </section>
         <!-- Tabla batería por media hora -->
         <section class="seccion">
             <div class="titulo-tabla">

@@ -408,6 +408,106 @@ th.hora-diagonal > span {
     height: 100% !important;
 }
 
+.tarjetas-diagnostico {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.valor-destacado {
+    font-size: 28px;
+}
+
+.detalle-tarjeta {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+}
+
+.detalle-identificacion {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.chips-estado {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.chip-ok {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.chip-error {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.chip-neutro {
+    background-color: #f1f3f5;
+    color: #57606a;
+}
+
+.tarjeta-ok {
+    border-left: 5px solid #198754;
+}
+
+.tarjeta-warning {
+    border-left: 5px solid #ffc107;
+}
+
+.tarjeta-error {
+    border-left: 5px solid #dc3545;
+}
+
+.tarjeta-neutra {
+    border-left: 5px solid #adb5bd;
+}
+
+.bloque-alertas {
+    border-left: 5px solid #adb5bd;
+}
+
+.alerta-texto {
+    color: #842029;
+    font-weight: bold;
+}
+
+.lista-alertas {
+    margin-bottom: 0;
+    padding-left: 20px;
+    color: #842029;
+}
+
+.sin-alertas {
+    color: #0f5132;
+    font-weight: bold;
+}
+
+@media (max-width: 1300px) {
+    .tarjetas-diagnostico {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    .tarjetas-diagnostico {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Solo apilar en pantallas realmente pequeñas */
 @media (max-width: 750px) {
     .contenedor-grafico {
