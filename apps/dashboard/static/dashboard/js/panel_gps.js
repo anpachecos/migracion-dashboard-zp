@@ -9,11 +9,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const longitudElemento = document.getElementById("gps-longitud");
     const amidElemento = document.getElementById("gps-amid");
     const ubicacionesElemento = document.getElementById("gps-ubicaciones");
+    const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
 
     const latitud = latitudElemento ? JSON.parse(latitudElemento.textContent) : null;
     const longitud = longitudElemento ? JSON.parse(longitudElemento.textContent) : null;
     const amid = amidElemento ? JSON.parse(amidElemento.textContent) : "";
     const ubicaciones = ubicacionesElemento ? JSON.parse(ubicacionesElemento.textContent) : [];
+    const ubicacionEsperada = ubicacionEsperadaElemento ? JSON.parse(ubicacionEsperadaElemento.textContent) : null;
 
     const tieneCoordenadas = latitud !== null && longitud !== null;
 
@@ -25,56 +27,74 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const mapa = L.map("mapa-gps").setView(centroInicial, zoomInicial);
 
-    const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
-    const ubicacionEsperada = ubicacionEsperadaElemento
-        ? JSON.parse(ubicacionEsperadaElemento.textContent)
-        : null;
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
     }).addTo(mapa);
 
-    if (!ubicaciones || ubicaciones.length === 0) {
-        return;
-    }
-
     const puntosRuta = [];
+    const elementosMapa = [];
 
-    ubicaciones.forEach(function (ubicacion, index) {
-        const esUltima = index === ubicaciones.length - 1;
+    if (ubicaciones && ubicaciones.length > 0) {
+        ubicaciones.forEach(function (ubicacion, index) {
+            const esUltima = index === ubicaciones.length - 1;
 
-        const lat = ubicacion.latitud;
-        const lon = ubicacion.longitud;
+            const lat = ubicacion.latitud;
+            const lon = ubicacion.longitud;
 
-        puntosRuta.push([lat, lon]);
+            const esCoordenadaCero = ubicacion.coordenada_cero === true;
 
-        const colorPunto = esUltima ? "#2563eb" : "#9ca3af";
-        const radioPunto = esUltima ? 8 : 5;
+            puntosRuta.push([lat, lon]);
+            elementosMapa.push([lat, lon]);
 
-        const marcador = L.circleMarker([lat, lon], {
-            radius: radioPunto,
-            color: colorPunto,
-            fillColor: colorPunto,
-            fillOpacity: esUltima ? 0.9 : 0.55,
-            weight: esUltima ? 3 : 2,
-        }).addTo(mapa);
+            let colorPunto = "#9ca3af";
+            let radioPunto = 5;
 
-        const titulo = esUltima ? "Última ubicación" : "Ubicación anterior";
+            if (esCoordenadaCero) {
+                colorPunto = "#dc2626";
+                radioPunto = 7;
+            } else if (esUltima) {
+                colorPunto = "#2563eb";
+                radioPunto = 8;
+            }
 
-        marcador.bindPopup(`
-            <strong>${titulo}</strong><br>
-            AMID: ${amid}<br>
-            Fecha/hora: ${ubicacion.fecha_hora || "-"}<br>
-            Latitud: ${lat}<br>
-            Longitud: ${lon}<br>
-            Batería: ${ubicacion.porcentaje_bateria ?? "-"}%
-        `);
+            const marcador = L.circleMarker([lat, lon], {
+                radius: radioPunto,
+                color: colorPunto,
+                fillColor: colorPunto,
+                fillOpacity: esUltima ? 0.9 : 0.55,
+                weight: esUltima ? 3 : 2,
+            }).addTo(mapa);
 
-        if (esUltima) {
-            marcador.openPopup();
-        }
-    });
+            const titulo = esUltima ? "Última ubicación" : "Ubicación anterior";
+
+            const estadoRadio = ubicacion.dentro_radio === true
+                ? "Dentro del radio"
+                : ubicacion.dentro_radio === false
+                    ? "Fuera del radio"
+                    : "-";
+
+            const avisoCoordenada = esCoordenadaCero
+                ? "<br><strong>Advertencia:</strong> coordenada 0,0 reportada por el validador"
+                : "";
+
+            marcador.bindPopup(`
+                <strong>${titulo}</strong><br>
+                AMID: ${amid}<br>
+                Fecha/hora: ${ubicacion.fecha_hora || "-"}<br>
+                Latitud: ${lat}<br>
+                Longitud: ${lon}<br>
+                Batería: ${ubicacion.porcentaje_bateria ?? "-"}%<br>
+                Distancia esperada: ${ubicacion.distancia_metros ?? "-"} m<br>
+                Estado: ${estadoRadio}
+                ${avisoCoordenada}
+            `);
+
+            if (esUltima) {
+                marcador.openPopup();
+            }
+        });
+    }
 
     if (puntosRuta.length > 1) {
         L.polyline(puntosRuta, {
@@ -85,15 +105,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }).addTo(mapa);
     }
 
-    const limites = L.latLngBounds(puntosRuta);
-
-    if (limites.isValid()) {
-        mapa.fitBounds(limites, {
-            padding: [40, 40],
-            maxZoom: 17,
-        });
-    }
-
     if (ubicacionEsperada) {
         L.circle([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
             radius: ubicacionEsperada.radio_metros,
@@ -102,6 +113,8 @@ document.addEventListener("DOMContentLoaded", function () {
             fillOpacity: 0.12,
             weight: 2,
         }).addTo(mapa);
+
+        elementosMapa.push([ubicacionEsperada.latitud, ubicacionEsperada.longitud]);
 
         L.circleMarker([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
             radius: 6,
@@ -118,5 +131,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 Distancia al GPS real: ${ubicacionEsperada.distancia_metros} m<br>
                 Estado: ${ubicacionEsperada.dentro_radio ? "Dentro del radio" : "Fuera del radio"}
             `);
+    }
+
+    if (elementosMapa.length > 0) {
+        const limites = L.latLngBounds(elementosMapa);
+
+        if (limites.isValid()) {
+            mapa.fitBounds(limites, {
+                padding: [40, 40],
+                maxZoom: 17,
+            });
+        }
     }
 });

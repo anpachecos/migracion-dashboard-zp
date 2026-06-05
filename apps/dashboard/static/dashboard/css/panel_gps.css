@@ -2,22 +2,23 @@
     width: 100%;
 }
 
-.gps-layout {
-    display: grid;
-    grid-template-columns: 1fr 3fr;
-    gap: 24px;
-    min-height: calc(100vh - 150px);
-}
-
 .gps-panel-datos {
     display: flex;
     flex-direction: column;
+    gap: 12px;
+}
+
+.gps-bloque-superior {
+    display: grid;
+    grid-template-columns: 300px 1fr;
     gap: 18px;
+    align-items: start;
 }
 
 .gps-formulario,
 .gps-card,
-.gps-mensaje {
+.gps-mensaje,
+.gps-resumen-card {
     background: #ffffff;
     border-radius: 16px;
     padding: 20px;
@@ -60,68 +61,12 @@
     background: #1d4ed8;
 }
 
-.gps-mensaje {
-    color: #92400e;
-    background: #fffbeb;
-    border: 1px solid #fcd34d;
-}
-
-.gps-card h2 {
-    margin: 0 0 16px;
-    font-size: 20px;
-    color: #111827;
-}
-
-.gps-dato {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 12px 0;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.gps-dato:last-child {
-    border-bottom: none;
-}
-
-.gps-dato span {
-    font-size: 13px;
-    color: #6b7280;
-}
-
-.gps-dato strong {
-    font-size: 15px;
-    color: #111827;
-    word-break: break-word;
-}
-
-.gps-card-vacia p {
-    margin: 0;
-    color: #6b7280;
-    line-height: 1.5;
-}
-
-.gps-panel-mapa {
-    background: #ffffff;
-    padding: 12px;
-    border-radius: 18px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-    min-height: 600px;
-}
-
-#mapa-gps {
-    width: 100%;
-    height: 100%;
-    min-height: 600px;
-    border-radius: 14px;
-}
 .gps-filtro-dias {
     margin-top: 12px;
     padding: 10px 12px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-
     display: flex;
     align-items: center;
     gap: 10px;
@@ -165,15 +110,139 @@
     color: #ffffff;
 }
 
-.gps-separador {
-    margin: 18px 0;
-    border-top: 1px solid #e5e7eb;
+.gps-tarjetas-resumen {
+    display: grid;
+    gap: 12px;
+    align-self: start;
 }
 
-.gps-subtitulo {
-    margin: 0 0 10px;
-    font-size: 18px;
+.gps-tarjetas-resumen-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.gps-resumen-card {
+    padding: 10px 14px;
+    min-height: unset;
+    height: auto;
+}
+
+.gps-resumen-card span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.gps-resumen-card strong {
+    display: block;
+    font-size: 15px;
     color: #111827;
+    line-height: 1.15;
+}
+
+.gps-card-estado {
+    border-left: 5px solid transparent;
+    min-height: unset;
+}
+
+.gps-card-ok,
+.gps-card-estado.gps-estado-ok {
+    border-left-color: #15803d;
+    background: #f0fdf4;
+}
+
+.gps-card-alerta,
+.gps-card-estado.gps-estado-alerta {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+}
+
+.gps-card-neutral {
+    border-left-color: #9ca3af;
+    background: #f9fafb;
+}
+
+.gps-card-estado.gps-estado-advertencia {
+    border-left-color: #d97706;
+    background: #fffbeb;
+}
+
+.gps-card-estado span {
+    color: #6b7280;
+}
+
+.gps-card-estado strong {
+    font-size: 15px;
+}
+
+.gps-mensaje {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+}
+
+.gps-zona-mapa {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.gps-info-lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gps-card h2 {
+    margin: 0 0 16px;
+    font-size: 20px;
+    color: #111827;
+}
+
+.gps-card-compacta {
+    padding: 16px;
+}
+
+.gps-card-compacta h2 {
+    font-size: 17px;
+    margin-bottom: 12px;
+}
+
+.gps-dato {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.gps-dato:last-child {
+    border-bottom: none;
+}
+
+.gps-dato span {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.gps-dato strong {
+    font-size: 15px;
+    color: #111827;
+    word-break: break-word;
+}
+
+.gps-dato-doble {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.gps-card-vacia p,
+.gps-card-compacta p {
+    margin: 0;
+    color: #6b7280;
+    line-height: 1.5;
 }
 
 .gps-estado-ok {
@@ -184,14 +253,46 @@
     color: #dc2626;
 }
 
-/* Responsive */
-@media (max-width: 1000px) {
-    .gps-layout {
+.gps-estado-advertencia {
+    color: #d97706;
+}
+
+.gps-panel-mapa {
+    background: #ffffff;
+    padding: 10px;
+    border-radius: 18px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    min-height: 430px;
+}
+
+#mapa-gps {
+    width: 100%;
+    height: 100%;
+    min-height: 430px;
+    border-radius: 14px;
+}
+
+@media (max-width: 1200px) {
+    .gps-bloque-superior {
+        grid-template-columns: 1fr;
+    }
+
+    .gps-tarjetas-resumen-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .gps-zona-mapa {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 850px) {
+    .gps-tarjetas-resumen-3 {
         grid-template-columns: 1fr;
     }
 
     .gps-panel-mapa,
     #mapa-gps {
-        min-height: 420px;
+        min-height: 380px;
     }
 }

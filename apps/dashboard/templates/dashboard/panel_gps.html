@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -15,13 +15,13 @@
     <header class="panel-header">
         <h1>Ubicación GPS</h1>
         <p>
-            Busca un AMID para revisar la última ubicación GPS registrada por el validador.
+            Busca un AMID para revisar si el validador está dentro de su zona esperada.
         </p>
     </header>
 
-    <div class="gps-layout">
+    <div class="gps-panel-datos">
 
-        <aside class="gps-panel-datos">
+        <div class="gps-bloque-superior">
 
             <form method="get" class="gps-formulario">
 
@@ -40,176 +40,151 @@
                         Buscar
                     </button>
                 </div>
+
                 <div class="gps-filtro-dias">
                     <span class="gps-filtro-label">Días</span>
 
                     <div class="gps-botones-dias">
-                        <button 
-                            type="submit" 
-                            name="dias" 
-                            value="1"
-                            class="gps-btn-dia {% if dias == 1 %}activo{% endif %}"
-                        >
-                            1
-                        </button>
-
-                        <button 
-                            type="submit" 
-                            name="dias" 
-                            value="3"
-                            class="gps-btn-dia {% if dias == 3 %}activo{% endif %}"
-                        >
-                            3
-                        </button>
-
-                        <button 
-                            type="submit" 
-                            name="dias" 
-                            value="7"
-                            class="gps-btn-dia {% if dias == 7 %}activo{% endif %}"
-                        >
-                            7
-                        </button>
-
-                        <button 
-                            type="submit" 
-                            name="dias" 
-                            value="14"
-                            class="gps-btn-dia {% if dias == 14 %}activo{% endif %}"
-                        >
-                            14
-                        </button>
+                        <button type="submit" name="dias" value="1" class="gps-btn-dia {% if dias == 1 %}activo{% endif %}">1</button>
+                        <button type="submit" name="dias" value="3" class="gps-btn-dia {% if dias == 3 %}activo{% endif %}">3</button>
+                        <button type="submit" name="dias" value="7" class="gps-btn-dia {% if dias == 7 %}activo{% endif %}">7</button>
+                        <button type="submit" name="dias" value="14" class="gps-btn-dia {% if dias == 14 %}activo{% endif %}">14</button>
                     </div>
                 </div>
+
             </form>
 
-            {% if mensaje %}
-                <div class="gps-mensaje">
-                    {{ mensaje }}
-                </div>
-            {% endif %}
+            <section class="gps-tarjetas-resumen gps-tarjetas-resumen-3">
 
-            {% if ultimo_registro %}
-
-                <div class="gps-card">
-                    <h2>Última ubicación</h2>
-
-                    <div class="gps-dato">
-                        <span>AMID</span>
-                        <strong>{{ ultimo_registro.amid }}</strong>
-                    </div>
-
-                    <div class="gps-dato">
-                        <span>Latitud</span>
-                        <strong>{{ ultimo_registro.latitud }}</strong>
-                    </div>
-
-                    <div class="gps-dato">
-                        <span>Longitud</span>
-                        <strong>{{ ultimo_registro.longitud }}</strong>
-                    </div>
-
-                    <div class="gps-dato">
-                        <span>Fecha última notificación</span>
-                        <strong>
-                            {% if ultimo_registro.fecha_hora %}
-                                {{ ultimo_registro.fecha_hora|date:"d-m-Y H:i" }}
+                <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio %}gps-card-ok{% elif ubicacion_esperada %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
+                    <span>Estado ubicación</span>
+                    <strong>
+                        {% if ubicacion_esperada %}
+                            {% if ubicacion_esperada.dentro_radio %}
+                                Dentro del radio
                             {% else %}
-                                -
+                                Fuera del radio
                             {% endif %}
-                        </strong>
-                    </div>
+                        {% else %}
+                            Sin referencia
+                        {% endif %}
+                    </strong>
+                </article>
 
-                    <div class="gps-dato">
-                        <span>Batería</span>
-                        <strong>
-                            {% if ultimo_registro.porcentaje_bateria %}
-                                {{ ultimo_registro.porcentaje_bateria }}%
-                            {% else %}
-                                -
-                            {% endif %}
-                        </strong>
-                    </div>
-                    <div class="gps-dato">
-                        <span>Período consultado</span>
-                        <strong>
-                            {% if dias == 1 %}
-                                Hoy
-                            {% else %}
-                                Últimos {{ dias }} días
-                            {% endif %}
-                        </strong>
-                    </div>
+                <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_ultima_ubicacion }}">
+                    <span>Última ubicación</span>
+                    <strong>{{ resumen_gps.texto_ultima_ubicacion }}</strong>
+                </article>
 
-                    <div class="gps-dato">
-                        <span>Registros GPS encontrados</span>
-                        <strong>{{ ubicaciones_gps|length }}</strong>
-                    </div>
-                    {% if ubicacion_esperada %}
-                        <div class="gps-separador"></div>
+                <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_cumplimiento_hoy }}">
+                    <span>Cumplimiento hoy</span>
+                    <strong>
+                        {% if resumen_gps.porcentaje_cumplimiento_hoy is not None %}
+                            {{ resumen_gps.porcentaje_cumplimiento_hoy }}%
+                        {% else %}
+                            Sin datos
+                        {% endif %}
+                    </strong>
+                </article>
 
-                        <h2 class="gps-subtitulo">Ubicación esperada</h2>
+            </section>
 
-                        <div class="gps-dato">
-                            <span>Lugar esperado</span>
-                            <strong>{{ ubicacion_esperada.nombre }}</strong>
-                        </div>
+        </div>
+
+        {% if mensaje %}
+            <div class="gps-mensaje">
+                {{ mensaje }}
+            </div>
+        {% endif %}
+
+        {% if ultimo_registro %}
+
+            <div class="gps-zona-mapa">
+
+                <aside class="gps-info-lateral">
+
+                    <div class="gps-card gps-card-compacta">
+                        <h2>Ubicación esperada</h2>
+
+                        {% if ubicacion_esperada %}
+                            <div class="gps-dato">
+                                <span>Lugar esperado</span>
+                                <strong>{{ ubicacion_esperada.nombre }}</strong>
+                            </div>
+
                             {% if ubicacion_esperada.origen_ubicacion == "laboratorio_default" %}
                                 <div class="gps-dato">
-                                    <span>Origen ubicación esperada</span>
+                                    <span>Origen</span>
                                     <strong>Laboratorio por defecto</strong>
                                 </div>
                             {% endif %}
+
+                            <div class="gps-dato gps-dato-doble">
+                                <div>
+                                    <span>Radio</span>
+                                    <strong>{{ ubicacion_esperada.radio_metros }} m</strong>
+                                </div>
+
+                                <div>
+                                    <span>Distancia</span>
+                                    <strong>{{ ubicacion_esperada.distancia_metros }} m</strong>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p>No hay referencia de ubicación esperada para este AMID.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="gps-card gps-card-compacta">
+                        <h2>Resumen del período</h2>
+
                         <div class="gps-dato">
-                            <span>Estado operativo</span>
+                            <span>Período visualizado</span>
                             <strong>
-                                {% if ubicacion_esperada.operativa %}
-                                    Operativo
+                                {% if dias == 1 %}
+                                    Hoy
                                 {% else %}
-                                    No operativo
+                                    Últimos {{ dias }} días
                                 {% endif %}
                             </strong>
                         </div>
 
                         <div class="gps-dato">
-                            <span>Radio esperado</span>
-                            <strong>{{ ubicacion_esperada.radio_metros }} m</strong>
+                            <span>Cantidad registros GPS</span>
+                            <strong>{{ ubicaciones_gps|length }}</strong>
                         </div>
 
-                        <div class="gps-dato">
-                            <span>Distancia al punto esperado</span>
-                            <strong>{{ ubicacion_esperada.distancia_metros }} m</strong>
+                        <div class="gps-dato gps-dato-doble">
+                            <div>
+                                <span>Dentro hoy</span>
+                                <strong class="gps-estado-ok">{{ resumen_gps.registros_dentro_hoy }}</strong>
+                            </div>
+
+                            <div>
+                                <span>Fuera hoy</span>
+                                <strong class="gps-estado-alerta">{{ resumen_gps.registros_fuera_hoy }}</strong>
+                            </div>
                         </div>
+                    </div>
 
-                        <div class="gps-dato">
-                            <span>Validación ubicación</span>
-                            <strong class="{% if ubicacion_esperada.dentro_radio %}gps-estado-ok{% else %}gps-estado-alerta{% endif %}">
-                                {% if ubicacion_esperada.dentro_radio %}
-                                    Dentro del radio
-                                {% else %}
-                                    Fuera del radio
-                                {% endif %}
-                            </strong>
-                        </div>
-                    {% endif %}
-                </div>
+                </aside>
 
-            {% else %}
+                <section class="gps-panel-mapa">
+                    <div id="mapa-gps"></div>
+                </section>
 
-                <div class="gps-card gps-card-vacia">
-                    <h2>Sin búsqueda activa</h2>
-                    <p>
-                        Ingresa un AMID para mostrar su última coordenada GPS en el mapa.
-                    </p>
-                </div>
+            </div>
 
-            {% endif %}
+        {% else %}
 
-        </aside>
+            <div class="gps-card gps-card-vacia">
+                <h2>Sin búsqueda activa</h2>
+                <p>
+                    Ingresa un AMID para mostrar su última coordenada GPS en el mapa.
+                </p>
+            </div>
 
-        <section class="gps-panel-mapa">
-            <div id="mapa-gps"></div>
-        </section>
+        {% endif %}
 
     </div>
 
@@ -225,5 +200,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=4"></script>
 {% endblock %}

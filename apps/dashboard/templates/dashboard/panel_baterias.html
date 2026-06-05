@@ -200,29 +200,28 @@
 
         </section>
         <!-- Alertas / ver como hacer que se oculte si no hay alertas-->
-        <section class="seccion bloque-alertas">
-            {% if total_caidas_drasticas > 0 %}
-                <h2>Alertas del período</h2>
-                <p class="alerta-texto">
-                    Se detectaron {{ total_caidas_drasticas }} caída{% if total_caidas_drasticas != 1 %}s{% endif %} drástica{% if total_caidas_drasticas != 1 %}s{% endif %} de batería.
-                </p>
+        {% if total_caidas_drasticas > 0 %}
+            <section class="seccion bloque-alertas">
+                {% if total_caidas_drasticas > 0 %}
+                    <h2>Alertas del período</h2>
+                    
+                    <ul class="lista-alertas">
+                        {% for alerta in alertas_periodo %}
+                            <li>
+                                {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
+                                batería pasó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%.
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <h2>Alertas del período</h2>
+                    <p class="sin-alertas">
+                        No se detectaron caídas drásticas de batería en el período seleccionado.
+                    </p>
+                {% endif %}
+            </section>
+        {% endif %}
 
-                <ul class="lista-alertas">
-                    {% for alerta in alertas_periodo %}
-                        <li>
-                            {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
-                            batería pasó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%.
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <h2>Alertas del período</h2>
-                <p class="sin-alertas">
-                    No se detectaron caídas drásticas de batería en el período seleccionado.
-                </p>
-            {% endif %}
-        </section>
-        
         <!-- Tabla batería por media hora -->
         <section class="seccion">
             <div class="titulo-tabla">
