@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pandas as pd
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -16,12 +19,25 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "ruta_excel",
+            nargs="?",
+            default=None,
             type=str,
             help="Ruta del archivo Excel de ubicaciones esperadas."
         )
 
     def handle(self, *args, **options):
         ruta_excel = options["ruta_excel"]
+
+        if ruta_excel:
+            ruta_excel = Path(ruta_excel)
+        else:
+            ruta_excel = Path(settings.BASE_DIR) / "VERSION ZONA PAGA.xlsx"
+
+        if not ruta_excel.exists():
+            self.stderr.write(
+                self.style.ERROR(f"No se encontró el archivo: {ruta_excel}")
+            )
+            return
 
         self.stdout.write(f"Leyendo archivo: {ruta_excel}")
 

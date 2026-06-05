@@ -81,54 +81,53 @@ def obtener_contexto_gps(request):
             longitud = ultima_ubicacion["longitud"]
             ultimo_registro = registros.last()
 
-            # Solo validamos ubicación esperada cuando el filtro es "Hoy"
-        if dias == 1:
-            parada_esperada = (
-                UbicacionEsperadaValidador.objects
-                .filter(amid=amid)
-                .first()
-            )
+            if dias == 1:
+                parada_esperada = (
+                    UbicacionEsperadaValidador.objects
+                    .filter(amid=amid)
+                    .first()
+                )
 
-            if (
-                parada_esperada
-                and parada_esperada.latitud_esperada is not None
-                and parada_esperada.longitud_esperada is not None
-                and parada_esperada.radio_metros is not None
-            ):
-                nombre_esperado = parada_esperada.nombre
-                latitud_esperada = float(parada_esperada.latitud_esperada)
-                longitud_esperada = float(parada_esperada.longitud_esperada)
-                radio_metros = float(parada_esperada.radio_metros)
-                operativa = parada_esperada.operativa
-                origen_ubicacion = "excel"
-            else:
-                nombre_esperado = NOMBRE_LABORATORIO_ZP
-                latitud_esperada = LATITUD_LABORATORIO_ZP
-                longitud_esperada = LONGITUD_LABORATORIO_ZP
-                radio_metros = RADIO_LABORATORIO_ZP
-                operativa = False
-                origen_ubicacion = "laboratorio_default"
+                if (
+                    parada_esperada
+                    and parada_esperada.latitud_esperada is not None
+                    and parada_esperada.longitud_esperada is not None
+                    and parada_esperada.radio_metros is not None
+                ):
+                    nombre_esperado = parada_esperada.nombre
+                    latitud_esperada = float(parada_esperada.latitud_esperada)
+                    longitud_esperada = float(parada_esperada.longitud_esperada)
+                    radio_metros = float(parada_esperada.radio_metros)
+                    operativa = parada_esperada.operativa
+                    origen_ubicacion = "excel"
+                else:
+                    nombre_esperado = NOMBRE_LABORATORIO_ZP
+                    latitud_esperada = LATITUD_LABORATORIO_ZP
+                    longitud_esperada = LONGITUD_LABORATORIO_ZP
+                    radio_metros = RADIO_LABORATORIO_ZP
+                    operativa = False
+                    origen_ubicacion = "laboratorio_default"
 
-            distancia = calcular_distancia_metros(
-                latitud,
-                longitud,
-                latitud_esperada,
-                longitud_esperada,
-            )
+                distancia = calcular_distancia_metros(
+                    latitud,
+                    longitud,
+                    latitud_esperada,
+                    longitud_esperada,
+                )
 
-            if distancia is not None:
-                dentro_radio = distancia <= radio_metros
+                if distancia is not None:
+                    dentro_radio = distancia <= radio_metros
 
-                ubicacion_esperada = {
-                    "nombre": nombre_esperado,
-                    "latitud": latitud_esperada,
-                    "longitud": longitud_esperada,
-                    "radio_metros": radio_metros,
-                    "distancia_metros": round(distancia, 2),
-                    "dentro_radio": dentro_radio,
-                    "operativa": operativa,
-                    "origen_ubicacion": origen_ubicacion,
-                }
+                    ubicacion_esperada = {
+                        "nombre": nombre_esperado,
+                        "latitud": latitud_esperada,
+                        "longitud": longitud_esperada,
+                        "radio_metros": radio_metros,
+                        "distancia_metros": round(distancia, 2),
+                        "dentro_radio": dentro_radio,
+                        "operativa": operativa,
+                        "origen_ubicacion": origen_ubicacion,
+                    }
         else:
             mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el período seleccionado."
 
