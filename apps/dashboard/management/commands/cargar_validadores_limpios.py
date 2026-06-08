@@ -1,3 +1,11 @@
+"""
+Comando Django: cargar_validadores_limpios.py
+- Toma registros de EstadoValidadorRaw y crea registros en EstadoValidadorLimpio.
+- Procesa datos de las últimas 2 semanas.
+- Si no se especifica --reprocesar, solo carga registros nuevos desde el último log OK.
+- Usa bulk_create con ignore_conflicts para evitar duplicados.
+- Registra resultados en LogImportacion.
+"""
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand

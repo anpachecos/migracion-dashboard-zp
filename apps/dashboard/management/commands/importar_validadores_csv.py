@@ -1,3 +1,10 @@
+"""
+Comando Django: importar_validadores_csv.py
+- Importa datos de validadores desde un archivo CSV hacia el modelo EstadoValidador.
+- Usa datos_query_prueba.csv por defecto, o un archivo especificado con --archivo.
+- Opción --limpiar elimina los registros existentes antes de importar.
+- Convierte columnas a enteros, decimales, booleanos y fechas.
+"""
 import pandas as pd
 from decimal import Decimal, InvalidOperation
 from pathlib import Path

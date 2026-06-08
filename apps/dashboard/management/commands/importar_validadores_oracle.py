@@ -1,3 +1,11 @@
+"""
+Comando Django: importar_validadores_oracle.py
+- Conecta a Oracle y consulta datos de validadores para importarlos en EstadoValidadorRaw.
+- Por defecto consulta las últimas 2 horas, o un rango mayor con --dias.
+- Opción --limpiar borra los registros RAW anteriores antes de la importación.
+- Inserta datos en bloque y registra métricas de filas obtenidas, creadas y duplicados ignorados.
+- Guarda un log en LogImportacion del resultado.
+"""
 import pandas as pd
 from decimal import Decimal, InvalidOperation
 

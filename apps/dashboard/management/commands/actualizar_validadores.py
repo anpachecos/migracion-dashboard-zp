@@ -1,3 +1,11 @@
+"""
+Comando Django: actualizar_validadores.py
+- Ejecuta el flujo completo de actualización de validadores.
+- Paso 1: importa datos desde Oracle a EstadoValidadorRaw.
+- Paso 2: carga datos desde EstadoValidadorRaw hacia EstadoValidadorLimpio.
+- Paso 3: elimina registros antiguos de RAW y Limpio.
+- Registra estado y errores en LogImportacion.
+"""
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone

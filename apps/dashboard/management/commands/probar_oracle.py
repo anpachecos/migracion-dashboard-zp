@@ -1,3 +1,9 @@
+"""
+Comando Django: probar_oracle.py
+- Prueba la conexión a la base de datos Oracle mediante una consulta simple.
+- Ejecuta SELECT SYSDATE FROM dual para verificar que la conexión funciona.
+- No modifica registros; solo informa si la conexión es exitosa o falla.
+"""
 from django.core.management.base import BaseCommand
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 

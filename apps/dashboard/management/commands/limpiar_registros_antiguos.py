@@ -1,3 +1,9 @@
+"""
+Comando Django: limpiar_registros_antiguos.py
+- Elimina registros antiguos de las tablas EstadoValidadorRaw y EstadoValidadorLimpio.
+- Borra datos con fecha_hora anterior a 14 días.
+- Registra la cantidad de filas eliminadas en LogImportacion.
+"""
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand

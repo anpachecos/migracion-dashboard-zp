@@ -1,3 +1,10 @@
+"""
+Comando Django: importar_ubicaciones_esperadas.py
+- Importa ubicaciones esperadas de validadores desde un archivo Excel de Zonas Pagas.
+- Lee la hoja Version_DB y espera columnas clave como IDDS, Nombre, Serie Val., Latitud, Longitud, Operativa y Radio.
+- Crea o actualiza registros de UbicacionEsperadaValidador usando el AMID.
+- Marca como no operativo cualquier validador existente que ya no aparece en el Excel.
+"""
 from pathlib import Path
 
 import pandas as pd
