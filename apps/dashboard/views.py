@@ -6,6 +6,7 @@ from .services.baterias_service import (
     construir_tabla_bateria,
 )
 from .services.gps_service import obtener_contexto_gps
+from .services.alertas_service import obtener_alertas_gps_cero
 
 #Para exportar excel
 from django.http import HttpResponse
@@ -21,24 +22,30 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 
+def panel_alertas(request):
+    dias = request.GET.get("dias", 1)
+    mostrar_todo = request.GET.get("ver") == "todo"
+
+    contexto_gps_cero = obtener_alertas_gps_cero(
+        dias=dias,
+        mostrar_todo=mostrar_todo
+    )
+
+    context = {
+        **contexto_gps_cero,
+    }
+
+    return render(request, "dashboard/panel_alertas.html", context)
 
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)
     contexto["active_page"] = "baterias"
     return render(request, "dashboard/panel_baterias.html", contexto)
 
-
 def panel_gps(request):
     contexto = obtener_contexto_gps(request)
     contexto["active_page"] = "gps"
     return render(request, "dashboard/panel_gps.html", contexto)
-
-
-def panel_alertas(request):
-    return render(request, "dashboard/panel_alertas.html", {
-        "active_page": "alertas",
-    })
-
 
 def panel_perfil(request):
     return render(request, "dashboard/panel_perfil.html", {

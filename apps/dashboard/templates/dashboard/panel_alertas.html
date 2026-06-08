@@ -11,12 +11,94 @@
 
 <section class="panel-alertas">
     <header class="panel-header">
-        <h1>Alertas</h1>
-        <p>Validadores que requieren revisión o seguimiento.</p>
+        <div>
+            <h1>Alertas</h1>
+            <p>Validadores que requieren revisión o seguimiento.</p>
+        </div>
     </header>
 
-    <div class="placeholder-card">
-        <p>Próximamente: validadores con batería baja, sin GPS o sin actualización reciente.</p>
+    <section class="filtros-alertas">
+        <span class="filtro-label">Días</span>
+
+        <a href="{% url 'dashboard:panel_alertas' %}?dias=1"
+           class="btn-dia {% if dias == 1 %}activo{% endif %}">
+            1
+        </a>
+
+        <a href="{% url 'dashboard:panel_alertas' %}?dias=3"
+           class="btn-dia {% if dias == 3 %}activo{% endif %}">
+            3
+        </a>
+
+        <a href="{% url 'dashboard:panel_alertas' %}?dias=7"
+           class="btn-dia {% if dias == 7 %}activo{% endif %}">
+            7
+        </a>
+
+        <a href="{% url 'dashboard:panel_alertas' %}?dias=14"
+           class="btn-dia {% if dias == 14 %}activo{% endif %}">
+            14
+        </a>
+    </section>
+
+    <section class="resumen-alertas">
+        <article class="alerta-card">
+            <span class="alerta-card-label">GPS 0</span>
+
+            <strong>{{ total_amids_gps_cero }}</strong>
+
+            <p>AMIDs únicos con latitud y longitud igual a 0.</p>
+
+        </article>
+    </section>
+
+    <div class="tabla-responsive">
+        <table class="tabla-alertas">
+            <thead>
+                <tr>
+                    <th>AMID</th>
+                    <th>Registros GPS 0</th>
+                    <th>Primera detección</th>
+                    <th>Última detección</th>
+                    <th>Última batería</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in resumen_gps_cero %}
+                    <tr>
+                        <td>{{ item.amid }}</td>
+
+                        <td>{{ item.cantidad_registros }}</td>
+
+                        <td>{{ item.primera_deteccion|date:"d-m-Y H:i" }}</td>
+
+                        <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
+
+                        <td>
+                            {% if item.ultima_bateria is not None %}
+                                {{ item.ultima_bateria }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <span class="badge-alerta badge-{{ item.estado_alerta|lower }}">
+                                {{ item.estado_alerta }}
+                            </span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="sin-datos">
+                            No se encontraron AMIDs con GPS 0 en el período seleccionado.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </section>
 
