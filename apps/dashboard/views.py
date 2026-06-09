@@ -11,6 +11,7 @@ from .services.alertas_service import (
     obtener_alertas_caidas_bateria,
     obtener_alertas_fuera_radio,
 )
+from django.contrib.auth.models import User, Group
 
 #Para exportar excel
 from django.http import HttpResponse
@@ -73,8 +74,51 @@ def panel_gps(request):
     return render(request, "dashboard/panel_gps.html", contexto)
 
 def panel_perfil(request):
+    usuarios = User.objects.all().order_by("username")
+
+    total_usuarios = usuarios.count()
+    usuarios_activos = usuarios.filter(is_active=True).count()
+    usuarios_inactivos = usuarios.filter(is_active=False).count()
+    total_admins = usuarios.filter(is_superuser=True).count()
+
+    grupos = Group.objects.all().order_by("name")
+
+    resumen_roles = []
+
+    for grupo in grupos:
+        resumen_roles.append({
+            "nombre": grupo.name,
+            "cantidad": grupo.user_set.count(),
+        })
+
+    lista_usuarios = []
+
+    for usuario in usuarios:
+        grupos_usuario = usuario.groups.all()
+        roles = ", ".join([grupo.name for grupo in grupos_usuario])
+
+        if usuario.is_superuser:
+            roles = "Admin" if not roles else f"Admin, {roles}"
+
+        lista_usuarios.append({
+            "username": usuario.username,
+            "email": usuario.email,
+            "nombre": usuario.get_full_name() or "-",
+            "roles": roles or "Sin rol",
+            "activo": usuario.is_active,
+            "ultimo_acceso": usuario.last_login,
+            "fecha_creacion": usuario.date_joined,
+            "es_admin": usuario.is_superuser,
+        })
+
     return render(request, "dashboard/panel_perfil.html", {
         "active_page": "perfil",
+        "total_usuarios": total_usuarios,
+        "usuarios_activos": usuarios_activos,
+        "usuarios_inactivos": usuarios_inactivos,
+        "total_admins": total_admins,
+        "resumen_roles": resumen_roles,
+        "lista_usuarios": lista_usuarios,
     })
 
 def exportar_baterias_excel(request):

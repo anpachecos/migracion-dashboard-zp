@@ -1,27 +1,157 @@
-{% extends 'dashboard/base_dashboard.html' %}
+{% extends "dashboard/base_dashboard.html" %}
 {% load static %}
 
-{% block title %}Perfil | Dashboard ZP{% endblock %}
+{% block title %}Perfil{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil.css' %}">
 {% endblock %}
 
 {% block content %}
+<div class="panel-header">
+    <h1>Perfil y usuarios</h1>
+    <p>Consulta de usuarios registrados, roles y estado de acceso al dashboard.</p>
+</div>
 
-<section class="panel-perfil">
-    <header class="panel-header">
-        <h1>Perfil</h1>
-        <p>Configuración del usuario y futuras opciones administrativas.</p>
-    </header>
+<section class="perfil-grid-resumen">
+    <div class="perfil-card">
+        <span>Total usuarios</span>
+        <strong>{{ total_usuarios }}</strong>
+    </div>
 
-    <div class="placeholder-card">
-        <p>Próximamente: cambio de contraseña, datos del usuario y opciones administrativas.</p>
+    <div class="perfil-card">
+        <span>Usuarios activos</span>
+        <strong>{{ usuarios_activos }}</strong>
+    </div>
+
+    <div class="perfil-card">
+        <span>Usuarios inactivos</span>
+        <strong>{{ usuarios_inactivos }}</strong>
+    </div>
+
+    <div class="perfil-card">
+        <span>Administradores</span>
+        <strong>{{ total_admins }}</strong>
     </div>
 </section>
 
-{% endblock %}
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Usuario conectado</h2>
+    </div>
 
-{% block extra_js %}
-<script src="{% static 'dashboard/js/panel_perfil.js' %}"></script>
+    <div class="usuario-conectado">
+        <div>
+            <span>Usuario</span>
+            <strong>{{ request.user.username }}</strong>
+        </div>
+
+        <div>
+            <span>Correo</span>
+            <strong>{{ request.user.email|default:"Sin correo registrado" }}</strong>
+        </div>
+
+        <div>
+            <span>Estado</span>
+            {% if request.user.is_active %}
+                <strong class="estado-activo">Activo</strong>
+            {% else %}
+                <strong class="estado-inactivo">Inactivo</strong>
+            {% endif %}
+        </div>
+
+        <div>
+            <span>Último acceso</span>
+            <strong>
+                {% if request.user.last_login %}
+                    {{ request.user.last_login|date:"d-m-Y H:i" }}
+                {% else %}
+                    Sin registro
+                {% endif %}
+            </strong>
+        </div>
+    </div>
+</section>
+
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Roles registrados</h2>
+    </div>
+
+    <div class="roles-grid">
+        {% for rol in resumen_roles %}
+            <div class="rol-card">
+                <span>{{ rol.nombre }}</span>
+                <strong>{{ rol.cantidad }}</strong>
+            </div>
+        {% empty %}
+            <p class="texto-vacio">No hay roles registrados todavía.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Usuarios del dashboard</h2>
+        <p>Por ahora todos los usuarios pueden visualizar todos los paneles.</p>
+    </div>
+
+    <div class="tabla-contenedor">
+        <table class="tabla-usuarios">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Último acceso</th>
+                    <th>Fecha creación</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for usuario in lista_usuarios %}
+                    <tr>
+                        <td>
+                            <strong>{{ usuario.username }}</strong>
+                        </td>
+
+                        <td>{{ usuario.nombre }}</td>
+
+                        <td>{{ usuario.email|default:"-" }}</td>
+
+                        <td>
+                            <span class="badge-rol {% if usuario.es_admin %}badge-admin{% endif %}">
+                                {{ usuario.roles }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if usuario.activo %}
+                                <span class="badge-estado activo">Activo</span>
+                            {% else %}
+                                <span class="badge-estado inactivo">Inactivo</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if usuario.ultimo_acceso %}
+                                {{ usuario.ultimo_acceso|date:"d-m-Y H:i" }}
+                            {% else %}
+                                Sin acceso
+                            {% endif %}
+                        </td>
+
+                        <td>{{ usuario.fecha_creacion|date:"d-m-Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">No hay usuarios registrados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}

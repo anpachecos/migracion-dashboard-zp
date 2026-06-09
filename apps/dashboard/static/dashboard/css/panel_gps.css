@@ -22,7 +22,7 @@
 
 .gps-fila-superior {
     display: grid;
-    grid-template-columns: 300px repeat(3, 1fr);
+    grid-template-columns: minmax(520px, 1.2fr) repeat(3, 1fr);
     gap: 14px;
     align-items: stretch;
 }
@@ -51,6 +51,10 @@
 
 .gps-formulario {
     padding: 16px;
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 12px;
+    align-items: end;
 }
 
 .gps-formulario label {
@@ -90,7 +94,7 @@
 }
 
 .gps-filtro-dias {
-    margin-top: 10px;
+    margin-top: 0;
     padding: 9px 10px;
     background: #ffffff;
     border: 1px solid #e5e7eb;
@@ -98,6 +102,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.gps-campo-busqueda {
+    min-width: 0;
 }
 
 .gps-filtro-label {
@@ -269,7 +277,7 @@
 
 @media (max-width: 1300px) {
     .gps-fila-superior {
-        grid-template-columns: 280px repeat(3, 1fr);
+        grid-template-columns: minmax(480px, 1.2fr) repeat(3, 1fr);
     }
 
     .gps-fila-mapa {
@@ -289,6 +297,11 @@
     .gps-panel-mapa,
     #mapa-gps {
         min-height: 420px;
+    }
+
+    .gps-formulario {
+        grid-template-columns: 1fr;
+        align-items: stretch;
     }
 }
 
