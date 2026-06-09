@@ -69,6 +69,19 @@
             </span>
         </a>
 
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio"
+            class="alerta-card alerta-card-link {% if tipo_alerta == 'fuera_radio' %}activa{% endif %}">
+                <span class="alerta-card-label">Fuera de radio</span>
+
+                <strong>{{ total_amids_fuera_radio }}</strong>
+
+                <p>AMIDs fuera de su ubicación esperada.</p>
+
+                <span class="detalle-card">
+                    {{ total_eventos_fuera_radio }} registros fuera de radio
+                </span>
+        </a>
+
     </section>
 
     {% if tipo_alerta == "gps_cero" %}
@@ -212,6 +225,79 @@
                 </table>
             </div>
         </section>
+
+    {% elif tipo_alerta == "fuera_radio" %}
+
+    <section class="tabla-card">
+        <div class="tabla-header">
+            <div>
+                <h2>Validadores fuera de radio</h2>
+                <p>
+                    AMIDs con coordenadas válidas, distintas de 0, pero fuera del radio
+                    definido para su ubicación esperada durante los últimos
+                    {{ dias }} día{% if dias != 1 %}s{% endif %}.
+                </p>
+            </div>
+
+            {% if hay_mas_fuera_radio and not mostrar_todo %}
+                <a class="btn-ver-mas"
+                   href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo">
+                    Ver más
+                </a>
+            {% endif %}
+
+            {% if mostrar_todo %}
+                <a class="btn-ver-mas"
+                   href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio">
+                    Ver solo 5
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="tabla-responsive">
+            <table class="tabla-alertas">
+                <thead>
+                    <tr>
+                        <th>AMID</th>
+                        <th>Registros fuera</th>
+                        <th>Última detección</th>
+                        <th>Ubicación esperada</th>
+                        <th>Distancia</th>
+                        <th>Radio</th>
+                        <th>Exceso</th>
+                        <th>Última batería</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in resumen_fuera_radio %}
+                        <tr>
+                            <td>{{ item.amid }}</td>
+                            <td>{{ item.cantidad_registros }}</td>
+                            <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
+                            <td>{{ item.nombre_ubicacion|default:"-" }}</td>
+                            <td>{{ item.distancia_metros }} m</td>
+                            <td>{{ item.radio_metros }} m</td>
+                            <td>{{ item.exceso_metros }} m</td>
+                            <td>
+                                {% if item.ultima_bateria is not None %}
+                                    {{ item.ultima_bateria }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="sin-datos">
+                                No se encontraron AMIDs fuera de radio en el período seleccionado.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     {% endif %}
 </section>
