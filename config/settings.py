@@ -129,3 +129,20 @@ ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD")
 ORACLE_HOST = os.getenv("ORACLE_HOST")
 ORACLE_PORT = os.getenv("ORACLE_PORT", "1521")
 ORACLE_SID = os.getenv("ORACLE_SID")
+
+# =========================
+# Autenticación / sesiones
+# =========================
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "dashboard:panel_baterias"
+LOGOUT_REDIRECT_URL = "login"
+
+# 2 horas de sesión
+SESSION_COOKIE_AGE = 60 * 60 * 2
+
+# Renueva la sesión si el usuario sigue usando el dashboard
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Cierra sesión al cerrar el navegador
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True

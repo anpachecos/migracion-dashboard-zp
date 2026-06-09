@@ -70,12 +70,21 @@
             <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}">
                 Perfil
             </a>
+
+            
         </nav>
 
         <div class="sidebar-footer">
             <p>Sistema de Monitoreo ZP</p>
             <p>Desarrollado por Antonia Pacheco</p>
             <p>Versión 0.2.0 · 2026</p>
+
+            <form method="post" action="{% url 'logout' %}" class="sidebar-logout-form">
+                {% csrf_token %}
+                <button type="submit" class="sidebar-logout-button">
+                    Cerrar sesión
+                </button>
+            </form>
         </div>
     </aside>
 

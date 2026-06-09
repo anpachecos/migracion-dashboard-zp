@@ -25,8 +25,9 @@ from io import BytesIO
 
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 
-
+@login_required
 def panel_alertas(request):
     dias = request.GET.get("dias", 1)
     tipo_alerta = request.GET.get("tipo", "gps_cero")
@@ -63,64 +64,87 @@ def panel_alertas(request):
 
     return render(request, "dashboard/panel_alertas.html", context)
 
+@login_required
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)
     contexto["active_page"] = "baterias"
     return render(request, "dashboard/panel_baterias.html", contexto)
 
+@login_required
 def panel_gps(request):
     contexto = obtener_contexto_gps(request)
     contexto["active_page"] = "gps"
     return render(request, "dashboard/panel_gps.html", contexto)
 
+@login_required
 def panel_perfil(request):
-    usuarios = User.objects.all().order_by("username")
+    usuario_actual = request.user
 
-    total_usuarios = usuarios.count()
-    usuarios_activos = usuarios.filter(is_active=True).count()
-    usuarios_inactivos = usuarios.filter(is_active=False).count()
-    total_admins = usuarios.filter(is_superuser=True).count()
+    es_admin = (
+        usuario_actual.is_superuser
+        or usuario_actual.groups.filter(name="Admin").exists()
+    )
 
-    grupos = Group.objects.all().order_by("name")
+    roles_usuario_actual = usuario_actual.groups.values_list("name", flat=True)
+    roles_usuario_actual = ", ".join(roles_usuario_actual)
 
-    resumen_roles = []
-
-    for grupo in grupos:
-        resumen_roles.append({
-            "nombre": grupo.name,
-            "cantidad": grupo.user_set.count(),
-        })
-
-    lista_usuarios = []
-
-    for usuario in usuarios:
-        grupos_usuario = usuario.groups.all()
-        roles = ", ".join([grupo.name for grupo in grupos_usuario])
-
-        if usuario.is_superuser:
-            roles = "Admin" if not roles else f"Admin, {roles}"
-
-        lista_usuarios.append({
-            "username": usuario.username,
-            "email": usuario.email,
-            "nombre": usuario.get_full_name() or "-",
-            "roles": roles or "Sin rol",
-            "activo": usuario.is_active,
-            "ultimo_acceso": usuario.last_login,
-            "fecha_creacion": usuario.date_joined,
-            "es_admin": usuario.is_superuser,
-        })
-
-    return render(request, "dashboard/panel_perfil.html", {
+    context = {
         "active_page": "perfil",
-        "total_usuarios": total_usuarios,
-        "usuarios_activos": usuarios_activos,
-        "usuarios_inactivos": usuarios_inactivos,
-        "total_admins": total_admins,
-        "resumen_roles": resumen_roles,
-        "lista_usuarios": lista_usuarios,
-    })
+        "es_admin": es_admin,
+        "usuario_actual": usuario_actual,
+        "roles_usuario_actual": roles_usuario_actual or "Sin rol asignado",
+    }
 
+    if es_admin:
+        usuarios = User.objects.all().order_by("username")
+
+        total_usuarios = usuarios.count()
+        usuarios_activos = usuarios.filter(is_active=True).count()
+        usuarios_inactivos = usuarios.filter(is_active=False).count()
+        total_admins = usuarios.filter(is_superuser=True).count()
+
+        grupos = Group.objects.all().order_by("name")
+
+        resumen_roles = []
+
+        for grupo in grupos:
+            resumen_roles.append({
+                "nombre": grupo.name,
+                "cantidad": grupo.user_set.count(),
+            })
+
+        lista_usuarios = []
+
+        for usuario in usuarios:
+            grupos_usuario = usuario.groups.all()
+            roles = ", ".join([grupo.name for grupo in grupos_usuario])
+
+            if usuario.is_superuser:
+                roles = "Admin" if not roles else f"Admin, {roles}"
+
+            lista_usuarios.append({
+                "username": usuario.username,
+                "email": usuario.email,
+                "nombre": usuario.get_full_name() or "-",
+                "roles": roles or "Sin rol",
+                "activo": usuario.is_active,
+                "ultimo_acceso": usuario.last_login,
+                "fecha_creacion": usuario.date_joined,
+                "es_admin": usuario.is_superuser,
+            })
+
+        context.update({
+            "total_usuarios": total_usuarios,
+            "usuarios_activos": usuarios_activos,
+            "usuarios_inactivos": usuarios_inactivos,
+            "total_admins": total_admins,
+            "resumen_roles": resumen_roles,
+            "lista_usuarios": lista_usuarios,
+        })
+
+    return render(request, "dashboard/panel_perfil.html", context)
+
+@login_required
 def exportar_baterias_excel(request):
     """
     Exporta a Excel los datos del AMID consultado.

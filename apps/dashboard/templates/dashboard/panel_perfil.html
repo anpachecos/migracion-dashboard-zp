@@ -9,10 +9,16 @@
 
 {% block content %}
 <div class="panel-header">
-    <h1>Perfil y usuarios</h1>
-    <p>Consulta de usuarios registrados, roles y estado de acceso al dashboard.</p>
+    <h1>Perfil</h1>
+
+    {% if es_admin %}
+        <p>Consulta de usuarios registrados, roles y estado de acceso al dashboard.</p>
+    {% else %}
+        <p>Consulta de tus datos de usuario y acceso al dashboard.</p>
+    {% endif %}
 </div>
 
+{% if es_admin %}
 <section class="perfil-grid-resumen">
     <div class="perfil-card">
         <span>Total usuarios</span>
@@ -34,6 +40,7 @@
         <strong>{{ total_admins }}</strong>
     </div>
 </section>
+{% endif %}
 
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
@@ -49,6 +56,11 @@
         <div>
             <span>Correo</span>
             <strong>{{ request.user.email|default:"Sin correo registrado" }}</strong>
+        </div>
+
+        <div>
+            <span>Rol</span>
+            <strong>{{ roles_usuario_actual|default:"Sin rol asignado" }}</strong>
         </div>
 
         <div>
@@ -70,9 +82,33 @@
                 {% endif %}
             </strong>
         </div>
+
+        <div>
+            <span>Fecha creación</span>
+            <strong>{{ request.user.date_joined|date:"d-m-Y H:i" }}</strong>
+        </div>
+    </div>
+
+    <div class="perfil-acciones">
+        <a href="{% url 'password_change' %}" class="btn-cambiar-password">
+            Cambiar contraseña
+        </a>
     </div>
 </section>
 
+{% if not es_admin %}
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Cuenta de usuario</h2>
+        <p>
+            Tu cuenta tiene acceso de visualización al dashboard.
+            La administración de usuarios está disponible solo para administradores.
+        </p>
+    </div>
+</section>
+{% endif %}
+
+{% if es_admin %}
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
         <h2>Roles registrados</h2>
@@ -93,7 +129,10 @@
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
         <h2>Usuarios del dashboard</h2>
-        <p>Por ahora todos los usuarios pueden visualizar todos los paneles.</p>
+        <p>
+            Por ahora todos los usuarios pueden visualizar todos los paneles.
+            Los roles se usan para clasificar usuarios y separar la administración.
+        </p>
     </div>
 
     <div class="tabla-contenedor">
@@ -154,4 +193,5 @@
         </table>
     </div>
 </section>
+{% endif %}
 {% endblock %}
