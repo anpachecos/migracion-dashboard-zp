@@ -15,8 +15,6 @@ def clasificar_gps_cero(cantidad_registros):
 
     return "Aislado"
 
-
-
 def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
     """
     Obtiene resumen de AMIDs únicos con GPS 0 dentro del período seleccionado.
@@ -93,4 +91,146 @@ def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
         "resumen_gps_cero": resumen_visible,
         "mostrar_todo": mostrar_todo,
         "hay_mas_registros": total_amids_gps_cero > 5,
+    }
+
+def formatear_duracion(delta):
+    """
+    Convierte un timedelta en texto corto.
+    Ejemplo: 1h 30m
+    """
+
+    total_minutos = int(delta.total_seconds() // 60)
+    horas = total_minutos // 60
+    minutos = total_minutos % 60
+
+    if horas > 0:
+        return f"{horas}h {minutos}m"
+
+    return f"{minutos}m"
+
+def obtener_alertas_caidas_bateria(
+    dias=1,
+    mostrar_todo=False,
+    umbral_caida=30,
+    ventana_horas=2
+):
+    """
+    Detecta caídas drásticas de batería por AMID.
+
+    Regla:
+    - La batería baja al menos `umbral_caida` puntos.
+    - La diferencia de tiempo entre mediciones es menor o igual a `ventana_horas`.
+    """
+
+    try:
+        dias = int(dias)
+    except ValueError:
+        dias = 1
+
+    if dias not in [1, 3, 7, 14]:
+        dias = 1
+
+    fecha_inicio = timezone.now() - timedelta(days=dias)
+    ventana_maxima = timedelta(hours=ventana_horas)
+
+    registros = (
+        EstadoValidadorLimpio.objects
+        .filter(
+            fec_estado__gte=fecha_inicio,
+            porcentaje_bateria__isnull=False,
+            fec_estado__isnull=False,
+        )
+        .values(
+            "amid",
+            "fec_estado",
+            "fec_descarga",
+            "porcentaje_bateria",
+            "latitud",
+            "longitud",
+        )
+        .order_by("amid", "fec_estado")
+    )
+
+    ultimo_por_amid = {}
+    eventos_por_amid = {}
+
+    for registro in registros:
+        amid = registro["amid"]
+        registro_anterior = ultimo_por_amid.get(amid)
+
+        if registro_anterior:
+            tiempo_transcurrido = registro["fec_estado"] - registro_anterior["fec_estado"]
+            caida = registro_anterior["porcentaje_bateria"] - registro["porcentaje_bateria"]
+
+            if (
+                tiempo_transcurrido > timedelta(0)
+                and tiempo_transcurrido <= ventana_maxima
+                and caida >= umbral_caida
+            ):
+                evento = {
+                    "amid": amid,
+                    "fecha_anterior": registro_anterior["fec_estado"],
+                    "fecha_actual": registro["fec_estado"],
+                    "bateria_anterior": registro_anterior["porcentaje_bateria"],
+                    "bateria_actual": registro["porcentaje_bateria"],
+                    "caida": caida,
+                    "tiempo_transcurrido": formatear_duracion(tiempo_transcurrido),
+                    "fec_descarga": registro["fec_descarga"],
+                    "latitud": registro["latitud"],
+                    "longitud": registro["longitud"],
+                }
+
+                eventos_por_amid.setdefault(amid, []).append(evento)
+
+        ultimo_por_amid[amid] = registro
+
+    resumen_caidas = []
+
+    for amid, eventos in eventos_por_amid.items():
+        eventos_ordenados = sorted(
+            eventos,
+            key=lambda evento: evento["fecha_actual"],
+            reverse=True
+        )
+
+        ultima_caida = eventos_ordenados[0]
+        mayor_caida = max(eventos, key=lambda evento: evento["caida"])
+
+        resumen_caidas.append({
+            "amid": amid,
+            "cantidad_caidas": len(eventos),
+            "mayor_caida": mayor_caida["caida"],
+            "ultima_caida": ultima_caida["fecha_actual"],
+            "bateria_anterior": ultima_caida["bateria_anterior"],
+            "bateria_actual": ultima_caida["bateria_actual"],
+            "tiempo_transcurrido": ultima_caida["tiempo_transcurrido"],
+        })
+
+    resumen_caidas = sorted(
+        resumen_caidas,
+        key=lambda item: (
+            item["cantidad_caidas"],
+            item["mayor_caida"],
+            item["ultima_caida"],
+        ),
+        reverse=True
+    )
+
+    total_amids_caidas_bateria = len(resumen_caidas)
+    total_eventos_caidas_bateria = sum(
+        item["cantidad_caidas"] for item in resumen_caidas
+    )
+
+    if mostrar_todo:
+        resumen_visible = resumen_caidas
+    else:
+        resumen_visible = resumen_caidas[:5]
+
+    return {
+        "total_amids_caidas_bateria": total_amids_caidas_bateria,
+        "total_eventos_caidas_bateria": total_eventos_caidas_bateria,
+        "resumen_caidas_bateria": resumen_visible,
+        "hay_mas_caidas_bateria": total_amids_caidas_bateria > 5,
+        "umbral_caida": umbral_caida,
+        "ventana_horas": ventana_horas,
     }

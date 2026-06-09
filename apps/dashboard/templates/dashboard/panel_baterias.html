@@ -208,8 +208,9 @@
                     <ul class="lista-alertas">
                         {% for alerta in alertas_periodo %}
                             <li>
-                                {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
-                                batería pasó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%.
+                                Entre {{ alerta.fecha_anterior|date:"d-m-Y H:i" }} y {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
+                                batería bajó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%
+                                (caída de {{ alerta.caida }} puntos en {{ alerta.tiempo_transcurrido }}).
                             </li>
                         {% endfor %}
                     </ul>

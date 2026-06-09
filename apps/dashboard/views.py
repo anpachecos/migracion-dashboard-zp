@@ -6,8 +6,10 @@ from .services.baterias_service import (
     construir_tabla_bateria,
 )
 from .services.gps_service import obtener_contexto_gps
-from .services.alertas_service import obtener_alertas_gps_cero
-
+from .services.alertas_service import (
+    obtener_alertas_gps_cero,
+    obtener_alertas_caidas_bateria,
+)
 #Para exportar excel
 from django.http import HttpResponse
 from openpyxl import Workbook
@@ -24,15 +26,30 @@ from django.utils import timezone
 
 def panel_alertas(request):
     dias = request.GET.get("dias", 1)
+    tipo_alerta = request.GET.get("tipo", "gps_cero")
     mostrar_todo = request.GET.get("ver") == "todo"
+
+    tipos_validos = ["gps_cero", "caidas_bateria"]
+
+    if tipo_alerta not in tipos_validos:
+        tipo_alerta = "gps_cero"
 
     contexto_gps_cero = obtener_alertas_gps_cero(
         dias=dias,
         mostrar_todo=mostrar_todo
     )
 
+    contexto_caidas_bateria = obtener_alertas_caidas_bateria(
+        dias=dias,
+        mostrar_todo=mostrar_todo,
+        umbral_caida=30,
+        ventana_horas=2,
+    )
+
     context = {
         **contexto_gps_cero,
+        **contexto_caidas_bateria,
+        "tipo_alerta": tipo_alerta,
     }
 
     return render(request, "dashboard/panel_alertas.html", context)

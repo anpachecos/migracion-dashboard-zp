@@ -75,19 +75,48 @@ def evaluar_error_bateria(valor):
     return "Sin dato", "chip-neutro"
 
 
-def detectar_caidas_drasticas(registros):
+def formatear_duracion(delta):
     """
-    Detecta caídas drásticas cuando la batería pasa desde 20% o más a 0%.
-    Solo considera valores reales, no nulos.
+    Convierte un timedelta en texto corto.
+    Ejemplo: 1h 30m
+    """
+
+    total_minutos = int(delta.total_seconds() // 60)
+    horas = total_minutos // 60
+    minutos = total_minutos % 60
+
+    if horas > 0:
+        return f"{horas}h {minutos}m"
+
+    return f"{minutos}m"
+
+
+def detectar_caidas_drasticas(registros, umbral_caida=30, ventana_horas=2):
+    """
+    Detecta caídas drásticas de batería para un AMID.
+
+    Regla:
+    - La batería baja al menos `umbral_caida` puntos.
+    - La diferencia de tiempo entre mediciones es menor o igual a `ventana_horas`.
+
+    Ejemplo:
+    70% -> 30% en 2 horas = caída drástica.
+    70% -> 30% en 24 horas = no cuenta.
     """
 
     caidas = []
     registros_validos = []
+    ventana_maxima = timedelta(hours=ventana_horas)
 
     for registro in registros:
         valor = registro.porcentaje_bateria
 
         if valor is None or valor == "":
+            continue
+
+        fecha = registro.fecha_hora or registro.fec_estado
+
+        if not fecha:
             continue
 
         try:
@@ -96,7 +125,7 @@ def detectar_caidas_drasticas(registros):
             continue
 
         registros_validos.append({
-            "fecha_hora": registro.fecha_hora,
+            "fecha_hora": fecha,
             "bateria": bateria,
         })
 
@@ -109,14 +138,25 @@ def detectar_caidas_drasticas(registros):
         bateria_anterior = anterior["bateria"]
         bateria_actual = actual["bateria"]
 
-        if bateria_anterior >= 20 and bateria_actual == 0:
+        tiempo_transcurrido = actual["fecha_hora"] - anterior["fecha_hora"]
+        caida = bateria_anterior - bateria_actual
+
+        if (
+            tiempo_transcurrido > timedelta(0)
+            and tiempo_transcurrido <= ventana_maxima
+            and caida >= umbral_caida
+        ):
             caidas.append({
                 "fecha_hora": actual["fecha_hora"],
+                "fecha_anterior": anterior["fecha_hora"],
                 "bateria_anterior": bateria_anterior,
                 "bateria_actual": bateria_actual,
+                "caida": caida,
+                "tiempo_transcurrido": formatear_duracion(tiempo_transcurrido),
             })
 
     return caidas
+
 
 def obtener_contexto_baterias(request):
     amid = request.GET.get("amid", "").strip()
