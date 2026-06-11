@@ -202,3 +202,40 @@ class UbicacionEsperadaValidador(models.Model):
 
     def __str__(self):
         return f"{self.amid} - {self.nombre}"
+    
+class HistorialUbicacionEsperadaValidador(models.Model):
+    amid = models.CharField(max_length=20)
+
+    nombre = models.CharField(max_length=255, blank=True, null=True)
+    serie_validador = models.CharField(max_length=100, blank=True, null=True)
+
+    latitud_esperada = models.FloatField(blank=True, null=True)
+    longitud_esperada = models.FloatField(blank=True, null=True)
+    radio_metros = models.FloatField(blank=True, null=True)
+
+    operativa = models.BooleanField(default=True)
+
+    origen_ubicacion = models.CharField(
+        max_length=30,
+        default="excel",
+        help_text="Origen de la ubicación: excel, laboratorio o laboratorio_default."
+    )
+
+    fecha_inicio_vigencia = models.DateTimeField()
+    fecha_fin_vigencia = models.DateTimeField(null=True, blank=True)
+
+    fecha_carga = models.DateTimeField()
+    archivo_origen = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Historial de ubicación esperada"
+        verbose_name_plural = "Historial de ubicaciones esperadas"
+        indexes = [
+            models.Index(fields=["amid"]),
+            models.Index(fields=["fecha_inicio_vigencia"]),
+            models.Index(fields=["fecha_fin_vigencia"]),
+            models.Index(fields=["amid", "fecha_inicio_vigencia", "fecha_fin_vigencia"]),
+        ]
+
+    def __str__(self):
+        return f"{self.amid} - {self.nombre} - {self.fecha_inicio_vigencia}"

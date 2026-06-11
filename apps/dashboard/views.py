@@ -50,12 +50,15 @@ def panel_alertas(request):
     else:
         ubicaciones_seleccionadas = opciones_ubicacion_esperada
 
-    parametros_ubicaciones = [("filtro_ubicaciones", "1")]
+    if filtro_ubicaciones_aplicado:
+        parametros_ubicaciones = [("filtro_ubicaciones", "1")]
 
-    for ubicacion in ubicaciones_seleccionadas:
-        parametros_ubicaciones.append(("ubicacion", ubicacion))
+        for ubicacion in ubicaciones_seleccionadas:
+            parametros_ubicaciones.append(("ubicacion", ubicacion))
 
-    ubicaciones_query_string = urlencode(parametros_ubicaciones)
+        ubicaciones_query_string = urlencode(parametros_ubicaciones)
+    else:
+        ubicaciones_query_string = ""
 
     contexto_gps_cero = obtener_alertas_gps_cero(
         dias=dias,

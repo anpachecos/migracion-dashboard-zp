@@ -25,22 +25,22 @@
         <div class="filtros-dias-grupo">
             <span class="filtro-label">Días</span>
 
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=1&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=1&tipo={{ tipo_alerta }}{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
                class="btn-dia {% if dias == 1 %}activo{% endif %}">
                 1
             </a>
 
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=3&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=3&tipo={{ tipo_alerta }}{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
                class="btn-dia {% if dias == 3 %}activo{% endif %}">
                 3
             </a>
 
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=7&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=7&tipo={{ tipo_alerta }}{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
                class="btn-dia {% if dias == 7 %}activo{% endif %}">
                 7
             </a>
 
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=14&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=14&tipo={{ tipo_alerta }}{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
                class="btn-dia {% if dias == 14 %}activo{% endif %}">
                 14
             </a>
@@ -101,7 +101,7 @@
     <!-- Tarjetas resumen -->
     <section class="resumen-alertas">
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&{{ ubicaciones_query_string }}"
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
            class="alerta-card alerta-card-link {% if tipo_alerta == 'gps_cero' %}activa{% endif %}">
             <span class="alerta-card-label">GPS 0</span>
 
@@ -114,7 +114,7 @@
             </span>
         </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&{{ ubicaciones_query_string }}"
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
            class="alerta-card alerta-card-link {% if tipo_alerta == 'caidas_bateria' %}activa{% endif %}">
             <span class="alerta-card-label">Caídas batería</span>
 
@@ -127,7 +127,7 @@
             </span>
         </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&{{ ubicaciones_query_string }}"
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}"
            class="alerta-card alerta-card-link {% if tipo_alerta == 'fuera_radio' %}activa{% endif %}">
             <span class="alerta-card-label">Fuera de radio</span>
 
@@ -157,14 +157,14 @@
 
                 {% if hay_mas_registros and not mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&ver=todo&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&ver=todo{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver más
                     </a>
                 {% endif %}
 
                 {% if mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver solo 5
                     </a>
                 {% endif %}
@@ -235,14 +235,14 @@
 
                 {% if hay_mas_caidas_bateria and not mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&ver=todo&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&ver=todo{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver más
                     </a>
                 {% endif %}
 
                 {% if mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver solo 5
                     </a>
                 {% endif %}
@@ -301,14 +301,14 @@
 
                 {% if hay_mas_fuera_radio and not mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver más
                     </a>
                 {% endif %}
 
                 {% if mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&{{ ubicaciones_query_string }}">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio{% if ubicaciones_query_string %}&{{ ubicaciones_query_string }}{% endif %}">
                         Ver solo 5
                     </a>
                 {% endif %}

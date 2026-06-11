@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=8">
 {% endblock %}
 
 {% block content %}
@@ -76,11 +76,11 @@
                 <strong>{{ resumen_gps.texto_ultima_ubicacion }}</strong>
             </article>
 
-            <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_cumplimiento_hoy }}">
-                <span>Cumplimiento hoy</span>
+            <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_cumplimiento_periodo }}">
+                <span>{{ resumen_gps.texto_cumplimiento }}</span>
                 <strong>
-                    {% if resumen_gps.porcentaje_cumplimiento_hoy is not None %}
-                        {{ resumen_gps.porcentaje_cumplimiento_hoy }}%
+                    {% if resumen_gps.porcentaje_cumplimiento_periodo is not None %}
+                        {{ resumen_gps.porcentaje_cumplimiento_periodo }}%
                     {% else %}
                         Sin datos
                     {% endif %}
@@ -138,13 +138,7 @@
 
                         <div class="gps-dato">
                             <span>Período visualizado</span>
-                            <strong>
-                                {% if dias == 1 %}
-                                    Hoy
-                                {% else %}
-                                    Últimos {{ dias }} días
-                                {% endif %}
-                            </strong>
+                            <strong>{{ resumen_gps.texto_periodo }}</strong>
                         </div>
 
                         <div class="gps-dato">
@@ -154,13 +148,17 @@
 
                         <div class="gps-dato gps-dato-doble">
                             <div>
-                                <span>Dentro hoy</span>
-                                <strong class="gps-estado-ok">{{ resumen_gps.registros_dentro_hoy }}</strong>
+                                <span>{{ resumen_gps.texto_dentro }}</span>
+                                <strong class="gps-estado-ok">
+                                    {{ resumen_gps.registros_dentro_periodo }}
+                                </strong>
                             </div>
 
                             <div>
-                                <span>Fuera hoy</span>
-                                <strong class="gps-estado-alerta">{{ resumen_gps.registros_fuera_hoy }}</strong>
+                                <span>{{ resumen_gps.texto_fuera }}</span>
+                                <strong class="gps-estado-alerta">
+                                    {{ resumen_gps.registros_fuera_periodo }}
+                                </strong>
                             </div>
                         </div>
                     </div>
@@ -205,10 +203,11 @@
 {{ amid|json_script:"gps-amid" }}
 {{ ubicaciones_gps|json_script:"gps-ubicaciones" }}
 {{ ubicacion_esperada|json_script:"gps-ubicacion-esperada" }}
+{{ ubicacion_laboratorio|json_script:"gps-ubicacion-laboratorio" }}
 
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=7"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=8"></script>
 {% endblock %}

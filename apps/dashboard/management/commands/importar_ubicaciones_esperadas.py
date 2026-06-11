@@ -1,10 +1,13 @@
 """
 Comando Django: importar_ubicaciones_esperadas.py
+
 - Importa ubicaciones esperadas de validadores desde un archivo Excel de Zonas Pagas.
-- Lee la hoja Version_DB y espera columnas clave como IDDS, Nombre, Serie Val., Latitud, Longitud, Operativa y Radio.
-- Crea o actualiza registros de UbicacionEsperadaValidador usando el AMID.
-- Marca como no operativo cualquier validador existente que ya no aparece en el Excel.
+- Lee únicamente la hoja Version_DB.
+- Actualiza la tabla vigente UbicacionEsperadaValidador.
+- Guarda historial de cambios en HistorialUbicacionEsperadaValidador.
+- Si un validador deja de venir en el Excel, lo mueve a Laboratorio Zonas Pagas.
 """
+
 from pathlib import Path
 
 import pandas as pd
@@ -13,12 +16,17 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.models import UbicacionEsperadaValidador
+from apps.dashboard.models import (
+    UbicacionEsperadaValidador,
+    HistorialUbicacionEsperadaValidador,
+)
+
 
 LATITUD_LABORATORIO_ZP = -33.437191
 LONGITUD_LABORATORIO_ZP = -70.656102
 RADIO_LABORATORIO_ZP = 150
 NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
+
 
 class Command(BaseCommand):
     help = "Importa ubicaciones esperadas de validadores desde Excel de Zonas Pagas."
@@ -33,6 +41,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        fecha_carga = timezone.now()
         ruta_excel = options["ruta_excel"]
 
         if ruta_excel:
@@ -47,8 +56,15 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(f"Leyendo archivo: {ruta_excel}")
+        self.stdout.write("Hoja utilizada: Version_DB")
 
-        df = pd.read_excel(ruta_excel, sheet_name="Version_DB")
+        try:
+            df = pd.read_excel(ruta_excel, sheet_name="Version_DB")
+        except ValueError:
+            self.stderr.write(
+                self.style.ERROR("No se encontró la hoja Version_DB en el Excel.")
+            )
+            return
 
         columnas_requeridas = [
             "IDDS",
@@ -68,77 +84,253 @@ class Command(BaseCommand):
             )
             return
 
-
-        creados = 0
-        actualizados = 0
+        creados_vigente = 0
+        actualizados_vigente = 0
         omitidos = 0
+        nuevos_historial = 0
+        cerrados_historial = 0
+        sin_cambios_historial = 0
 
         amids_excel = set()
 
         for _, fila in df.iterrows():
-            operativa_texto = str(fila["Operativa"]).strip().upper()
-            if operativa_texto not in ["SI", "NO"]:
+            datos = self.normalizar_fila(fila)
+
+            if datos is None:
                 omitidos += 1
                 continue
 
-            try:
-                amid = str(int(fila["IDDS"])).strip()
-            except (ValueError, TypeError):
-                omitidos += 1
-                continue
-
-            serie_validador = str(fila["Serie Val."]).strip() if pd.notna(fila["Serie Val."]) else ""
-
-            if operativa_texto == "SI":
-                try:
-                    latitud = float(fila["Latitud"])
-                    longitud = float(fila["Longitud"])
-                    radio = float(fila["Radio"])
-                except (ValueError, TypeError):
-                    omitidos += 1
-                    continue
-
-                nombre = str(fila["Nombre"]).strip() if pd.notna(fila["Nombre"]) else ""
-                operativa = True
-
-            else:
-                latitud = LATITUD_LABORATORIO_ZP
-                longitud = LONGITUD_LABORATORIO_ZP
-                radio = RADIO_LABORATORIO_ZP
-                nombre = NOMBRE_LABORATORIO_ZP
-                operativa = False
+            amid = datos["amid"]
+            amids_excel.add(amid)
 
             objeto, creado = UbicacionEsperadaValidador.objects.update_or_create(
                 amid=amid,
                 defaults={
-                    "nombre": nombre,
-                    "serie_validador": serie_validador,
-                    "latitud_esperada": latitud,
-                    "longitud_esperada": longitud,
-                    "radio_metros": radio,
-                    "operativa": operativa,
-                    "fecha_carga": timezone.now(),
+                    "nombre": datos["nombre"],
+                    "serie_validador": datos["serie_validador"],
+                    "latitud_esperada": datos["latitud_esperada"],
+                    "longitud_esperada": datos["longitud_esperada"],
+                    "radio_metros": datos["radio_metros"],
+                    "operativa": datos["operativa"],
+                    "fecha_carga": fecha_carga,
                 }
             )
 
-            amids_excel.add(amid)
-
             if creado:
-                creados += 1
+                creados_vigente += 1
             else:
-                actualizados += 1
+                actualizados_vigente += 1
 
-        # Opcional pero recomendable:
-        # Todo AMID que ya estaba en SQLite pero no viene operativo en el Excel actual,
-        # queda marcado como no operativo.
-        desactivados = (
-            UbicacionEsperadaValidador.objects
-            .exclude(amid__in=amids_excel)
-            .update(operativa=False)
+            resultado_historial = self.actualizar_historial(
+                datos=datos,
+                fecha_carga=fecha_carga,
+                archivo_origen=ruta_excel.name,
+            )
+
+            if resultado_historial == "nuevo":
+                nuevos_historial += 1
+            elif resultado_historial == "cerrado_y_nuevo":
+                cerrados_historial += 1
+                nuevos_historial += 1
+            elif resultado_historial == "sin_cambios":
+                sin_cambios_historial += 1
+
+        movidos_laboratorio, cerrados_por_ausencia, historicos_por_ausencia = (
+            self.mover_ausentes_a_laboratorio(
+                amids_excel=amids_excel,
+                fecha_carga=fecha_carga,
+                archivo_origen=ruta_excel.name,
+            )
         )
 
+        cerrados_historial += cerrados_por_ausencia
+        nuevos_historial += historicos_por_ausencia
+
         self.stdout.write(self.style.SUCCESS("Importación completada."))
-        self.stdout.write(f"Creados: {creados}")
-        self.stdout.write(f"Actualizados: {actualizados}")
+        self.stdout.write(f"Fecha carga: {timezone.localtime(fecha_carga).strftime('%d-%m-%Y %H:%M:%S')}")
+        self.stdout.write(f"Vigentes creados: {creados_vigente}")
+        self.stdout.write(f"Vigentes actualizados: {actualizados_vigente}")
         self.stdout.write(f"Omitidos: {omitidos}")
-        self.stdout.write(f"Marcados no operativos: {desactivados}")
+        self.stdout.write(f"Historial nuevos: {nuevos_historial}")
+        self.stdout.write(f"Historial cerrados: {cerrados_historial}")
+        self.stdout.write(f"Historial sin cambios: {sin_cambios_historial}")
+        self.stdout.write(f"Movidos a laboratorio por no venir en Excel: {movidos_laboratorio}")
+
+    def normalizar_fila(self, fila):
+        operativa_texto = str(fila["Operativa"]).strip().upper()
+
+        if operativa_texto not in ["SI", "NO"]:
+            return None
+
+        try:
+            amid = str(int(fila["IDDS"])).strip()
+        except (ValueError, TypeError):
+            return None
+
+        serie_validador = (
+            str(fila["Serie Val."]).strip()
+            if pd.notna(fila["Serie Val."])
+            else ""
+        )
+
+        if operativa_texto == "SI":
+            try:
+                latitud = float(fila["Latitud"])
+                longitud = float(fila["Longitud"])
+                radio = float(fila["Radio"])
+            except (ValueError, TypeError):
+                return None
+
+            nombre = (
+                str(fila["Nombre"]).strip()
+                if pd.notna(fila["Nombre"])
+                else ""
+            )
+            operativa = True
+            origen_ubicacion = "excel"
+
+        else:
+            latitud = LATITUD_LABORATORIO_ZP
+            longitud = LONGITUD_LABORATORIO_ZP
+            radio = RADIO_LABORATORIO_ZP
+            nombre = NOMBRE_LABORATORIO_ZP
+            operativa = False
+            origen_ubicacion = "laboratorio"
+
+        return {
+            "amid": amid,
+            "nombre": nombre,
+            "serie_validador": serie_validador,
+            "latitud_esperada": latitud,
+            "longitud_esperada": longitud,
+            "radio_metros": radio,
+            "operativa": operativa,
+            "origen_ubicacion": origen_ubicacion,
+        }
+
+    def actualizar_historial(self, datos, fecha_carga, archivo_origen):
+        historial_vigente = (
+            HistorialUbicacionEsperadaValidador.objects
+            .filter(
+                amid=datos["amid"],
+                fecha_fin_vigencia__isnull=True,
+            )
+            .order_by("-fecha_inicio_vigencia")
+            .first()
+        )
+
+        if historial_vigente is None:
+            self.crear_historial(datos, fecha_carga, archivo_origen)
+            return "nuevo"
+
+        if self.historial_es_igual(historial_vigente, datos):
+            return "sin_cambios"
+
+        historial_vigente.fecha_fin_vigencia = fecha_carga
+        historial_vigente.save(update_fields=["fecha_fin_vigencia"])
+
+        self.crear_historial(datos, fecha_carga, archivo_origen)
+
+        return "cerrado_y_nuevo"
+
+    def crear_historial(self, datos, fecha_carga, archivo_origen):
+        HistorialUbicacionEsperadaValidador.objects.create(
+            amid=datos["amid"],
+            nombre=datos["nombre"],
+            serie_validador=datos["serie_validador"],
+            latitud_esperada=datos["latitud_esperada"],
+            longitud_esperada=datos["longitud_esperada"],
+            radio_metros=datos["radio_metros"],
+            operativa=datos["operativa"],
+            origen_ubicacion=datos["origen_ubicacion"],
+            fecha_inicio_vigencia=fecha_carga,
+            fecha_fin_vigencia=None,
+            fecha_carga=fecha_carga,
+            archivo_origen=archivo_origen,
+        )
+
+    def historial_es_igual(self, historial, datos):
+        return (
+            self.texto(historial.nombre) == self.texto(datos["nombre"])
+            and self.texto(historial.serie_validador) == self.texto(datos["serie_validador"])
+            and self.numero_igual(historial.latitud_esperada, datos["latitud_esperada"])
+            and self.numero_igual(historial.longitud_esperada, datos["longitud_esperada"])
+            and self.numero_igual(historial.radio_metros, datos["radio_metros"])
+            and historial.operativa == datos["operativa"]
+            and self.texto(historial.origen_ubicacion) == self.texto(datos["origen_ubicacion"])
+        )
+
+    def mover_ausentes_a_laboratorio(self, amids_excel, fecha_carga, archivo_origen):
+        movidos = 0
+        cerrados_historial = 0
+        nuevos_historial = 0
+
+        ubicaciones_ausentes = (
+            UbicacionEsperadaValidador.objects
+            .exclude(amid__in=amids_excel)
+        )
+
+        for ubicacion in ubicaciones_ausentes:
+            datos_laboratorio = {
+                "amid": ubicacion.amid,
+                "nombre": NOMBRE_LABORATORIO_ZP,
+                "serie_validador": ubicacion.serie_validador or "",
+                "latitud_esperada": LATITUD_LABORATORIO_ZP,
+                "longitud_esperada": LONGITUD_LABORATORIO_ZP,
+                "radio_metros": RADIO_LABORATORIO_ZP,
+                "operativa": False,
+                "origen_ubicacion": "laboratorio_default",
+            }
+
+            cambio_necesario = not (
+                self.texto(ubicacion.nombre) == self.texto(datos_laboratorio["nombre"])
+                and self.numero_igual(ubicacion.latitud_esperada, datos_laboratorio["latitud_esperada"])
+                and self.numero_igual(ubicacion.longitud_esperada, datos_laboratorio["longitud_esperada"])
+                and self.numero_igual(ubicacion.radio_metros, datos_laboratorio["radio_metros"])
+                and ubicacion.operativa == datos_laboratorio["operativa"]
+            )
+
+            if not cambio_necesario:
+                continue
+
+            ubicacion.nombre = datos_laboratorio["nombre"]
+            ubicacion.latitud_esperada = datos_laboratorio["latitud_esperada"]
+            ubicacion.longitud_esperada = datos_laboratorio["longitud_esperada"]
+            ubicacion.radio_metros = datos_laboratorio["radio_metros"]
+            ubicacion.operativa = datos_laboratorio["operativa"]
+            ubicacion.fecha_carga = fecha_carga
+            ubicacion.save()
+
+            resultado_historial = self.actualizar_historial(
+                datos=datos_laboratorio,
+                fecha_carga=fecha_carga,
+                archivo_origen=archivo_origen,
+            )
+
+            movidos += 1
+
+            if resultado_historial == "cerrado_y_nuevo":
+                cerrados_historial += 1
+                nuevos_historial += 1
+            elif resultado_historial == "nuevo":
+                nuevos_historial += 1
+
+        return movidos, cerrados_historial, nuevos_historial
+
+    def texto(self, valor):
+        if valor is None:
+            return ""
+
+        return str(valor).strip()
+
+    def numero_igual(self, valor_1, valor_2):
+        if valor_1 is None and valor_2 is None:
+            return True
+
+        if valor_1 is None or valor_2 is None:
+            return False
+
+        try:
+            return round(float(valor_1), 7) == round(float(valor_2), 7)
+        except (ValueError, TypeError):
+            return False
