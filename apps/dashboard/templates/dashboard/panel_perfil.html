@@ -111,6 +111,154 @@
 {% if es_admin %}
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
+        <h2>Administración del sistema</h2>
+        <p>Ejecuta procesos administrativos del dashboard. Estas acciones están disponibles solo para administradores.</p>
+    </div>
+
+    {% if messages %}
+        <div class="admin-mensajes">
+            {% for message in messages %}
+                <div class="admin-mensaje {{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="admin-comandos-grid">
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="probar_oracle">
+            <h3>Probar Oracle</h3>
+            <p>Verifica si la conexión a Oracle está disponible.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="actualizar_validadores">
+            <h3>Actualizar validadores</h3>
+            <p>Ejecuta Oracle → Limpio → Limpieza de registros antiguos.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="importar_oracle_2h">
+            <h3>Importar Oracle 2 horas</h3>
+            <p>Importa datos recientes desde Oracle hacia RAW.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="importar_oracle_14d">
+            <h3>Importar Oracle 14 días</h3>
+            <p>Importa datos de las últimas dos semanas desde Oracle.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="cargar_limpios">
+            <h3>Cargar datos limpios</h3>
+            <p>Pasa registros desde RAW hacia Limpio.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="limpiar_antiguos">
+            <h3>Limpiar antiguos</h3>
+            <p>Elimina registros RAW y Limpio mayores a 14 días.</p>
+            <button type="submit">Ejecutar</button>
+        </form>
+    </div>
+</section>
+
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Cargar ubicaciones esperadas</h2>
+        <p>Sube el Excel de Versión Zonas Pagas. Debe contener la hoja Version_DB.</p>
+    </div>
+
+    <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" enctype="multipart/form-data" class="form-subida-version">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="importar_ubicaciones">
+
+        <input type="file" name="archivo_version_zp" accept=".xlsx,.xls" required>
+
+        <button type="submit">
+            Cargar archivo
+        </button>
+    </form>
+</section>
+
+{% if resultado_comando_admin %}
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Resultado de ejecución</h2>
+    </div>
+
+    <pre class="resultado-comando">{{ resultado_comando_admin }}</pre>
+</section>
+{% endif %}
+
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
+        <h2>Últimos logs de importación</h2>
+    </div>
+
+    <div class="tabla-contenedor">
+        <table class="tabla-usuarios">
+            <thead>
+                <tr>
+                    <th>Origen</th>
+                    <th>Estado</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th>Obtenidas</th>
+                    <th>Creadas</th>
+                    <th>Eliminadas</th>
+                    <th>Mensaje</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for log in ultimos_logs %}
+                    <tr>
+                        <td>{{ log.origen }}</td>
+                        <td>
+                            {% if log.estado == "OK" %}
+                                <span class="badge-estado activo">OK</span>
+                            {% else %}
+                                <span class="badge-estado inactivo">Error</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.fecha_inicio|date:"d-m-Y H:i" }}</td>
+                        <td>
+                            {% if log.fecha_fin %}
+                                {{ log.fecha_fin|date:"d-m-Y H:i" }}
+                            {% else %}
+                                En proceso / sin cierre
+                            {% endif %}
+                        </td>
+                        <td>{{ log.filas_obtenidas }}</td>
+                        <td>{{ log.filas_creadas }}</td>
+                        <td>{{ log.filas_eliminadas }}</td>
+                        <td>{{ log.mensaje|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">No hay logs registrados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
         <h2>Roles registrados</h2>
     </div>
 

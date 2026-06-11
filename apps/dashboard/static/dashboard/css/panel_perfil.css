@@ -206,3 +206,124 @@
 .btn-cambiar-password:hover {
     background: #1d4ed8;
 }
+
+.admin-comandos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(190px, 1fr));
+    gap: 16px;
+}
+
+.admin-comando-card {
+    padding: 16px;
+    border-radius: 14px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+}
+
+.admin-comando-card h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #111827;
+}
+
+.admin-comando-card p {
+    margin: 0 0 14px;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.admin-comando-card button,
+.form-subida-version button {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.admin-comando-card button:hover,
+.form-subida-version button:hover {
+    background: #1d4ed8;
+}
+
+.form-subida-version {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.form-subida-version input[type="file"] {
+    flex: 1;
+    padding: 10px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    background: #f9fafb;
+    font-size: 14px;
+}
+
+.form-subida-version button {
+    width: auto;
+    min-width: 150px;
+}
+
+.resultado-comando {
+    margin: 0;
+    padding: 16px;
+    border-radius: 12px;
+    background: #111827;
+    color: #d1d5db;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+}
+
+.admin-mensajes {
+    margin-bottom: 16px;
+}
+
+.admin-mensaje {
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.admin-mensaje.success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.admin-mensaje.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+@media (max-width: 1100px) {
+    .admin-comandos-grid {
+        grid-template-columns: repeat(2, minmax(190px, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .admin-comandos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-subida-version {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-subida-version button {
+        width: 100%;
+    }
+}

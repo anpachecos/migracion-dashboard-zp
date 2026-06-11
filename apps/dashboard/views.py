@@ -30,6 +30,90 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 
+import os
+from io import BytesIO, StringIO
+from django.conf import settings
+from django.contrib import messages
+from django.core.files.storage import FileSystemStorage
+from django.core.management import call_command
+from django.shortcuts import redirect
+from .models import EstadoValidadorLimpio, LogImportacion
+
+
+def usuario_es_admin(user):
+    return user.is_superuser or user.groups.filter(name="Admin").exists()
+
+
+@login_required
+def ejecutar_comando_admin(request):
+    if not usuario_es_admin(request.user):
+        messages.error(request, "No tienes permisos para ejecutar acciones administrativas.")
+        return redirect("dashboard:panel_perfil")
+
+    if request.method != "POST":
+        return redirect("dashboard:panel_perfil")
+
+    accion = request.POST.get("accion")
+    salida = StringIO()
+
+    try:
+        if accion == "probar_oracle":
+            call_command("probar_oracle", stdout=salida, stderr=salida)
+
+        elif accion == "actualizar_validadores":
+            call_command("actualizar_validadores", stdout=salida, stderr=salida)
+
+        elif accion == "importar_oracle_2h":
+            call_command("importar_validadores_oracle", stdout=salida, stderr=salida)
+
+        elif accion == "importar_oracle_14d":
+            call_command("importar_validadores_oracle", dias=14, stdout=salida, stderr=salida)
+
+        elif accion == "cargar_limpios":
+            call_command("cargar_validadores_limpios", stdout=salida, stderr=salida)
+
+        elif accion == "limpiar_antiguos":
+            call_command("limpiar_registros_antiguos", stdout=salida, stderr=salida)
+
+        elif accion == "importar_ubicaciones":
+            archivo = request.FILES.get("archivo_version_zp")
+
+            if not archivo:
+                messages.error(request, "Debes seleccionar un archivo Excel.")
+                return redirect("dashboard:panel_perfil")
+
+            carpeta_tmp = os.path.join(settings.BASE_DIR, "temp_uploads")
+            os.makedirs(carpeta_tmp, exist_ok=True)
+
+            storage = FileSystemStorage(location=carpeta_tmp)
+            nombre_archivo = storage.save(archivo.name, archivo)
+            ruta_archivo = storage.path(nombre_archivo)
+
+            call_command(
+                "importar_ubicaciones_esperadas",
+                ruta_archivo,
+                stdout=salida,
+                stderr=salida,
+            )
+
+            try:
+                os.remove(ruta_archivo)
+            except OSError:
+                pass
+
+        else:
+            messages.error(request, "Acción no reconocida.")
+            return redirect("dashboard:panel_perfil")
+
+        request.session["resultado_comando_admin"] = salida.getvalue()
+        messages.success(request, "Proceso ejecutado correctamente.")
+
+    except Exception as error:
+        request.session["resultado_comando_admin"] = salida.getvalue()
+        messages.error(request, f"Error ejecutando proceso: {error}")
+
+    return redirect("dashboard:panel_perfil")
+
 @login_required
 def panel_alertas(request):
     dias = request.GET.get("dias", 1)
@@ -217,6 +301,96 @@ def panel_gps(request):
     return render(request, "dashboard/panel_gps.html", contexto)
 
 @login_required
+def exportar_gps_excel(request):
+    amid = request.GET.get("amid", "").strip()
+    dias = request.GET.get("dias", "1")
+
+    if not amid:
+        return HttpResponse("Debe indicar un AMID para exportar.", status=400)
+
+    try:
+        dias = int(dias)
+    except ValueError:
+        dias = 1
+
+    if dias not in [1, 3, 7, 14]:
+        dias = 1
+
+    fecha_inicio = timezone.now() - timedelta(days=dias)
+
+    registros = (
+        EstadoValidadorLimpio.objects
+        .filter(
+            amid=amid,
+            fecha_hora__gte=fecha_inicio,
+        )
+        .only(
+            "amid",
+            "fecha_hora",
+            "fec_descarga",
+            "fec_estado",
+            "latitud",
+            "longitud",
+            "porcentaje_bateria",
+            "is_contiene_gps",
+            "is_error_obtener_gps",
+        )
+        .order_by("fecha_hora")
+    )
+
+    if not registros.exists():
+        return HttpResponse(
+            f"No existen registros GPS para el AMID {amid} en el rango seleccionado.",
+            status=404
+        )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "GPS AMID"
+
+    ws.append([
+        "AMID",
+        "Fecha hora",
+        "Fecha descarga",
+        "Fecha estado",
+        "Latitud",
+        "Longitud",
+        "Porcentaje batería",
+        "Contiene GPS",
+        "Error GPS",
+    ])
+
+    for registro in registros.iterator(chunk_size=2000):
+        ws.append([
+            preparar_valor_excel(registro.amid),
+            preparar_valor_excel(registro.fecha_hora),
+            preparar_valor_excel(registro.fec_descarga),
+            preparar_valor_excel(registro.fec_estado),
+            preparar_valor_excel(registro.latitud),
+            preparar_valor_excel(registro.longitud),
+            preparar_valor_excel(registro.porcentaje_bateria),
+            preparar_valor_excel(registro.is_contiene_gps),
+            preparar_valor_excel(registro.is_error_obtener_gps),
+        ])
+
+    aplicar_estilo_hoja(ws)
+
+    output = BytesIO()
+    wb.save(output)
+    wb.close()
+    output.seek(0)
+
+    filename = f"gps_amid_{amid}_{dias}_dias.xlsx"
+
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    return response
+
+@login_required
 def panel_perfil(request):
     usuario_actual = request.user
 
@@ -242,7 +416,8 @@ def panel_perfil(request):
         usuarios_activos = usuarios.filter(is_active=True).count()
         usuarios_inactivos = usuarios.filter(is_active=False).count()
         total_admins = usuarios.filter(is_superuser=True).count()
-
+        ultimos_logs = LogImportacion.objects.all().order_by("-fecha_inicio")[:8]
+        resultado_comando_admin = request.session.pop("resultado_comando_admin", None)
         grupos = Group.objects.all().order_by("name")
 
         resumen_roles = []
@@ -280,6 +455,8 @@ def panel_perfil(request):
             "total_admins": total_admins,
             "resumen_roles": resumen_roles,
             "lista_usuarios": lista_usuarios,
+            "ultimos_logs": ultimos_logs,
+            "resultado_comando_admin": resultado_comando_admin,
         })
 
     return render(request, "dashboard/panel_perfil.html", context)

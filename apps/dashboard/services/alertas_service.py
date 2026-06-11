@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Count, Min, Max, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.dashboard.models import (
@@ -52,77 +52,108 @@ def construir_referencia_desde_objeto(objeto, origen_ubicacion):
     return None
 
 
+def construir_resolvedor_referencias(amids, fecha_inicio=None):
+    """
+    Precarga ubicaciones vigentes e históricas para evitar consultar
+    la base por cada registro de alerta.
+    """
+
+    amids = {str(amid).strip() for amid in amids if amid is not None}
+
+    if not amids:
+        def resolver_vacio(amid, fecha_consulta=None):
+            return obtener_referencia_laboratorio()
+
+        return resolver_vacio
+
+    ubicaciones_vigentes = {
+        str(item.amid): item
+        for item in UbicacionEsperadaValidador.objects.filter(amid__in=amids)
+    }
+
+    historiales_qs = (
+        HistorialUbicacionEsperadaValidador.objects
+        .filter(amid__in=amids)
+        .order_by("amid", "-fecha_inicio_vigencia")
+    )
+
+    if fecha_inicio:
+        historiales_qs = historiales_qs.filter(
+            Q(fecha_fin_vigencia__isnull=True)
+            | Q(fecha_fin_vigencia__gte=fecha_inicio)
+        )
+
+    historiales_por_amid = {}
+
+    for historial in historiales_qs:
+        historiales_por_amid.setdefault(str(historial.amid), []).append(historial)
+
+    def resolver(amid, fecha_consulta=None):
+        amid = str(amid).strip()
+
+        if fecha_consulta:
+            for historial in historiales_por_amid.get(amid, []):
+                inicio_ok = historial.fecha_inicio_vigencia <= fecha_consulta
+                fin_ok = (
+                    historial.fecha_fin_vigencia is None
+                    or historial.fecha_fin_vigencia > fecha_consulta
+                )
+
+                if inicio_ok and fin_ok:
+                    referencia = construir_referencia_desde_objeto(
+                        historial,
+                        origen_ubicacion=getattr(
+                            historial,
+                            "origen_ubicacion",
+                            "historial"
+                        ),
+                    )
+
+                    if referencia:
+                        return referencia
+
+        vigente = ubicaciones_vigentes.get(amid)
+
+        referencia_vigente = construir_referencia_desde_objeto(
+            vigente,
+            origen_ubicacion="vigente",
+        )
+
+        if referencia_vigente:
+            return referencia_vigente
+
+        return obtener_referencia_laboratorio()
+
+    return resolver
+
+
 def obtener_referencia_esperada_por_fecha(amid, fecha_consulta=None):
-    amid = str(amid).strip()
+    """
+    Mantengo esta función por compatibilidad con otros services.
+    Para alertas masivas se usa construir_resolvedor_referencias().
+    """
 
-    if fecha_consulta:
-        historial = (
-            HistorialUbicacionEsperadaValidador.objects
-            .filter(
-                amid=amid,
-                fecha_inicio_vigencia__lte=fecha_consulta,
-            )
-            .filter(
-                Q(fecha_fin_vigencia__isnull=True)
-                | Q(fecha_fin_vigencia__gt=fecha_consulta)
-            )
-            .order_by("-fecha_inicio_vigencia")
-            .first()
-        )
-
-        referencia_historial = construir_referencia_desde_objeto(
-            historial,
-            origen_ubicacion=getattr(historial, "origen_ubicacion", "historial") if historial else "historial",
-        )
-
-        if referencia_historial:
-            return referencia_historial
-
-    ubicacion_vigente = (
-        UbicacionEsperadaValidador.objects
-        .filter(amid=amid)
-        .first()
+    resolver = construir_resolvedor_referencias(
+        amids=[amid],
+        fecha_inicio=None,
     )
 
-    referencia_vigente = construir_referencia_desde_objeto(
-        ubicacion_vigente,
-        origen_ubicacion="vigente",
-    )
-
-    if referencia_vigente:
-        return referencia_vigente
-
-    return obtener_referencia_laboratorio()
+    return resolver(amid=amid, fecha_consulta=fecha_consulta)
 
 
 def obtener_opciones_ubicacion_esperada():
-    """
-    Devuelve ubicaciones para filtros.
-
-    Usa:
-    - ubicaciones vigentes
-    - ubicaciones históricas recientes
-
-    Así una ubicación que existió dentro del período reciente puede seguir
-    apareciendo en el filtro aunque ya no sea la ubicación vigente.
-    """
-
     fecha_inicio_historial = timezone.now() - timedelta(days=14)
 
     nombres_vigentes = (
         UbicacionEsperadaValidador.objects
-        .filter(
-            nombre__isnull=False,
-        )
+        .filter(nombre__isnull=False)
         .exclude(nombre="")
         .values_list("nombre", flat=True)
     )
 
     nombres_historicos = (
         HistorialUbicacionEsperadaValidador.objects
-        .filter(
-            nombre__isnull=False,
-        )
+        .filter(nombre__isnull=False)
         .exclude(nombre="")
         .filter(
             Q(fecha_fin_vigencia__isnull=True)
@@ -163,19 +194,11 @@ def obtener_fecha_inicio_periodo(dias):
 
 
 def obtener_fecha_referencia_registro(registro):
-    return registro.get("fecha_hora") or registro.get("fec_estado") or registro.get("fec_descarga")
-
-
-def ubicacion_pasa_filtro(amid, fecha_referencia, ubicaciones_seleccionadas):
-    if ubicaciones_seleccionadas is None:
-        return True
-
-    referencia = obtener_referencia_esperada_por_fecha(
-        amid=amid,
-        fecha_consulta=fecha_referencia,
+    return (
+        registro.get("fecha_hora")
+        or registro.get("fec_estado")
+        or registro.get("fec_descarga")
     )
-
-    return referencia["nombre"] in ubicaciones_seleccionadas
 
 
 def obtener_alertas_gps_cero(
@@ -183,17 +206,6 @@ def obtener_alertas_gps_cero(
     mostrar_todo=False,
     ubicaciones_seleccionadas=None
 ):
-    """
-    Obtiene resumen de AMIDs únicos con GPS 0 dentro del período seleccionado.
-
-    Regla:
-    - latitud = 0
-    - longitud = 0
-
-    Si ubicaciones_seleccionadas viene como lista, filtra usando
-    la ubicación esperada histórica vigente en la fecha del registro.
-    """
-
     dias = normalizar_dias(dias)
     fecha_inicio = obtener_fecha_inicio_periodo(dias)
 
@@ -215,23 +227,33 @@ def obtener_alertas_gps_cero(
         .order_by("amid", "fecha_hora")
     )
 
+    registros_gps_cero = list(registros_gps_cero)
+
+    amids_periodo = {
+        str(registro["amid"])
+        for registro in registros_gps_cero
+        if registro.get("amid") is not None
+    }
+
+    resolver_referencia = construir_resolvedor_referencias(
+        amids=amids_periodo,
+        fecha_inicio=fecha_inicio,
+    )
+
     eventos_por_amid = {}
 
     for registro in registros_gps_cero:
         amid = str(registro["amid"])
         fecha_referencia = obtener_fecha_referencia_registro(registro)
 
-        if not ubicacion_pasa_filtro(
-            amid=amid,
-            fecha_referencia=fecha_referencia,
-            ubicaciones_seleccionadas=ubicaciones_seleccionadas,
-        ):
-            continue
-
-        referencia = obtener_referencia_esperada_por_fecha(
+        referencia = resolver_referencia(
             amid=amid,
             fecha_consulta=fecha_referencia,
         )
+
+        if ubicaciones_seleccionadas is not None:
+            if referencia["nombre"] not in ubicaciones_seleccionadas:
+                continue
 
         evento = {
             "amid": amid,
@@ -246,17 +268,20 @@ def obtener_alertas_gps_cero(
         eventos_por_amid.setdefault(amid, []).append(evento)
 
     resumen_gps_cero = []
-
     total_registros_gps_cero = 0
+    fecha_minima = timezone.datetime.min.replace(
+        tzinfo=timezone.get_current_timezone()
+    )
 
     for amid, eventos in eventos_por_amid.items():
         eventos_ordenados = sorted(
             eventos,
-            key=lambda evento: evento["fecha_referencia"] or timezone.datetime.min.replace(tzinfo=timezone.get_current_timezone()),
+            key=lambda evento: evento["fecha_referencia"] or fecha_minima,
             reverse=True,
         )
 
         ultimo_evento = eventos_ordenados[0]
+
         fechas_validas = [
             evento["fecha_referencia"]
             for evento in eventos
@@ -279,17 +304,14 @@ def obtener_alertas_gps_cero(
         resumen_gps_cero,
         key=lambda item: (
             item["cantidad_registros"],
-            item["ultima_deteccion"] or timezone.datetime.min.replace(tzinfo=timezone.get_current_timezone()),
+            item["ultima_deteccion"] or fecha_minima,
         ),
         reverse=True,
     )
 
     total_amids_gps_cero = len(resumen_gps_cero)
 
-    if mostrar_todo:
-        resumen_visible = resumen_gps_cero
-    else:
-        resumen_visible = resumen_gps_cero[:5]
+    resumen_visible = resumen_gps_cero if mostrar_todo else resumen_gps_cero[:5]
 
     return {
         "dias": dias,
@@ -301,27 +323,12 @@ def obtener_alertas_gps_cero(
     }
 
 
-def formatear_duracion(delta):
-    total_minutos = int(delta.total_seconds() // 60)
-    horas = total_minutos // 60
-    minutos = total_minutos % 60
-
-    if horas > 0:
-        return f"{horas}h {minutos}m"
-
-    return f"{minutos}m"
-
-
 def obtener_alertas_caidas_bateria(
     dias=1,
     mostrar_todo=False,
     umbral_caida=30,
     ventana_horas=2
 ):
-    """
-    Detecta caídas drásticas de batería por AMID usando la lógica compartida.
-    """
-
     dias = normalizar_dias(dias)
     fecha_inicio = obtener_fecha_inicio_periodo(dias)
 
@@ -331,6 +338,15 @@ def obtener_alertas_caidas_bateria(
             fecha_hora__gte=fecha_inicio,
             porcentaje_bateria__isnull=False,
             fecha_hora__isnull=False,
+        )
+        .only(
+            "amid",
+            "fecha_hora",
+            "fec_descarga",
+            "fec_estado",
+            "porcentaje_bateria",
+            "latitud",
+            "longitud",
         )
         .order_by("amid", "fecha_hora")
     )
@@ -386,10 +402,7 @@ def obtener_alertas_caidas_bateria(
         item["cantidad_caidas"] for item in resumen_caidas
     )
 
-    if mostrar_todo:
-        resumen_visible = resumen_caidas
-    else:
-        resumen_visible = resumen_caidas[:5]
+    resumen_visible = resumen_caidas if mostrar_todo else resumen_caidas[:5]
 
     return {
         "total_amids_caidas_bateria": total_amids_caidas_bateria,
@@ -406,14 +419,6 @@ def obtener_alertas_fuera_radio(
     mostrar_todo=False,
     ubicaciones_seleccionadas=None
 ):
-    """
-    Detecta AMIDs que tienen coordenadas válidas, distintas de 0,
-    pero fuera del radio esperado.
-
-    Ahora compara cada registro contra la ubicación esperada histórica
-    vigente en la fecha_hora de ese registro.
-    """
-
     dias = normalizar_dias(dias)
     fecha_inicio = obtener_fecha_inicio_periodo(dias)
 
@@ -436,6 +441,19 @@ def obtener_alertas_fuera_radio(
         .order_by("amid", "fecha_hora")
     )
 
+    registros = list(registros)
+
+    amids_periodo = {
+        str(registro["amid"])
+        for registro in registros
+        if registro.get("amid") is not None
+    }
+
+    resolver_referencia = construir_resolvedor_referencias(
+        amids=amids_periodo,
+        fecha_inicio=fecha_inicio,
+    )
+
     eventos_por_amid = {}
 
     for registro in registros:
@@ -451,7 +469,7 @@ def obtener_alertas_fuera_radio(
         if latitud == 0 and longitud == 0:
             continue
 
-        referencia = obtener_referencia_esperada_por_fecha(
+        referencia = resolver_referencia(
             amid=amid,
             fecha_consulta=fecha_referencia,
         )
@@ -472,29 +490,34 @@ def obtener_alertas_fuera_radio(
 
         fuera_radio = distancia > referencia["radio_metros"]
 
-        if fuera_radio:
-            evento = {
-                "amid": amid,
-                "fecha_hora": registro["fecha_hora"],
-                "fec_descarga": registro["fec_descarga"],
-                "fec_estado": registro["fec_estado"],
-                "porcentaje_bateria": registro["porcentaje_bateria"],
-                "latitud": latitud,
-                "longitud": longitud,
-                "nombre_ubicacion": referencia["nombre"],
-                "radio_metros": referencia["radio_metros"],
-                "distancia_metros": round(distancia, 2),
-                "exceso_metros": round(distancia - referencia["radio_metros"], 2),
-            }
+        if not fuera_radio:
+            continue
 
-            eventos_por_amid.setdefault(amid, []).append(evento)
+        evento = {
+            "amid": amid,
+            "fecha_hora": registro["fecha_hora"],
+            "fec_descarga": registro["fec_descarga"],
+            "fec_estado": registro["fec_estado"],
+            "porcentaje_bateria": registro["porcentaje_bateria"],
+            "latitud": latitud,
+            "longitud": longitud,
+            "nombre_ubicacion": referencia["nombre"],
+            "radio_metros": referencia["radio_metros"],
+            "distancia_metros": round(distancia, 2),
+            "exceso_metros": round(distancia - referencia["radio_metros"], 2),
+        }
+
+        eventos_por_amid.setdefault(amid, []).append(evento)
 
     resumen_fuera_radio = []
+    fecha_minima = timezone.datetime.min.replace(
+        tzinfo=timezone.get_current_timezone()
+    )
 
     for amid, eventos in eventos_por_amid.items():
         eventos_ordenados = sorted(
             eventos,
-            key=lambda evento: evento["fecha_hora"] or timezone.datetime.min.replace(tzinfo=timezone.get_current_timezone()),
+            key=lambda evento: evento["fecha_hora"] or fecha_minima,
             reverse=True,
         )
 
@@ -518,7 +541,7 @@ def obtener_alertas_fuera_radio(
         key=lambda item: (
             item["cantidad_registros"],
             item["exceso_metros"],
-            item["ultima_deteccion"] or timezone.datetime.min.replace(tzinfo=timezone.get_current_timezone()),
+            item["ultima_deteccion"] or fecha_minima,
         ),
         reverse=True,
     )
@@ -528,10 +551,7 @@ def obtener_alertas_fuera_radio(
         item["cantidad_registros"] for item in resumen_fuera_radio
     )
 
-    if mostrar_todo:
-        resumen_visible = resumen_fuera_radio
-    else:
-        resumen_visible = resumen_fuera_radio[:5]
+    resumen_visible = resumen_fuera_radio if mostrar_todo else resumen_fuera_radio[:5]
 
     return {
         "total_amids_fuera_radio": total_amids_fuera_radio,

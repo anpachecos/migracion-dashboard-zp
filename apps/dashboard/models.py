@@ -123,6 +123,10 @@ class EstadoValidadorRaw(models.Model):
             models.Index(fields=["amid"]),
             models.Index(fields=["fecha_hora"]),
             models.Index(fields=["porcentaje_bateria"]),
+
+            models.Index(fields=["amid", "fecha_hora"]),
+            models.Index(fields=["fecha_hora", "latitud", "longitud"]),
+            models.Index(fields=["fecha_hora", "porcentaje_bateria"]),
         ]
 
     def __str__(self):
@@ -177,6 +181,10 @@ class EstadoValidadorLimpio(models.Model):
             models.Index(fields=["amid"]),
             models.Index(fields=["fecha_hora"]),
             models.Index(fields=["porcentaje_bateria"]),
+
+            models.Index(fields=["amid", "fecha_hora"]),
+            models.Index(fields=["fecha_hora", "latitud", "longitud"]),
+            models.Index(fields=["fecha_hora", "porcentaje_bateria"]),
         ]
 
     def __str__(self):

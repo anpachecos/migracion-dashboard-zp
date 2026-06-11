@@ -216,12 +216,26 @@ def obtener_contexto_baterias(request):
     if amid:
         fecha_inicio = timezone.now() - timedelta(days=dias)
 
-        registros = EstadoValidadorLimpio.objects.filter(
-            amid=amid,
-            fecha_hora__gte=fecha_inicio
-        ).order_by("fecha_hora")
+        registros_qs = (
+            EstadoValidadorLimpio.objects
+            .filter(
+                amid=amid,
+                fecha_hora__gte=fecha_inicio,
+            )
+            .only(
+                "amid",
+                "fecha_hora",
+                "fec_descarga",
+                "fec_estado",
+                "porcentaje_bateria",
+                "is_contiene_bateria",
+                "is_error_obtener_bateria",
+            )
+            .order_by("fecha_hora")
+        )
 
-        ultimo_registro = registros.order_by("-fecha_hora").first()
+        registros = list(registros_qs)
+        ultimo_registro = registros[-1] if registros else None
 
         if ultimo_registro:
             if usar_sugerido == "1":

@@ -54,6 +54,26 @@
                     </div>
                 </div>
 
+                <div class="gps-exportar">
+                    {% if amid %}
+                        <a 
+                            class="btn-exportar-gps"
+                            href="{% url 'dashboard:exportar_gps_excel' %}?amid={{ amid }}&dias={{ dias }}"
+                            title="Exporta a Excel los registros GPS del AMID consultado."
+                        >
+                            Exportar Excel
+                        </a>
+                    {% else %}
+                        <a 
+                            class="btn-exportar-gps btn-exportar-gps-deshabilitado"
+                            href="#"
+                            title="Busca un AMID antes de exportar."
+                        >
+                            Exportar Excel
+                        </a>
+                    {% endif %}
+                </div>
+
             </form>
             
             <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio %}gps-card-ok{% elif ubicacion_esperada %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">

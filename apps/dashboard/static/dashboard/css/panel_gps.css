@@ -360,3 +360,34 @@
         padding: 7px 10px;
     }
 }
+
+.gps-exportar {
+    display: flex;
+    align-items: end;
+}
+
+.btn-exportar-gps {
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 10px;
+    background: #198754;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    transition: 0.2s ease;
+}
+
+.btn-exportar-gps:hover {
+    background: #157347;
+}
+
+.btn-exportar-gps-deshabilitado {
+    background: #9ca3af;
+    pointer-events: none;
+    cursor: not-allowed;
+}

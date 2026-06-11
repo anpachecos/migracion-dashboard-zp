@@ -240,8 +240,18 @@ def obtener_contexto_gps(request):
                 amid=amid,
                 fecha_hora__date__gte=fecha_inicio,
             )
+            .only(
+                "amid",
+                "fecha_hora",
+                "latitud",
+                "longitud",
+                "porcentaje_bateria",
+                "is_error_obtener_gps",
+            )
             .order_by("fecha_hora")
         )
+
+        registros_periodo_base = list(registros_periodo_base)
 
         resumen_gps["errores_gps_periodo"] = sum(
             1 for registro in registros_periodo_base
@@ -252,13 +262,10 @@ def obtener_contexto_gps(request):
             resumen_gps["errores_gps_periodo"]
         )
 
-        registros = (
-            registros_periodo_base
-            .exclude(latitud__isnull=True)
-            .exclude(longitud__isnull=True)
-            .order_by("fecha_hora")
-        )
-
+        registros = [
+            registro for registro in registros_periodo_base
+            if registro.latitud is not None and registro.longitud is not None
+        ]
         for registro in registros:
             try:
                 lat = float(registro.latitud)
@@ -318,7 +325,7 @@ def obtener_contexto_gps(request):
             ultima_ubicacion = ubicaciones_gps[-1]
             latitud = ultima_ubicacion["latitud"]
             longitud = ultima_ubicacion["longitud"]
-            ultimo_registro = registros.last()
+            ultimo_registro = registros[-1] if registros else None
 
             fecha_ultima_referencia = None
 
