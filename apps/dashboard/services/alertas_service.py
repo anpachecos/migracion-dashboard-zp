@@ -5,6 +5,10 @@ from django.utils import timezone
 
 from apps.dashboard.models import EstadoValidadorLimpio, UbicacionEsperadaValidador
 from apps.dashboard.services.gps_service import calcular_distancia_metros
+from apps.dashboard.services.alertas_bateria_utils import (
+    preparar_puntos_bateria_desde_registros,
+    detectar_caidas_drasticas_desde_puntos,
+)
 
 def clasificar_gps_cero(cantidad_registros):
     if cantidad_registros >= 5:
@@ -115,11 +119,7 @@ def obtener_alertas_caidas_bateria(
     ventana_horas=2
 ):
     """
-    Detecta caídas drásticas de batería por AMID.
-
-    Regla:
-    - La batería baja al menos `umbral_caida` puntos.
-    - La diferencia de tiempo entre mediciones es menor o igual a `ventana_horas`.
+    Detecta caídas drásticas de batería por AMID usando la lógica compartida.
     """
 
     try:
@@ -131,74 +131,46 @@ def obtener_alertas_caidas_bateria(
         dias = 1
 
     fecha_inicio = timezone.now() - timedelta(days=dias)
-    ventana_maxima = timedelta(hours=ventana_horas)
 
     registros = (
         EstadoValidadorLimpio.objects
         .filter(
-            fec_estado__gte=fecha_inicio,
+            fecha_hora__gte=fecha_inicio,
             porcentaje_bateria__isnull=False,
-            fec_estado__isnull=False,
+            fecha_hora__isnull=False,
         )
-        .values(
-            "amid",
-            "fec_estado",
-            "fec_descarga",
-            "porcentaje_bateria",
-            "latitud",
-            "longitud",
-        )
-        .order_by("amid", "fec_estado")
+        .order_by("amid", "fecha_hora")
     )
 
-    ultimo_por_amid = {}
+    puntos = preparar_puntos_bateria_desde_registros(registros)
+
+    eventos = detectar_caidas_drasticas_desde_puntos(
+        puntos=puntos,
+        umbral_caida=umbral_caida,
+        ventana_horas=ventana_horas,
+    )
+
     eventos_por_amid = {}
 
-    for registro in registros:
-        amid = registro["amid"]
-        registro_anterior = ultimo_por_amid.get(amid)
-
-        if registro_anterior:
-            tiempo_transcurrido = registro["fec_estado"] - registro_anterior["fec_estado"]
-            caida = registro_anterior["porcentaje_bateria"] - registro["porcentaje_bateria"]
-
-            if (
-                tiempo_transcurrido > timedelta(0)
-                and tiempo_transcurrido <= ventana_maxima
-                and caida >= umbral_caida
-            ):
-                evento = {
-                    "amid": amid,
-                    "fecha_anterior": registro_anterior["fec_estado"],
-                    "fecha_actual": registro["fec_estado"],
-                    "bateria_anterior": registro_anterior["porcentaje_bateria"],
-                    "bateria_actual": registro["porcentaje_bateria"],
-                    "caida": caida,
-                    "tiempo_transcurrido": formatear_duracion(tiempo_transcurrido),
-                    "fec_descarga": registro["fec_descarga"],
-                    "latitud": registro["latitud"],
-                    "longitud": registro["longitud"],
-                }
-
-                eventos_por_amid.setdefault(amid, []).append(evento)
-
-        ultimo_por_amid[amid] = registro
+    for evento in eventos:
+        amid = evento["amid"]
+        eventos_por_amid.setdefault(amid, []).append(evento)
 
     resumen_caidas = []
 
-    for amid, eventos in eventos_por_amid.items():
+    for amid, eventos_amid in eventos_por_amid.items():
         eventos_ordenados = sorted(
-            eventos,
+            eventos_amid,
             key=lambda evento: evento["fecha_actual"],
             reverse=True
         )
 
         ultima_caida = eventos_ordenados[0]
-        mayor_caida = max(eventos, key=lambda evento: evento["caida"])
+        mayor_caida = max(eventos_amid, key=lambda evento: evento["caida"])
 
         resumen_caidas.append({
             "amid": amid,
-            "cantidad_caidas": len(eventos),
+            "cantidad_caidas": len(eventos_amid),
             "mayor_caida": mayor_caida["caida"],
             "ultima_caida": ultima_caida["fecha_actual"],
             "bateria_anterior": ultima_caida["bateria_anterior"],

@@ -4,6 +4,10 @@ from django.utils import timezone
 
 from ..models import EstadoValidadorLimpio
 
+from apps.dashboard.services.alertas_bateria_utils import (
+    detectar_caidas_drasticas_desde_puntos,
+)
+
 def obtener_clase_tarjeta_bateria(valor):
     if valor is None or valor == "":
         return "tarjeta-neutra"
@@ -538,27 +542,15 @@ def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
 
     return columnas_horas[mejor_inicio], columnas_horas[mejor_inicio + largo_ventana - 1]
 
+
 def detectar_caidas_drasticas_tabla(
     tabla_bateria,
     umbral_caida=30,
     ventana_horas=2,
     ventana_confirmacion_minutos=60
 ):
-    """
-    Detecta caídas drásticas usando la misma tabla visible del panel.
-
-    Regla general:
-    - Detecta caídas de al menos `umbral_caida` puntos dentro de `ventana_horas`.
-
-    Regla especial para batería 0:
-    - Si cae a 0 y luego vuelve rápido a un valor normal, se considera posible error de transmisión.
-    - Si cae a 0 y se mantiene en 0, sigue baja, o no vuelve a transmitir dentro de la ventana de confirmación,
-      se considera caída drástica.
-    """
-
     puntos = []
 
-    # La tabla viene desde hoy hacia atrás, por eso se invierte para analizar en orden cronológico.
     tabla_ordenada = list(reversed(tabla_bateria))
 
     for fila in tabla_ordenada:
@@ -591,58 +583,17 @@ def detectar_caidas_drasticas_tabla(
                 fecha_hora = timezone.make_aware(fecha_hora)
 
             puntos.append({
+                "amid": "",
                 "fecha_hora": fecha_hora,
                 "bateria": bateria,
             })
 
-    puntos = sorted(puntos, key=lambda item: item["fecha_hora"])
-
-    caidas = []
-    ventana_maxima = timedelta(hours=ventana_horas)
-    ventana_confirmacion = timedelta(minutes=ventana_confirmacion_minutos)
-
-    for indice, actual in enumerate(puntos):
-        if indice == 0:
-            continue
-
-        anterior = puntos[indice - 1]
-
-        bateria_anterior = anterior["bateria"]
-        bateria_actual = actual["bateria"]
-
-        tiempo_transcurrido = actual["fecha_hora"] - anterior["fecha_hora"]
-        caida = bateria_anterior - bateria_actual
-
-        if tiempo_transcurrido <= timedelta(0):
-            continue
-
-        if tiempo_transcurrido > ventana_maxima:
-            continue
-
-        if caida < umbral_caida:
-            continue
-
-        # Caso especial: caída a 0.
-        if bateria_actual == 0:
-            if es_cero_probablemente_transitorio(
-                puntos=puntos,
-                indice_actual=indice,
-                bateria_anterior=bateria_anterior,
-                umbral_caida=umbral_caida,
-                ventana_confirmacion=ventana_confirmacion
-            ):
-                continue
-
-        caidas.append({
-            "fecha_hora": actual["fecha_hora"],
-            "fecha_anterior": anterior["fecha_hora"],
-            "bateria_anterior": bateria_anterior,
-            "bateria_actual": bateria_actual,
-            "caida": caida,
-            "tiempo_transcurrido": formatear_duracion(tiempo_transcurrido),
-        })
-
-    return caidas
+    return detectar_caidas_drasticas_desde_puntos(
+        puntos=puntos,
+        umbral_caida=umbral_caida,
+        ventana_horas=ventana_horas,
+        ventana_confirmacion_minutos=ventana_confirmacion_minutos,
+    )
 
 def es_cero_probablemente_transitorio(
     puntos,
