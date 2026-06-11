@@ -256,7 +256,7 @@ def obtener_contexto_baterias(request):
                 ultimo_registro.is_error_obtener_bateria
             )
 
-            alertas_periodo = detectar_caidas_drasticas(registros)
+            alertas_periodo = detectar_caidas_drasticas_tabla(tabla_bateria)
             total_caidas_drasticas = len(alertas_periodo)
 
             if total_caidas_drasticas > 0:
@@ -537,3 +537,166 @@ def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
         return "00:00", "23:30"
 
     return columnas_horas[mejor_inicio], columnas_horas[mejor_inicio + largo_ventana - 1]
+
+def detectar_caidas_drasticas_tabla(
+    tabla_bateria,
+    umbral_caida=30,
+    ventana_horas=2,
+    ventana_confirmacion_minutos=60
+):
+    """
+    Detecta caídas drásticas usando la misma tabla visible del panel.
+
+    Regla general:
+    - Detecta caídas de al menos `umbral_caida` puntos dentro de `ventana_horas`.
+
+    Regla especial para batería 0:
+    - Si cae a 0 y luego vuelve rápido a un valor normal, se considera posible error de transmisión.
+    - Si cae a 0 y se mantiene en 0, sigue baja, o no vuelve a transmitir dentro de la ventana de confirmación,
+      se considera caída drástica.
+    """
+
+    puntos = []
+
+    # La tabla viene desde hoy hacia atrás, por eso se invierte para analizar en orden cronológico.
+    tabla_ordenada = list(reversed(tabla_bateria))
+
+    for fila in tabla_ordenada:
+        fecha_texto = fila["fecha"]
+
+        try:
+            fecha = datetime.strptime(fecha_texto, "%d-%m-%Y").date()
+        except ValueError:
+            continue
+
+        for celda in fila["valores"]:
+            valor = celda["valor"]
+
+            if valor == "" or valor is None:
+                continue
+
+            try:
+                bateria = float(valor)
+            except (ValueError, TypeError):
+                continue
+
+            try:
+                hora = datetime.strptime(celda["hora"], "%H:%M").time()
+            except ValueError:
+                continue
+
+            fecha_hora = datetime.combine(fecha, hora)
+
+            if timezone.is_naive(fecha_hora):
+                fecha_hora = timezone.make_aware(fecha_hora)
+
+            puntos.append({
+                "fecha_hora": fecha_hora,
+                "bateria": bateria,
+            })
+
+    puntos = sorted(puntos, key=lambda item: item["fecha_hora"])
+
+    caidas = []
+    ventana_maxima = timedelta(hours=ventana_horas)
+    ventana_confirmacion = timedelta(minutes=ventana_confirmacion_minutos)
+
+    for indice, actual in enumerate(puntos):
+        if indice == 0:
+            continue
+
+        anterior = puntos[indice - 1]
+
+        bateria_anterior = anterior["bateria"]
+        bateria_actual = actual["bateria"]
+
+        tiempo_transcurrido = actual["fecha_hora"] - anterior["fecha_hora"]
+        caida = bateria_anterior - bateria_actual
+
+        if tiempo_transcurrido <= timedelta(0):
+            continue
+
+        if tiempo_transcurrido > ventana_maxima:
+            continue
+
+        if caida < umbral_caida:
+            continue
+
+        # Caso especial: caída a 0.
+        if bateria_actual == 0:
+            if es_cero_probablemente_transitorio(
+                puntos=puntos,
+                indice_actual=indice,
+                bateria_anterior=bateria_anterior,
+                umbral_caida=umbral_caida,
+                ventana_confirmacion=ventana_confirmacion
+            ):
+                continue
+
+        caidas.append({
+            "fecha_hora": actual["fecha_hora"],
+            "fecha_anterior": anterior["fecha_hora"],
+            "bateria_anterior": bateria_anterior,
+            "bateria_actual": bateria_actual,
+            "caida": caida,
+            "tiempo_transcurrido": formatear_duracion(tiempo_transcurrido),
+        })
+
+    return caidas
+
+def es_cero_probablemente_transitorio(
+    puntos,
+    indice_actual,
+    bateria_anterior,
+    umbral_caida,
+    ventana_confirmacion
+):
+    """
+    Revisa si una batería 0 parece error de transmisión.
+
+    Ejemplo que NO debería ser alerta:
+    70 -> 0 -> 64
+
+    Ejemplos que SÍ deberían ser alerta:
+    70 -> 0 -> 0
+    70 -> 0 -> 20
+    70 -> 0 -> sin nueva transmisión cercana
+    """
+
+    punto_cero = puntos[indice_actual]
+    fecha_cero = punto_cero["fecha_hora"]
+
+    puntos_posteriores_cercanos = []
+
+    for siguiente in puntos[indice_actual + 1:]:
+        diferencia = siguiente["fecha_hora"] - fecha_cero
+
+        if diferencia <= timedelta(0):
+            continue
+
+        if diferencia > ventana_confirmacion:
+            break
+
+        puntos_posteriores_cercanos.append(siguiente)
+
+    # Si no volvió a transmitir pronto, se considera alerta.
+    if not puntos_posteriores_cercanos:
+        return False
+
+    # Si vuelve a marcar 0 dentro de la ventana, se confirma alerta.
+    for punto in puntos_posteriores_cercanos:
+        if punto["bateria"] == 0:
+            return False
+
+    primer_punto_posterior = puntos_posteriores_cercanos[0]
+    bateria_posterior = primer_punto_posterior["bateria"]
+
+    caida_real_posterior = bateria_anterior - bateria_posterior
+
+    # Si después del 0 vuelve a un valor cercano al anterior,
+    # probablemente fue error de transmisión.
+    if bateria_posterior > 0 and caida_real_posterior < umbral_caida:
+        return True
+
+    # Si después del 0 sigue con una caída grande, se mantiene como alerta.
+    return False
