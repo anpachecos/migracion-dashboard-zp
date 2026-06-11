@@ -388,7 +388,7 @@ body {
     border-collapse: collapse;
     width: 100%;
     table-layout: fixed;
-    font-size: 9px;
+    font-size: 12px;
 }
 
 .tabla-bateria th,
@@ -450,7 +450,7 @@ th.hora-diagonal > span {
 
 /* Valores pequeños dentro de la tabla */
 .tabla-bateria td:not(.col-fecha) {
-    font-size: 8px;
+    font-size: 10px;
     font-weight: bold;
 }
 
