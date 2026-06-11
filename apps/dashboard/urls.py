@@ -10,4 +10,5 @@ urlpatterns = [
     path("alertas/", views.panel_alertas, name="panel_alertas"),
     path("perfil/", views.panel_perfil, name="panel_perfil"),
     path("baterias/exportar/", views.exportar_baterias_excel, name="exportar_baterias_excel"),
+    path("alertas/exportar/", views.exportar_alertas_excel, name="exportar_alertas_excel"),
 ]

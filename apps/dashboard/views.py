@@ -41,29 +41,10 @@ def panel_alertas(request):
     if tipo_alerta not in tipos_validos:
         tipo_alerta = "gps_cero"
 
-    opciones_ubicacion_esperada = obtener_opciones_ubicacion_esperada()
-
-    filtro_ubicaciones_aplicado = request.GET.get("filtro_ubicaciones") == "1"
-
-    if filtro_ubicaciones_aplicado:
-        ubicaciones_seleccionadas = request.GET.getlist("ubicacion")
-    else:
-        ubicaciones_seleccionadas = opciones_ubicacion_esperada
-
-    if filtro_ubicaciones_aplicado:
-        parametros_ubicaciones = [("filtro_ubicaciones", "1")]
-
-        for ubicacion in ubicaciones_seleccionadas:
-            parametros_ubicaciones.append(("ubicacion", ubicacion))
-
-        ubicaciones_query_string = urlencode(parametros_ubicaciones)
-    else:
-        ubicaciones_query_string = ""
-
     contexto_gps_cero = obtener_alertas_gps_cero(
         dias=dias,
         mostrar_todo=mostrar_todo,
-        ubicaciones_seleccionadas=ubicaciones_seleccionadas,
+        ubicaciones_seleccionadas=None,
     )
 
     contexto_caidas_bateria = obtener_alertas_caidas_bateria(
@@ -76,7 +57,7 @@ def panel_alertas(request):
     contexto_fuera_radio = obtener_alertas_fuera_radio(
         dias=dias,
         mostrar_todo=mostrar_todo,
-        ubicaciones_seleccionadas=ubicaciones_seleccionadas,
+        ubicaciones_seleccionadas=None,
     )
 
     context = {
@@ -84,13 +65,145 @@ def panel_alertas(request):
         **contexto_caidas_bateria,
         **contexto_fuera_radio,
         "tipo_alerta": tipo_alerta,
-        "opciones_ubicacion_esperada": opciones_ubicacion_esperada,
-        "ubicaciones_seleccionadas": ubicaciones_seleccionadas,
-        "filtro_ubicaciones_aplicado": filtro_ubicaciones_aplicado,
-        "ubicaciones_query_string": ubicaciones_query_string,
     }
 
     return render(request, "dashboard/panel_alertas.html", context)
+
+@login_required
+def exportar_alertas_excel(request):
+    dias = request.GET.get("dias", 1)
+
+    contexto_gps_cero = obtener_alertas_gps_cero(
+        dias=dias,
+        mostrar_todo=True,
+        ubicaciones_seleccionadas=None,
+    )
+
+    contexto_caidas_bateria = obtener_alertas_caidas_bateria(
+        dias=dias,
+        mostrar_todo=True,
+        umbral_caida=30,
+        ventana_horas=2,
+    )
+
+    contexto_fuera_radio = obtener_alertas_fuera_radio(
+        dias=dias,
+        mostrar_todo=True,
+        ubicaciones_seleccionadas=None,
+    )
+
+    try:
+        dias_int = int(dias)
+    except ValueError:
+        dias_int = 1
+
+    wb = Workbook()
+
+    # =========================
+    # Hoja 1: GPS 0
+    # =========================
+    ws_gps = wb.active
+    ws_gps.title = "GPS 0"
+
+    ws_gps.append([
+        "AMID",
+        "Ubicación esperada",
+        "Registros GPS 0",
+        "Primera detección",
+        "Última detección",
+        "Última batería",
+        "Frecuencia",
+    ])
+
+    for item in contexto_gps_cero["resumen_gps_cero"]:
+        ws_gps.append([
+            item.get("amid"),
+            item.get("ubicacion_esperada"),
+            item.get("cantidad_registros"),
+            preparar_valor_excel(item.get("primera_deteccion")),
+            preparar_valor_excel(item.get("ultima_deteccion")),
+            item.get("ultima_bateria"),
+            item.get("estado_alerta"),
+        ])
+
+    aplicar_estilo_hoja(ws_gps)
+
+    # =========================
+    # Hoja 2: Caídas batería
+    # =========================
+    ws_caidas = wb.create_sheet("Caidas bateria")
+
+    ws_caidas.append([
+        "AMID",
+        "Caídas detectadas",
+        "Mayor caída",
+        "Última caída",
+        "Batería anterior",
+        "Batería actual",
+        "Tiempo transcurrido",
+    ])
+
+    for item in contexto_caidas_bateria["resumen_caidas_bateria"]:
+        ws_caidas.append([
+            item.get("amid"),
+            item.get("cantidad_caidas"),
+            item.get("mayor_caida"),
+            preparar_valor_excel(item.get("ultima_caida")),
+            item.get("bateria_anterior"),
+            item.get("bateria_actual"),
+            item.get("tiempo_transcurrido"),
+        ])
+
+    aplicar_estilo_hoja(ws_caidas)
+
+    # =========================
+    # Hoja 3: Fuera de radio
+    # =========================
+    ws_fuera = wb.create_sheet("Fuera de radio")
+
+    ws_fuera.append([
+        "AMID",
+        "Registros fuera",
+        "Última detección",
+        "Ubicación esperada",
+        "Distancia metros",
+        "Radio metros",
+        "Exceso metros",
+        "Mayor distancia",
+        "Última batería",
+    ])
+
+    for item in contexto_fuera_radio["resumen_fuera_radio"]:
+        ws_fuera.append([
+            item.get("amid"),
+            item.get("cantidad_registros"),
+            preparar_valor_excel(item.get("ultima_deteccion")),
+            item.get("nombre_ubicacion"),
+            item.get("distancia_metros"),
+            item.get("radio_metros"),
+            item.get("exceso_metros"),
+            item.get("mayor_distancia"),
+            item.get("ultima_bateria"),
+        ])
+
+    aplicar_estilo_hoja(ws_fuera)
+
+    output = BytesIO()
+    wb.save(output)
+    wb.close()
+    output.seek(0)
+
+    fecha_exportacion = timezone.localtime(timezone.now()).strftime("%Y%m%d_%H%M%S")
+    filename = f"alertas_{dias_int}_dias_{fecha_exportacion}.xlsx"
+
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    return response
+
 @login_required
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)
