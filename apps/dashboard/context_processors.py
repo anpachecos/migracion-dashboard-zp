@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db.models import Max
 
 from .models import EstadoValidadorLimpio, UbicacionEsperadaValidador
 
@@ -6,29 +7,26 @@ from .models import EstadoValidadorLimpio, UbicacionEsperadaValidador
 def datos_actualizacion_dashboard(request):
     ultima_actualizacion = timezone.localtime(timezone.now())
 
-    ultimo_registro = (
-        EstadoValidadorLimpio.objects
-        .exclude(fecha_hora__isnull=True)
-        .order_by("-fecha_hora")
-        .first()
-    )
-
     ultima_carga_datos = None
-
-    if ultimo_registro and ultimo_registro.fecha_hora:
-        ultima_carga_datos = timezone.localtime(ultimo_registro.fecha_hora)
-
-    ultima_version_zp = (
-        UbicacionEsperadaValidador.objects
-        .exclude(fecha_carga__isnull=True)
-        .order_by("-fecha_carga")
-        .first()
-    )
-
     ultima_actualizacion_version_zp = None
 
-    if ultima_version_zp and ultima_version_zp.fecha_carga:
-        ultima_actualizacion_version_zp = timezone.localtime(ultima_version_zp.fecha_carga)
+    try:
+        ultima_fecha = EstadoValidadorLimpio.objects.aggregate(
+            ultima=Max("fecha_hora")
+        )["ultima"]
+
+        if ultima_fecha:
+            ultima_carga_datos = timezone.localtime(ultima_fecha)
+
+        ultima_version = UbicacionEsperadaValidador.objects.aggregate(
+            ultima=Max("fecha_carga")
+        )["ultima"]
+
+        if ultima_version:
+            ultima_actualizacion_version_zp = timezone.localtime(ultima_version)
+
+    except Exception:
+        pass
 
     return {
         "ultima_actualizacion_dashboard": ultima_actualizacion,
