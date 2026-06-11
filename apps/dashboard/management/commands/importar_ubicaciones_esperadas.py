@@ -282,40 +282,60 @@ class Command(BaseCommand):
                 "origen_ubicacion": "laboratorio_default",
             }
 
-            cambio_necesario = not (
-                self.texto(ubicacion.nombre) == self.texto(datos_laboratorio["nombre"])
-                and self.numero_igual(ubicacion.latitud_esperada, datos_laboratorio["latitud_esperada"])
-                and self.numero_igual(ubicacion.longitud_esperada, datos_laboratorio["longitud_esperada"])
-                and self.numero_igual(ubicacion.radio_metros, datos_laboratorio["radio_metros"])
-                and ubicacion.operativa == datos_laboratorio["operativa"]
+            ya_esta_en_laboratorio = (
+                self.texto(ubicacion.nombre) == self.texto(NOMBRE_LABORATORIO_ZP)
+                and self.numero_igual(ubicacion.latitud_esperada, LATITUD_LABORATORIO_ZP)
+                and self.numero_igual(ubicacion.longitud_esperada, LONGITUD_LABORATORIO_ZP)
+                and self.numero_igual(ubicacion.radio_metros, RADIO_LABORATORIO_ZP)
+                and ubicacion.operativa is False
             )
 
-            if not cambio_necesario:
+            if ya_esta_en_laboratorio:
                 continue
 
-            ubicacion.nombre = datos_laboratorio["nombre"]
-            ubicacion.latitud_esperada = datos_laboratorio["latitud_esperada"]
-            ubicacion.longitud_esperada = datos_laboratorio["longitud_esperada"]
-            ubicacion.radio_metros = datos_laboratorio["radio_metros"]
-            ubicacion.operativa = datos_laboratorio["operativa"]
+            ubicacion.nombre = NOMBRE_LABORATORIO_ZP
+            ubicacion.latitud_esperada = LATITUD_LABORATORIO_ZP
+            ubicacion.longitud_esperada = LONGITUD_LABORATORIO_ZP
+            ubicacion.radio_metros = RADIO_LABORATORIO_ZP
+            ubicacion.operativa = False
             ubicacion.fecha_carga = fecha_carga
             ubicacion.save()
 
-            resultado_historial = self.actualizar_historial(
-                datos=datos_laboratorio,
+            historial_vigente = (
+                HistorialUbicacionEsperadaValidador.objects
+                .filter(
+                    amid=ubicacion.amid,
+                    fecha_fin_vigencia__isnull=True,
+                )
+                .order_by("-fecha_inicio_vigencia")
+                .first()
+            )
+
+            if historial_vigente:
+                historial_vigente.fecha_fin_vigencia = fecha_carga
+                historial_vigente.save(update_fields=["fecha_fin_vigencia"])
+                cerrados_historial += 1
+
+            HistorialUbicacionEsperadaValidador.objects.create(
+                amid=ubicacion.amid,
+                nombre=NOMBRE_LABORATORIO_ZP,
+                serie_validador=ubicacion.serie_validador or "",
+                latitud_esperada=LATITUD_LABORATORIO_ZP,
+                longitud_esperada=LONGITUD_LABORATORIO_ZP,
+                radio_metros=RADIO_LABORATORIO_ZP,
+                operativa=False,
+                origen_ubicacion="laboratorio_default",
+                fecha_inicio_vigencia=fecha_carga,
+                fecha_fin_vigencia=None,
                 fecha_carga=fecha_carga,
                 archivo_origen=archivo_origen,
             )
 
+            nuevos_historial += 1
             movidos += 1
 
-            if resultado_historial == "cerrado_y_nuevo":
-                cerrados_historial += 1
-                nuevos_historial += 1
-            elif resultado_historial == "nuevo":
-                nuevos_historial += 1
-
         return movidos, cerrados_historial, nuevos_historial
+
 
     def texto(self, valor):
         if valor is None:
