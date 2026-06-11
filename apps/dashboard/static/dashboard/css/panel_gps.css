@@ -315,3 +315,48 @@
         min-height: 380px;
     }
 }
+
+.gps-panel-mapa {
+    position: relative;
+}
+
+.gps-controles-mapa {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 500;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.gps-controles-mapa button {
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+}
+
+.gps-controles-mapa button:hover {
+    background: #f3f4f6;
+    color: #2563eb;
+}
+
+@media (max-width: 700px) {
+    .gps-controles-mapa {
+        top: 16px;
+        right: 16px;
+        left: 16px;
+        justify-content: flex-end;
+    }
+
+    .gps-controles-mapa button {
+        font-size: 11px;
+        padding: 7px 10px;
+    }
+}

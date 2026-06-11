@@ -10,6 +10,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const amidElemento = document.getElementById("gps-amid");
     const ubicacionesElemento = document.getElementById("gps-ubicaciones");
     const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
+    const ubicacionLaboratorio = {
+        nombre: "Laboratorio Zonas Pagas",
+        latitud: -33.437191,
+        longitud: -70.656102,
+        radio_metros: 70
+    };
 
     const latitud = latitudElemento ? JSON.parse(latitudElemento.textContent) : null;
     const longitud = longitudElemento ? JSON.parse(longitudElemento.textContent) : null;
@@ -32,8 +38,15 @@ document.addEventListener("DOMContentLoaded", function () {
         attribution: "&copy; OpenStreetMap contributors"
     }).addTo(mapa);
 
+    function moverMapaAUbicacion(ubicacion, zoom = 17) {
+        if (!ubicacion || ubicacion.latitud === null || ubicacion.longitud === null) {
+            return;
+        }
+
+        mapa.setView([ubicacion.latitud, ubicacion.longitud], zoom);
+    }
+
     const puntosRuta = [];
-    const elementosMapa = [];
 
     if (ubicaciones && ubicaciones.length > 0) {
         ubicaciones.forEach(function (ubicacion, index) {
@@ -45,7 +58,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const esCoordenadaCero = ubicacion.coordenada_cero === true;
 
             puntosRuta.push([lat, lon]);
-            elementosMapa.push([lat, lon]);
 
             let colorPunto = "#9ca3af";
             let radioPunto = 5;
@@ -114,8 +126,6 @@ document.addEventListener("DOMContentLoaded", function () {
             weight: 2,
         }).addTo(mapa);
 
-        elementosMapa.push([ubicacionEsperada.latitud, ubicacionEsperada.longitud]);
-
         L.circleMarker([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
             radius: 6,
             color: "#111827",
@@ -128,19 +138,52 @@ document.addEventListener("DOMContentLoaded", function () {
                 <strong>Ubicación esperada</strong><br>
                 ${ubicacionEsperada.nombre || "-"}<br>
                 Radio: ${ubicacionEsperada.radio_metros} m<br>
-                Distancia al GPS real: ${ubicacionEsperada.distancia_metros} m<br>
+                Distancia al GPS real: ${ubicacionEsperada.distancia_metros ?? "-"} m<br>
                 Estado: ${ubicacionEsperada.dentro_radio ? "Dentro del radio" : "Fuera del radio"}
             `);
     }
 
-    if (elementosMapa.length > 0) {
-        const limites = L.latLngBounds(elementosMapa);
+    if (ubicacionLaboratorio) {
+        L.circle([ubicacionLaboratorio.latitud, ubicacionLaboratorio.longitud], {
+            radius: ubicacionLaboratorio.radio_metros,
+            color: "#7c3aed",
+            fillColor: "#7c3aed",
+            fillOpacity: 0.10,
+            weight: 2,
+        }).addTo(mapa);
 
-        if (limites.isValid()) {
-            mapa.fitBounds(limites, {
-                padding: [40, 40],
-                maxZoom: 17,
-            });
-        }
+        L.circleMarker([ubicacionLaboratorio.latitud, ubicacionLaboratorio.longitud], {
+            radius: 6,
+            color: "#7c3aed",
+            fillColor: "#ffffff",
+            fillOpacity: 1,
+            weight: 2,
+        })
+            .addTo(mapa)
+            .bindPopup(`
+                <strong>Laboratorio Zonas Pagas</strong><br>
+                ${ubicacionLaboratorio.nombre || "-"}<br>
+                Radio: ${ubicacionLaboratorio.radio_metros} m
+            `);
+    }
+
+    const btnMostrarLaboratorio = document.getElementById("btn-mostrar-laboratorio");
+    const btnMostrarEsperada = document.getElementById("btn-mostrar-esperada");
+
+    if (btnMostrarLaboratorio) {
+        btnMostrarLaboratorio.addEventListener("click", function () {
+            const circuloLaboratorio = L.latLng(
+                ubicacionLaboratorio.latitud,
+                ubicacionLaboratorio.longitud
+            );
+
+            mapa.setView(circuloLaboratorio, 17);
+        });
+    }
+
+    if (btnMostrarEsperada) {
+        btnMostrarEsperada.addEventListener("click", function () {
+            moverMapaAUbicacion(ubicacionEsperada, 17);
+        });
     }
 });

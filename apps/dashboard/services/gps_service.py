@@ -126,6 +126,12 @@ def obtener_contexto_gps(request):
     longitud = None
     ubicaciones_gps = []
     ubicacion_esperada = None
+    ubicacion_laboratorio = {
+        "nombre": NOMBRE_LABORATORIO_ZP,
+        "latitud": LATITUD_LABORATORIO_ZP,
+        "longitud": LONGITUD_LABORATORIO_ZP,
+        "radio_metros": RADIO_LABORATORIO_ZP,
+    }
 
     resumen_gps = {
         "errores_gps_periodo": 0,
@@ -298,5 +304,6 @@ def obtener_contexto_gps(request):
         "longitud": longitud,
         "ubicaciones_gps": ubicaciones_gps,
         "ubicacion_esperada": ubicacion_esperada,
+        "ubicacion_laboratorio": ubicacion_laboratorio,
         "resumen_gps": resumen_gps,
     }

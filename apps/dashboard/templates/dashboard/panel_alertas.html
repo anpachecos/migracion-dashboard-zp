@@ -4,12 +4,14 @@
 {% block title %}Alertas | Dashboard ZP{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=3">
 {% endblock %}
 
 {% block content %}
 
 <section class="panel-alertas">
+
+    <!-- Encabezado -->
     <header class="panel-header">
         <div>
             <h1>Alertas</h1>
@@ -17,33 +19,89 @@
         </div>
     </header>
 
+    <!-- Filtros superiores -->
     <section class="filtros-alertas">
-        <span class="filtro-label">Días</span>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias=1&tipo={{ tipo_alerta }}"
-           class="btn-dia {% if dias == 1 %}activo{% endif %}">
-            1
-        </a>
+        <div class="filtros-dias-grupo">
+            <span class="filtro-label">Días</span>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias=3&tipo={{ tipo_alerta }}"
-           class="btn-dia {% if dias == 3 %}activo{% endif %}">
-            3
-        </a>
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=1&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+               class="btn-dia {% if dias == 1 %}activo{% endif %}">
+                1
+            </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias=7&tipo={{ tipo_alerta }}"
-           class="btn-dia {% if dias == 7 %}activo{% endif %}">
-            7
-        </a>
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=3&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+               class="btn-dia {% if dias == 3 %}activo{% endif %}">
+                3
+            </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias=14&tipo={{ tipo_alerta }}"
-           class="btn-dia {% if dias == 14 %}activo{% endif %}">
-            14
-        </a>
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=7&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+               class="btn-dia {% if dias == 7 %}activo{% endif %}">
+                7
+            </a>
+
+            <a href="{% url 'dashboard:panel_alertas' %}?dias=14&tipo={{ tipo_alerta }}&{{ ubicaciones_query_string }}"
+               class="btn-dia {% if dias == 14 %}activo{% endif %}">
+                14
+            </a>
+        </div>
+
+        {% if tipo_alerta == "gps_cero" or tipo_alerta == "fuera_radio" %}
+            <details class="filtro-ubicaciones-dropdown">
+                <summary>
+                    Ubicación esperada
+                    <span class="contador-ubicaciones">
+                        {{ ubicaciones_seleccionadas|length }}
+                    </span>
+                </summary>
+
+                <form method="get" class="filtro-ubicaciones-form" id="form-filtro-ubicaciones">
+                    <input type="hidden" name="dias" value="{{ dias }}">
+                    <input type="hidden" name="tipo" value="{{ tipo_alerta }}">
+                    <input type="hidden" name="filtro_ubicaciones" value="1">
+
+                    <div class="filtro-ubicaciones-acciones">
+                        <button type="button" id="btn-seleccionar-ubicaciones">
+                            Seleccionar todo
+                        </button>
+
+                        <button type="button" id="btn-deseleccionar-ubicaciones">
+                            Deseleccionar todo
+                        </button>
+
+                        <button type="submit" class="btn-aplicar-filtro">
+                            Aplicar
+                        </button>
+                    </div>
+
+                    <div class="filtro-ubicaciones-lista">
+                        {% for ubicacion in opciones_ubicacion_esperada %}
+                            <label class="filtro-ubicacion-item">
+                                <input
+                                    type="checkbox"
+                                    name="ubicacion"
+                                    value="{{ ubicacion }}"
+                                    class="checkbox-ubicacion"
+                                    {% if ubicacion in ubicaciones_seleccionadas %}checked{% endif %}
+                                >
+                                <span>{{ ubicacion }}</span>
+                            </label>
+                        {% empty %}
+                            <p class="sin-datos">
+                                No hay ubicaciones esperadas cargadas para filtrar.
+                            </p>
+                        {% endfor %}
+                    </div>
+                </form>
+            </details>
+        {% endif %}
+
     </section>
 
+    <!-- Tarjetas resumen -->
     <section class="resumen-alertas">
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero"
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&{{ ubicaciones_query_string }}"
            class="alerta-card alerta-card-link {% if tipo_alerta == 'gps_cero' %}activa{% endif %}">
             <span class="alerta-card-label">GPS 0</span>
 
@@ -56,8 +114,8 @@
             </span>
         </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria"
-            class="alerta-card alerta-card-link {% if tipo_alerta == 'caidas_bateria' %}activa{% endif %}">
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&{{ ubicaciones_query_string }}"
+           class="alerta-card alerta-card-link {% if tipo_alerta == 'caidas_bateria' %}activa{% endif %}">
             <span class="alerta-card-label">Caídas batería</span>
 
             <strong>{{ total_amids_caidas_bateria }}</strong>
@@ -69,21 +127,22 @@
             </span>
         </a>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio"
-            class="alerta-card alerta-card-link {% if tipo_alerta == 'fuera_radio' %}activa{% endif %}">
-                <span class="alerta-card-label">Fuera de radio</span>
+        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&{{ ubicaciones_query_string }}"
+           class="alerta-card alerta-card-link {% if tipo_alerta == 'fuera_radio' %}activa{% endif %}">
+            <span class="alerta-card-label">Fuera de radio</span>
 
-                <strong>{{ total_amids_fuera_radio }}</strong>
+            <strong>{{ total_amids_fuera_radio }}</strong>
 
-                <p>AMIDs fuera de su ubicación esperada.</p>
+            <p>AMIDs fuera de su ubicación esperada.</p>
 
-                <span class="detalle-card">
-                    {{ total_eventos_fuera_radio }} registros fuera de radio
-                </span>
+            <span class="detalle-card">
+                {{ total_eventos_fuera_radio }} registros fuera de radio
+            </span>
         </a>
 
     </section>
 
+    <!-- Tabla GPS 0 -->
     {% if tipo_alerta == "gps_cero" %}
 
         <section class="tabla-card">
@@ -98,14 +157,14 @@
 
                 {% if hay_mas_registros and not mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&ver=todo">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&ver=todo&{{ ubicaciones_query_string }}">
                         Ver más
                     </a>
                 {% endif %}
 
                 {% if mostrar_todo %}
                     <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&{{ ubicaciones_query_string }}">
                         Ver solo 5
                     </a>
                 {% endif %}
@@ -116,6 +175,7 @@
                     <thead>
                         <tr>
                             <th>AMID</th>
+                            <th>Ubicación esperada</th>
                             <th>Registros GPS 0</th>
                             <th>Primera detección</th>
                             <th>Última detección</th>
@@ -128,11 +188,9 @@
                         {% for item in resumen_gps_cero %}
                             <tr>
                                 <td>{{ item.amid }}</td>
-
+                                <td>{{ item.ubicacion_esperada|default:"-" }}</td>
                                 <td>{{ item.cantidad_registros }}</td>
-
                                 <td>{{ item.primera_deteccion|date:"d-m-Y H:i" }}</td>
-
                                 <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
 
                                 <td>
@@ -151,7 +209,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="6" class="sin-datos">
+                                <td colspan="7" class="sin-datos">
                                     No se encontraron AMIDs con GPS 0 en el período seleccionado.
                                 </td>
                             </tr>
@@ -161,6 +219,7 @@
             </div>
         </section>
 
+    <!-- Tabla caídas batería -->
     {% elif tipo_alerta == "caidas_bateria" %}
 
         <section class="tabla-card">
@@ -176,14 +235,14 @@
 
                 {% if hay_mas_caidas_bateria and not mostrar_todo %}
                     <a class="btn-ver-mas"
-                    href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&ver=todo">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&ver=todo&{{ ubicaciones_query_string }}">
                         Ver más
                     </a>
                 {% endif %}
 
                 {% if mostrar_todo %}
                     <a class="btn-ver-mas"
-                    href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria">
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&{{ ubicaciones_query_string }}">
                         Ver solo 5
                     </a>
                 {% endif %}
@@ -226,84 +285,87 @@
             </div>
         </section>
 
+    <!-- Tabla fuera de radio -->
     {% elif tipo_alerta == "fuera_radio" %}
 
-    <section class="tabla-card">
-        <div class="tabla-header">
-            <div>
-                <h2>Validadores fuera de radio</h2>
-                <p>
-                    AMIDs con coordenadas válidas, distintas de 0, pero fuera del radio
-                    definido para su ubicación esperada durante los últimos
-                    {{ dias }} día{% if dias != 1 %}s{% endif %}.
-                </p>
+        <section class="tabla-card">
+            <div class="tabla-header">
+                <div>
+                    <h2>Validadores fuera de radio</h2>
+                    <p>
+                        AMIDs con coordenadas válidas, distintas de 0, pero fuera del radio
+                        definido para su ubicación esperada durante los últimos
+                        {{ dias }} día{% if dias != 1 %}s{% endif %}.
+                    </p>
+                </div>
+
+                {% if hay_mas_fuera_radio and not mostrar_todo %}
+                    <a class="btn-ver-mas"
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo&{{ ubicaciones_query_string }}">
+                        Ver más
+                    </a>
+                {% endif %}
+
+                {% if mostrar_todo %}
+                    <a class="btn-ver-mas"
+                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&{{ ubicaciones_query_string }}">
+                        Ver solo 5
+                    </a>
+                {% endif %}
             </div>
 
-            {% if hay_mas_fuera_radio and not mostrar_todo %}
-                <a class="btn-ver-mas"
-                   href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo">
-                    Ver más
-                </a>
-            {% endif %}
-
-            {% if mostrar_todo %}
-                <a class="btn-ver-mas"
-                   href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio">
-                    Ver solo 5
-                </a>
-            {% endif %}
-        </div>
-
-        <div class="tabla-responsive">
-            <table class="tabla-alertas">
-                <thead>
-                    <tr>
-                        <th>AMID</th>
-                        <th>Registros fuera</th>
-                        <th>Última detección</th>
-                        <th>Ubicación esperada</th>
-                        <th>Distancia</th>
-                        <th>Radio</th>
-                        <th>Exceso</th>
-                        <th>Última batería</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for item in resumen_fuera_radio %}
+            <div class="tabla-responsive">
+                <table class="tabla-alertas">
+                    <thead>
                         <tr>
-                            <td>{{ item.amid }}</td>
-                            <td>{{ item.cantidad_registros }}</td>
-                            <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
-                            <td>{{ item.nombre_ubicacion|default:"-" }}</td>
-                            <td>{{ item.distancia_metros }} m</td>
-                            <td>{{ item.radio_metros }} m</td>
-                            <td>{{ item.exceso_metros }} m</td>
-                            <td>
-                                {% if item.ultima_bateria is not None %}
-                                    {{ item.ultima_bateria }}%
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
+                            <th>AMID</th>
+                            <th>Registros fuera</th>
+                            <th>Última detección</th>
+                            <th>Ubicación esperada</th>
+                            <th>Distancia</th>
+                            <th>Radio</th>
+                            <th>Exceso</th>
+                            <th>Última batería</th>
                         </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="8" class="sin-datos">
-                                No se encontraron AMIDs fuera de radio en el período seleccionado.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
+                    </thead>
+
+                    <tbody>
+                        {% for item in resumen_fuera_radio %}
+                            <tr>
+                                <td>{{ item.amid }}</td>
+                                <td>{{ item.cantidad_registros }}</td>
+                                <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
+                                <td>{{ item.nombre_ubicacion|default:"-" }}</td>
+                                <td>{{ item.distancia_metros }} m</td>
+                                <td>{{ item.radio_metros }} m</td>
+                                <td>{{ item.exceso_metros }} m</td>
+
+                                <td>
+                                    {% if item.ultima_bateria is not None %}
+                                        {{ item.ultima_bateria }}%
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8" class="sin-datos">
+                                    No se encontraron AMIDs fuera de radio en el período seleccionado.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
     {% endif %}
+
 </section>
 
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'dashboard/js/panel_alertas.js' %}"></script>
+<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=3"></script>
 {% endblock %}

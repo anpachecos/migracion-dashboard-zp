@@ -1,4 +1,5 @@
 ﻿from django.shortcuts import render
+from urllib.parse import urlencode
 
 from .services.baterias_service import (
     obtener_contexto_baterias,
@@ -10,7 +11,9 @@ from .services.alertas_service import (
     obtener_alertas_gps_cero,
     obtener_alertas_caidas_bateria,
     obtener_alertas_fuera_radio,
+    obtener_opciones_ubicacion_esperada,
 )
+
 from django.contrib.auth.models import User, Group
 
 #Para exportar excel
@@ -38,9 +41,26 @@ def panel_alertas(request):
     if tipo_alerta not in tipos_validos:
         tipo_alerta = "gps_cero"
 
+    opciones_ubicacion_esperada = obtener_opciones_ubicacion_esperada()
+
+    filtro_ubicaciones_aplicado = request.GET.get("filtro_ubicaciones") == "1"
+
+    if filtro_ubicaciones_aplicado:
+        ubicaciones_seleccionadas = request.GET.getlist("ubicacion")
+    else:
+        ubicaciones_seleccionadas = opciones_ubicacion_esperada
+
+    parametros_ubicaciones = [("filtro_ubicaciones", "1")]
+
+    for ubicacion in ubicaciones_seleccionadas:
+        parametros_ubicaciones.append(("ubicacion", ubicacion))
+
+    ubicaciones_query_string = urlencode(parametros_ubicaciones)
+
     contexto_gps_cero = obtener_alertas_gps_cero(
         dias=dias,
-        mostrar_todo=mostrar_todo
+        mostrar_todo=mostrar_todo,
+        ubicaciones_seleccionadas=ubicaciones_seleccionadas,
     )
 
     contexto_caidas_bateria = obtener_alertas_caidas_bateria(
@@ -49,10 +69,11 @@ def panel_alertas(request):
         umbral_caida=30,
         ventana_horas=2,
     )
-    
+
     contexto_fuera_radio = obtener_alertas_fuera_radio(
         dias=dias,
         mostrar_todo=mostrar_todo,
+        ubicaciones_seleccionadas=ubicaciones_seleccionadas,
     )
 
     context = {
@@ -60,10 +81,13 @@ def panel_alertas(request):
         **contexto_caidas_bateria,
         **contexto_fuera_radio,
         "tipo_alerta": tipo_alerta,
+        "opciones_ubicacion_esperada": opciones_ubicacion_esperada,
+        "ubicaciones_seleccionadas": ubicaciones_seleccionadas,
+        "filtro_ubicaciones_aplicado": filtro_ubicaciones_aplicado,
+        "ubicaciones_query_string": ubicaciones_query_string,
     }
 
     return render(request, "dashboard/panel_alertas.html", context)
-
 @login_required
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)

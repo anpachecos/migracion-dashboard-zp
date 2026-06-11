@@ -10,6 +10,23 @@ from apps.dashboard.services.alertas_bateria_utils import (
     detectar_caidas_drasticas_desde_puntos,
 )
 
+def obtener_opciones_ubicacion_esperada():
+    """
+    Devuelve la lista de ubicaciones esperadas disponibles para usar como filtro.
+    """
+
+    return list(
+        UbicacionEsperadaValidador.objects
+        .filter(
+            operativa=True,
+            nombre__isnull=False,
+        )
+        .exclude(nombre="")
+        .values_list("nombre", flat=True)
+        .distinct()
+        .order_by("nombre")
+    )
+
 def clasificar_gps_cero(cantidad_registros):
     if cantidad_registros >= 5:
         return "Frecuente"
@@ -19,13 +36,19 @@ def clasificar_gps_cero(cantidad_registros):
 
     return "Aislado"
 
-def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
+def obtener_alertas_gps_cero(
+    dias=1,
+    mostrar_todo=False,
+    ubicaciones_seleccionadas=None
+):
     """
     Obtiene resumen de AMIDs únicos con GPS 0 dentro del período seleccionado.
 
     Regla:
     - latitud = 0
     - longitud = 0
+
+    Si ubicaciones_seleccionadas viene como lista, filtra por nombre de ubicación esperada.
     """
 
     try:
@@ -38,6 +61,20 @@ def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
 
     fecha_inicio = timezone.now() - timedelta(days=dias)
 
+    ubicaciones_qs = UbicacionEsperadaValidador.objects.filter(
+        operativa=True
+    )
+
+    if ubicaciones_seleccionadas is not None:
+        ubicaciones_qs = ubicaciones_qs.filter(
+            nombre__in=ubicaciones_seleccionadas
+        )
+
+    ubicaciones_por_amid = {
+        str(item.amid): item
+        for item in ubicaciones_qs
+    }
+
     registros_gps_cero = (
         EstadoValidadorLimpio.objects
         .filter(
@@ -46,6 +83,11 @@ def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
             longitud=0,
         )
     )
+
+    if ubicaciones_seleccionadas is not None:
+        registros_gps_cero = registros_gps_cero.filter(
+            amid__in=ubicaciones_por_amid.keys()
+        )
 
     total_registros_gps_cero = registros_gps_cero.count()
 
@@ -68,6 +110,9 @@ def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
         resumen_visible = list(resumen_por_amid[:5])
 
     for item in resumen_visible:
+        amid_texto = str(item["amid"])
+        ubicacion_esperada = ubicaciones_por_amid.get(amid_texto)
+
         ultimo_registro = (
             registros_gps_cero
             .filter(
@@ -76,6 +121,12 @@ def obtener_alertas_gps_cero(dias=1, mostrar_todo=False):
             )
             .order_by("-id")
             .first()
+        )
+
+        item["ubicacion_esperada"] = (
+            ubicacion_esperada.nombre
+            if ubicacion_esperada and ubicacion_esperada.nombre
+            else "-"
         )
 
         item["ultima_bateria"] = (
@@ -207,7 +258,11 @@ def obtener_alertas_caidas_bateria(
         "ventana_horas": ventana_horas,
     }
 
-def obtener_alertas_fuera_radio(dias=1, mostrar_todo=False):
+def obtener_alertas_fuera_radio(
+    dias=1,
+    mostrar_todo=False,
+    ubicaciones_seleccionadas=None
+):
     """
     Detecta AMIDs que tienen coordenadas válidas, distintas de 0,
     pero fuera del radio esperado definido en UbicacionEsperadaValidador.
@@ -228,14 +283,21 @@ def obtener_alertas_fuera_radio(dias=1, mostrar_todo=False):
 
     fecha_inicio = timezone.now() - timedelta(days=dias)
 
+    ubicaciones_qs = UbicacionEsperadaValidador.objects.filter(
+        operativa=True,
+        latitud_esperada__isnull=False,
+        longitud_esperada__isnull=False,
+        radio_metros__isnull=False,
+    )
+
+    if ubicaciones_seleccionadas is not None:
+        ubicaciones_qs = ubicaciones_qs.filter(
+            nombre__in=ubicaciones_seleccionadas
+        )
+
     ubicaciones_esperadas = {
         str(item.amid): item
-        for item in UbicacionEsperadaValidador.objects.filter(
-            operativa=True,
-            latitud_esperada__isnull=False,
-            longitud_esperada__isnull=False,
-            radio_metros__isnull=False,
-        )
+        for item in ubicaciones_qs
     }
 
     registros = (

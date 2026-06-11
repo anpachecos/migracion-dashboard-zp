@@ -179,7 +179,19 @@
             </aside>
 
             <section class="gps-panel-mapa">
+
+                <div class="gps-controles-mapa">
+                    <button type="button" id="btn-mostrar-laboratorio">
+                        Mostrar laboratorio
+                    </button>
+
+                    <button type="button" id="btn-mostrar-esperada">
+                        Mostrar ubicación esperada
+                    </button>
+                </div>
+
                 <div id="mapa-gps"></div>
+
             </section>
 
         </section>
@@ -198,5 +210,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=6"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=7"></script>
 {% endblock %}
