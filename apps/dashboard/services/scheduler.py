@@ -1,15 +1,17 @@
 import logging
+import time
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.conf import settings
 from django.core.management import call_command
+from django.db import OperationalError
 from django.utils import timezone
 
 from apps.dashboard.models import LogImportacion
 
-#Para importar ubicaciones esperadas desde Excel manualmente, se ejecuta el comando:
-#python manage.py importar_ubicaciones_esperadas
+# Para importar ubicaciones esperadas desde Excel manualmente, se ejecuta el comando:
+# python manage.py importar_ubicaciones_esperadas
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,92 @@ scheduler_started = False
 
 job_validadores_running = False
 job_ubicaciones_running = False
+
+
+def es_error_database_locked(error):
+    """
+    Detecta el error típico de SQLite cuando la base está ocupada.
+    """
+    return "database is locked" in str(error).lower()
+
+
+def ejecutar_comando_con_reintentos(nombre_comando, *args, max_intentos=3, esperas=None):
+    """
+    Ejecuta un comando Django con reintentos solo si falla por 'database is locked'.
+
+    Ejemplo:
+    - intento 1 falla
+    - espera 10 segundos
+    - intento 2 falla
+    - espera 20 segundos
+    - intento 3 falla
+    - lanza el error final
+    """
+
+    if esperas is None:
+        esperas = [10, 20, 30]
+
+    ultimo_error = None
+
+    for intento in range(1, max_intentos + 1):
+        try:
+            logger.info(
+                "Ejecutando comando %s. Intento %s de %s.",
+                nombre_comando,
+                intento,
+                max_intentos,
+            )
+
+            call_command(nombre_comando, *args)
+
+            logger.info(
+                "Comando %s ejecutado correctamente en intento %s.",
+                nombre_comando,
+                intento,
+            )
+
+            return
+
+        except OperationalError as error:
+            ultimo_error = error
+
+            if not es_error_database_locked(error):
+                raise
+
+            logger.warning(
+                "SQLite ocupado al ejecutar %s. Intento %s de %s. Error: %s",
+                nombre_comando,
+                intento,
+                max_intentos,
+                error,
+            )
+
+        except Exception as error:
+            ultimo_error = error
+
+            if not es_error_database_locked(error):
+                raise
+
+            logger.warning(
+                "Base de datos bloqueada al ejecutar %s. Intento %s de %s. Error: %s",
+                nombre_comando,
+                intento,
+                max_intentos,
+                error,
+            )
+
+        if intento < max_intentos:
+            segundos_espera = esperas[min(intento - 1, len(esperas) - 1)]
+
+            logger.info(
+                "Esperando %s segundos antes de reintentar %s.",
+                segundos_espera,
+                nombre_comando,
+            )
+
+            time.sleep(segundos_espera)
+
+    raise ultimo_error
 
 
 def actualizar_validadores_job():
@@ -33,7 +121,11 @@ def actualizar_validadores_job():
     try:
         logger.info("Iniciando actualización automática de validadores...")
 
-        call_command("actualizar_validadores")
+        ejecutar_comando_con_reintentos(
+            "actualizar_validadores",
+            max_intentos=3,
+            esperas=[10, 20, 30],
+        )
 
         logger.info("Actualización automática de validadores finalizada correctamente.")
 
@@ -80,7 +172,12 @@ def importar_ubicaciones_esperadas_job():
 
         logger.info(f"Iniciando importación automática de ubicaciones esperadas desde: {ruta_excel}")
 
-        call_command("importar_ubicaciones_esperadas", str(ruta_excel))
+        ejecutar_comando_con_reintentos(
+            "importar_ubicaciones_esperadas",
+            str(ruta_excel),
+            max_intentos=3,
+            esperas=[10, 20, 30],
+        )
 
         logger.info("Importación automática de ubicaciones esperadas finalizada correctamente.")
 
@@ -117,8 +214,8 @@ def iniciar_scheduler():
     scheduler.add_job(
         importar_ubicaciones_esperadas_job,
         trigger="cron",
-        hour=8,
-        minute=30,
+        hour=18,
+        minute=45,
         id="importar_ubicaciones_esperadas_diario",
         replace_existing=True,
         max_instances=1,
@@ -129,4 +226,4 @@ def iniciar_scheduler():
 
     logger.info("Scheduler iniciado.")
     logger.info("Job validadores: cada 30 minutos.")
-    logger.info("Job ubicaciones esperadas: todos los días a las 08:30.")
+    logger.info("Job ubicaciones esperadas: todos los días a las 18:45.")
