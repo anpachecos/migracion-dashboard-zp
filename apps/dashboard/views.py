@@ -1,10 +1,11 @@
 ﻿from django.shortcuts import render
 from urllib.parse import urlencode
-
 from .services.baterias_service import (
     obtener_contexto_baterias,
     generar_columnas_media_hora,
     construir_tabla_bateria,
+    obtener_registros_bateria_oracle,
+    obtener_ahora_referencia,
 )
 from .services.gps_service import obtener_contexto_gps
 from .services.alertas_service import (
@@ -464,7 +465,7 @@ def panel_perfil(request):
 @login_required
 def exportar_baterias_excel(request):
     """
-    Exporta a Excel los datos del AMID consultado.
+    Exporta a Excel los datos del AMID consultado desde Oracle.
     Hoja 1: matriz fecha x hora, igual a la tabla del panel.
     Hoja 2: registros completos del AMID.
     """
@@ -475,8 +476,7 @@ def exportar_baterias_excel(request):
     hora_fin = request.GET.get("hora_fin", "23:30")
 
     if not amid:
-        response = HttpResponse("Debe indicar un AMID para exportar.", status=400)
-        return response
+        return HttpResponse("Debe indicar un AMID para exportar.", status=400)
 
     try:
         dias = int(dias)
@@ -496,14 +496,22 @@ def exportar_baterias_excel(request):
         hora_inicio = "00:00"
         hora_fin = "23:30"
 
-    fecha_inicio = timezone.now() - timedelta(days=dias)
+    fecha_inicio = obtener_ahora_referencia() - timedelta(days=dias)
 
-    registros = EstadoValidadorLimpio.objects.filter(
-        amid=amid,
-        fecha_hora__gte=fecha_inicio
-    ).order_by("fecha_hora")
+    try:
+        registros = obtener_registros_bateria_oracle(
+            amid=amid,
+            fecha_inicio=fecha_inicio,
+        )
+    except ValueError:
+        return HttpResponse("El AMID ingresado no es válido.", status=400)
+    except Exception as error:
+        return HttpResponse(
+            f"Error consultando datos de baterías en Oracle: {error}",
+            status=500
+        )
 
-    if not registros.exists():
+    if not registros:
         return HttpResponse(
             f"No existen registros para el AMID {amid} en el rango seleccionado.",
             status=404
@@ -554,32 +562,32 @@ def exportar_baterias_excel(request):
         "Fecha estado",
         "BUSID",
         "OP",
+        "Versión",
         "Patente",
+        "TD01",
+        "TD04",
         "Porcentaje batería",
-        "Tiempo vida",
         "Batería detectada",
         "Error batería",
-        "Latitud",
-        "Longitud",
     ]
 
     ws_datos.append(encabezados_datos)
 
-    for registro in registros.iterator(chunk_size=2000):
+    for registro in registros:
         ws_datos.append([
             preparar_valor_excel(registro.amid),
             preparar_valor_excel(registro.fecha_hora),
             preparar_valor_excel(registro.fec_descarga),
             preparar_valor_excel(registro.fec_estado),
-            preparar_valor_excel(registro.busid),
-            preparar_valor_excel(registro.op),
-            preparar_valor_excel(registro.patente),
+            preparar_valor_excel(getattr(registro, "busid", None)),
+            preparar_valor_excel(getattr(registro, "op", None)),
+            preparar_valor_excel(getattr(registro, "version", None)),
+            preparar_valor_excel(getattr(registro, "patente", None)),
+            preparar_valor_excel(getattr(registro, "td01", None)),
+            preparar_valor_excel(getattr(registro, "td04", None)),
             preparar_valor_excel(registro.porcentaje_bateria),
-            preparar_valor_excel(registro.tiempo_vida),
             preparar_valor_excel(registro.is_contiene_bateria),
             preparar_valor_excel(registro.is_error_obtener_bateria),
-            preparar_valor_excel(registro.latitud),
-            preparar_valor_excel(registro.longitud),
         ])
 
     aplicar_estilo_hoja(ws_datos)
@@ -589,7 +597,8 @@ def exportar_baterias_excel(request):
     wb.close()
     output.seek(0)
 
-    filename = f"bateria_amid_{amid}.xlsx"
+    fecha_exportacion = obtener_ahora_referencia().strftime("%Y%m%d_%H%M%S")
+    filename = f"bateria_amid_{amid}_{dias}_dias_{fecha_exportacion}.xlsx"
 
     response = HttpResponse(
         output.getvalue(),

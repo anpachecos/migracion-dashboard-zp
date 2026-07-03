@@ -1,12 +1,158 @@
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 from django.utils import timezone
 
-from ..models import EstadoValidadorLimpio
-
+from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 from apps.dashboard.services.alertas_bateria_utils import (
     detectar_caidas_drasticas_desde_puntos,
 )
+
+
+def obtener_ahora_referencia():
+    """
+    Retorna la fecha/hora actual sin tzinfo para comparar con fechas Oracle.
+    Oracle ya entrega las fechas en la hora correcta, por eso evitamos conversiones
+    que puedan generar desfase.
+    """
+    ahora = timezone.localtime(timezone.now())
+
+    if timezone.is_aware(ahora):
+        return timezone.make_naive(ahora)
+
+    return ahora
+
+
+def normalizar_fecha_para_comparar(fecha):
+    """
+    Evita errores al comparar/restar fechas aware vs naive.
+    No cambia la hora funcional, solo quita tzinfo si existe.
+    """
+    if not fecha:
+        return None
+
+    if timezone.is_aware(fecha):
+        return timezone.make_naive(fecha)
+
+    return fecha
+
+
+def obtener_fecha(valor):
+    """
+    Devuelve solo la fecha, sin aplicar timezone.localtime().
+    """
+    if not valor:
+        return None
+
+    valor = normalizar_fecha_para_comparar(valor)
+    return valor.date()
+
+
+def normalizar_booleano_oracle(valor):
+    """
+    Normaliza valores booleanos que pueden venir desde Oracle como:
+    1/0, true/false, TRUE/FALSE, Sí/No, etc.
+    """
+    if valor is None:
+        return None
+
+    if valor in [True, False]:
+        return valor
+
+    texto = str(valor).strip().lower()
+
+    if texto in ["true", "1", "si", "sí", "s", "yes", "y"]:
+        return True
+
+    if texto in ["false", "0", "no", "n"]:
+        return False
+
+    return None
+
+def obtener_registros_bateria_oracle(amid, fecha_inicio):
+    """
+    Obtiene registros de batería directamente desde Oracle 11g.
+
+    No usa Django ORM porque el backend Oracle de Django actual exige Oracle 19+,
+    pero python-oracledb en modo thick sí permite conectarse a Oracle 11g.
+    """
+
+    fecha_inicio = normalizar_fecha_para_comparar(fecha_inicio)
+    fecha_inicio_texto = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
+
+    query = """
+        SELECT
+            ID,
+            AMID,
+            FEC_DESCARGA,
+            FEC_ESTADO,
+            BUSID,
+            OP,
+            VERSION,
+            PATENTE,
+            TD01,
+            TD04,
+            FECHA_HORA,
+            PORCENTAJE_BATERIA,
+            IS_CONTIENE_BATERIA,
+            IS_ERROR_OBTENER_BATERIA
+        FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
+        WHERE AMID = :amid
+          AND FECHA_HORA >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
+        ORDER BY FECHA_HORA
+    """
+
+    registros = []
+
+    with obtener_conexion_oracle() as conexion:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                query,
+                {
+                    "amid": int(amid),
+                    "fecha_inicio": fecha_inicio_texto,
+                }
+            )
+
+            columnas = [col[0].lower() for col in cursor.description]
+
+            for fila in cursor.fetchall():
+                datos = dict(zip(columnas, fila))
+
+                registros.append(
+                    SimpleNamespace(
+                        id=datos.get("id"),
+                        amid=datos.get("amid"),
+
+                        fec_descarga=normalizar_fecha_para_comparar(
+                            datos.get("fec_descarga")
+                        ),
+                        fec_estado=normalizar_fecha_para_comparar(
+                            datos.get("fec_estado")
+                        ),
+                        fecha_hora=normalizar_fecha_para_comparar(
+                            datos.get("fecha_hora")
+                        ),
+
+                        busid=datos.get("busid"),
+                        op=datos.get("op"),
+                        version=datos.get("version"),
+                        patente=datos.get("patente"),
+                        td01=datos.get("td01"),
+                        td04=datos.get("td04"),
+
+                        porcentaje_bateria=datos.get("porcentaje_bateria"),
+
+                        is_contiene_bateria=normalizar_booleano_oracle(
+                            datos.get("is_contiene_bateria")
+                        ),
+                        is_error_obtener_bateria=normalizar_booleano_oracle(
+                            datos.get("is_error_obtener_bateria")
+                        ),
+                    )
+                )
+
+    return registros
 
 def obtener_clase_tarjeta_bateria(valor):
     if valor is None or valor == "":
@@ -31,10 +177,10 @@ def evaluar_fecha_descarga(fecha_descarga):
     if not fecha_descarga:
         return "Sin dato", "tarjeta-neutra"
 
-    fecha_local = timezone.localtime(fecha_descarga)
-    hoy = timezone.localdate()
+    fecha = obtener_fecha(fecha_descarga)
+    hoy = obtener_ahora_referencia().date()
 
-    if fecha_local.date() == hoy:
+    if fecha == hoy:
         return "Hoy", "tarjeta-ok"
 
     return "No descargó hoy", "tarjeta-error"
@@ -44,14 +190,14 @@ def evaluar_fecha_estatus(fecha_estado):
     if not fecha_estado:
         return "Sin dato", "tarjeta-neutra"
 
-    fecha_local = timezone.localtime(fecha_estado)
-    ahora = timezone.localtime(timezone.now())
-    hoy = timezone.localdate()
+    fecha_estado = normalizar_fecha_para_comparar(fecha_estado)
+    ahora = obtener_ahora_referencia()
+    hoy = ahora.date()
 
-    if fecha_local.date() != hoy:
+    if fecha_estado.date() != hoy:
         return "Sin estatus hoy", "tarjeta-error"
 
-    diferencia_horas = (ahora - fecha_local).total_seconds() / 3600
+    diferencia_horas = (ahora - fecha_estado).total_seconds() / 3600
 
     if diferencia_horas <= 1:
         return "Actualizado", "tarjeta-ok"
@@ -60,20 +206,24 @@ def evaluar_fecha_estatus(fecha_estado):
 
 
 def evaluar_chip_booleano(valor, texto_ok="Sí", texto_error="No"):
-    if valor in [True, "True", "true", "1", 1, "SI", "Sí", "S", "s", "si", "sí"]:
+    valor = normalizar_booleano_oracle(valor)
+
+    if valor is True:
         return texto_ok, "chip-ok"
 
-    if valor in [False, "False", "false", "0", 0, "NO", "No", "N", "n", "no"]:
+    if valor is False:
         return texto_error, "chip-error"
 
     return "Sin dato", "chip-neutro"
 
 
 def evaluar_error_bateria(valor):
-    if valor in [True, "True", "true", "1", 1, "SI", "Sí", "S", "s", "si", "sí"]:
+    valor = normalizar_booleano_oracle(valor)
+
+    if valor is True:
         return "Sí", "chip-error"
 
-    if valor in [False, "False", "false", "0", 0, "NO", "No", "N", "n", "no"]:
+    if valor is False:
         return "No", "chip-ok"
 
     return "Sin dato", "chip-neutro"
@@ -84,7 +234,6 @@ def formatear_duracion(delta):
     Convierte un timedelta en texto corto.
     Ejemplo: 1h 30m
     """
-
     total_minutos = int(delta.total_seconds() // 60)
     horas = total_minutos // 60
     minutos = total_minutos % 60
@@ -102,12 +251,7 @@ def detectar_caidas_drasticas(registros, umbral_caida=30, ventana_horas=2):
     Regla:
     - La batería baja al menos `umbral_caida` puntos.
     - La diferencia de tiempo entre mediciones es menor o igual a `ventana_horas`.
-
-    Ejemplo:
-    70% -> 30% en 2 horas = caída drástica.
-    70% -> 30% en 24 horas = no cuenta.
     """
-
     caidas = []
     registros_validos = []
     ventana_maxima = timedelta(hours=ventana_horas)
@@ -119,6 +263,7 @@ def detectar_caidas_drasticas(registros, umbral_caida=30, ventana_horas=2):
             continue
 
         fecha = registro.fecha_hora or registro.fec_estado
+        fecha = normalizar_fecha_para_comparar(fecha)
 
         if not fecha:
             continue
@@ -194,7 +339,7 @@ def obtener_contexto_baterias(request):
     mensaje = ""
     horario_sugerido_aplicado = False
     datos_grafico_periodo = []
-    
+
     clase_bateria_actual = "tarjeta-neutra"
 
     estado_descarga = "-"
@@ -212,29 +357,22 @@ def obtener_contexto_baterias(request):
     total_caidas_drasticas = 0
     clase_alertas_periodo = "tarjeta-neutra"
     alertas_periodo = []
-    
+
     if amid:
-        fecha_inicio = timezone.now() - timedelta(days=dias)
+        fecha_inicio = obtener_ahora_referencia() - timedelta(days=dias)
 
-        registros_qs = (
-            EstadoValidadorLimpio.objects
-            .filter(
+        try:
+            registros = obtener_registros_bateria_oracle(
                 amid=amid,
-                fecha_hora__gte=fecha_inicio,
+                fecha_inicio=fecha_inicio,
             )
-            .only(
-                "amid",
-                "fecha_hora",
-                "fec_descarga",
-                "fec_estado",
-                "porcentaje_bateria",
-                "is_contiene_bateria",
-                "is_error_obtener_bateria",
-            )
-            .order_by("fecha_hora")
-        )
+        except ValueError:
+            registros = []
+            mensaje = "El AMID ingresado no es válido."
+        except Exception as error:
+            registros = []
+            mensaje = f"Error consultando datos de baterías en Oracle: {error}"
 
-        registros = list(registros_qs)
         ultimo_registro = registros[-1] if registros else None
 
         if ultimo_registro:
@@ -254,6 +392,7 @@ def obtener_contexto_baterias(request):
 
             datos_grafico_periodo = construir_datos_grafico_periodo(tabla_bateria)
             datos_grafico_dia = construir_datos_grafico_dia(registros)
+
             clase_bateria_actual = obtener_clase_tarjeta_bateria(
                 ultimo_registro.porcentaje_bateria
             )
@@ -281,7 +420,8 @@ def obtener_contexto_baterias(request):
                 clase_alertas_periodo = "tarjeta-error"
             else:
                 clase_alertas_periodo = "tarjeta-ok"
-        else:
+
+        elif not mensaje:
             mensaje = "No se encontraron registros para el AMID ingresado en el rango seleccionado."
 
     return {
@@ -333,7 +473,7 @@ def generar_columnas_media_hora(hora_inicio="00:00", hora_fin="23:30"):
 
 
 def generar_fechas_ultimos_dias(cantidad_dias=14):
-    hoy = timezone.localdate()
+    hoy = obtener_ahora_referencia().date()
     fechas = []
 
     for i in range(cantidad_dias):
@@ -342,12 +482,14 @@ def generar_fechas_ultimos_dias(cantidad_dias=14):
     return fechas
 
 
-def obtener_registro_mas_cercano(registros_por_fecha, fecha, hora_texto, tolerancia_minutos=15):
+def obtener_registro_mas_cercano(
+    registros_por_fecha,
+    fecha,
+    hora_texto,
+    tolerancia_minutos=15
+):
     hora_obj = datetime.strptime(hora_texto, "%H:%M").time()
     fecha_hora_referencia = datetime.combine(fecha, hora_obj)
-
-    if timezone.is_naive(fecha_hora_referencia):
-        fecha_hora_referencia = timezone.make_aware(fecha_hora_referencia)
 
     registros_del_dia = registros_por_fecha.get(fecha, [])
     mejor_registro = None
@@ -357,7 +499,11 @@ def obtener_registro_mas_cercano(registros_por_fecha, fecha, hora_texto, toleran
         if not registro.fecha_hora:
             continue
 
-        diferencia = abs((registro.fecha_hora - fecha_hora_referencia).total_seconds()) / 60
+        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
+
+        diferencia = abs(
+            (fecha_registro - fecha_hora_referencia).total_seconds()
+        ) / 60
 
         if diferencia <= tolerancia_minutos:
             if menor_diferencia is None or diferencia < menor_diferencia:
@@ -367,7 +513,12 @@ def obtener_registro_mas_cercano(registros_por_fecha, fecha, hora_texto, toleran
     return mejor_registro
 
 
-def construir_tabla_bateria(registros, cantidad_dias=14, hora_inicio="00:00", hora_fin="23:30"):
+def construir_tabla_bateria(
+    registros,
+    cantidad_dias=14,
+    hora_inicio="00:00",
+    hora_fin="23:30"
+):
     columnas_horas = generar_columnas_media_hora(hora_inicio, hora_fin)
     fechas = generar_fechas_ultimos_dias(cantidad_dias)
     registros_por_fecha = {}
@@ -376,7 +527,8 @@ def construir_tabla_bateria(registros, cantidad_dias=14, hora_inicio="00:00", ho
         if not registro.fecha_hora:
             continue
 
-        fecha = timezone.localtime(registro.fecha_hora).date()
+        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
+        fecha = fecha_registro.date()
         registros_por_fecha.setdefault(fecha, []).append(registro)
 
     tabla = []
@@ -426,12 +578,13 @@ def obtener_clase_bateria(valor):
         return "bateria-media"
     if valor >= 20:
         return "bateria-baja"
+
     return "bateria-critica"
 
 
 def construir_datos_grafico_dia(registros, fecha_objetivo=None):
     if fecha_objetivo is None:
-        fecha_objetivo = timezone.localdate()
+        fecha_objetivo = obtener_ahora_referencia().date()
 
     columnas_horas = generar_columnas_media_hora("00:00", "23:30")
     registros_por_fecha = {}
@@ -440,10 +593,12 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
         if not registro.fecha_hora:
             continue
 
-        fecha = timezone.localtime(registro.fecha_hora).date()
+        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
+        fecha = fecha_registro.date()
         registros_por_fecha.setdefault(fecha, []).append(registro)
 
     datos = []
+
     for hora_texto in columnas_horas:
         registro_cercano = obtener_registro_mas_cercano(
             registros_por_fecha=registros_por_fecha,
@@ -453,6 +608,7 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
         )
 
         bateria_real = None
+
         if registro_cercano and registro_cercano.porcentaje_bateria is not None:
             try:
                 bateria_real = float(registro_cercano.porcentaje_bateria)
@@ -465,8 +621,10 @@ def construir_datos_grafico_dia(registros, fecha_objetivo=None):
             "bateria_esperada": None,
         })
 
-    indices_validos = [i for i, punto in enumerate(datos)
-                      if punto["bateria_real"] is not None and punto["bateria_real"] > 0]
+    indices_validos = [
+        i for i, punto in enumerate(datos)
+        if punto["bateria_real"] is not None and punto["bateria_real"] > 0
+    ]
 
     if not indices_validos:
         return []
@@ -513,6 +671,7 @@ def construir_datos_grafico_periodo(tabla_bateria):
 
     return datos
 
+
 def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
     columnas_horas = generar_columnas_media_hora("00:00", "23:30")
     conteo_por_hora = {hora: 0 for hora in columnas_horas}
@@ -521,9 +680,9 @@ def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
         if not registro.fecha_hora:
             continue
 
-        fecha_hora_local = timezone.localtime(registro.fecha_hora)
-        hora = fecha_hora_local.hour
-        minuto = fecha_hora_local.minute
+        fecha_hora = normalizar_fecha_para_comparar(registro.fecha_hora)
+        hora = fecha_hora.hour
+        minuto = fecha_hora.minute
 
         if minuto < 15:
             bloque = f"{hora:02d}:00"
@@ -531,6 +690,7 @@ def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
             bloque = f"{hora:02d}:30"
         else:
             hora_siguiente = hora + 1
+
             if hora_siguiente == 24:
                 bloque = "23:30"
             else:
@@ -593,9 +753,6 @@ def detectar_caidas_drasticas_tabla(
 
             fecha_hora = datetime.combine(fecha, hora)
 
-            if timezone.is_naive(fecha_hora):
-                fecha_hora = timezone.make_aware(fecha_hora)
-
             puntos.append({
                 "amid": "",
                 "fecha_hora": fecha_hora,
@@ -608,6 +765,7 @@ def detectar_caidas_drasticas_tabla(
         ventana_horas=ventana_horas,
         ventana_confirmacion_minutos=ventana_confirmacion_minutos,
     )
+
 
 def es_cero_probablemente_transitorio(
     puntos,
@@ -627,7 +785,6 @@ def es_cero_probablemente_transitorio(
     70 -> 0 -> 20
     70 -> 0 -> sin nueva transmisión cercana
     """
-
     punto_cero = puntos[indice_actual]
     fecha_cero = punto_cero["fecha_hora"]
 
@@ -644,11 +801,9 @@ def es_cero_probablemente_transitorio(
 
         puntos_posteriores_cercanos.append(siguiente)
 
-    # Si no volvió a transmitir pronto, se considera alerta.
     if not puntos_posteriores_cercanos:
         return False
 
-    # Si vuelve a marcar 0 dentro de la ventana, se confirma alerta.
     for punto in puntos_posteriores_cercanos:
         if punto["bateria"] == 0:
             return False
@@ -658,10 +813,7 @@ def es_cero_probablemente_transitorio(
 
     caida_real_posterior = bateria_anterior - bateria_posterior
 
-    # Si después del 0 vuelve a un valor cercano al anterior,
-    # probablemente fue error de transmisión.
     if bateria_posterior > 0 and caida_real_posterior < umbral_caida:
         return True
 
-    # Si después del 0 sigue con una caída grande, se mantiene como alerta.
     return False
