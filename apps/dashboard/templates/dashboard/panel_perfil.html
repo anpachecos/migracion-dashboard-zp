@@ -112,7 +112,11 @@
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
         <h2>Administración del sistema</h2>
-        <p>Ejecuta procesos administrativos del dashboard. Estas acciones están disponibles solo para administradores.</p>
+        <p>
+            Acciones administrativas disponibles. Los datos operativos del dashboard
+            se consultan directamente desde Oracle; SQLite se mantiene para usuarios,
+            sesiones y logs internos.
+        </p>
     </div>
 
     {% if messages %}
@@ -130,48 +134,8 @@
             {% csrf_token %}
             <input type="hidden" name="accion" value="probar_oracle">
             <h3>Probar Oracle</h3>
-            <p>Verifica si la conexión a Oracle está disponible.</p>
-            <button type="submit">Ejecutar</button>
-        </form>
-
-        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="actualizar_validadores">
-            <h3>Actualizar validadores</h3>
-            <p>Ejecuta Oracle → Limpio → Limpieza de registros antiguos.</p>
-            <button type="submit">Ejecutar</button>
-        </form>
-
-        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="importar_oracle_2h">
-            <h3>Importar Oracle 2 horas</h3>
-            <p>Importa datos recientes desde Oracle hacia RAW.</p>
-            <button type="submit">Ejecutar</button>
-        </form>
-
-        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="importar_oracle_14d">
-            <h3>Importar Oracle 14 días</h3>
-            <p>Importa datos de las últimas dos semanas desde Oracle.</p>
-            <button type="submit">Ejecutar</button>
-        </form>
-
-        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="cargar_limpios">
-            <h3>Cargar datos limpios</h3>
-            <p>Pasa registros desde RAW hacia Limpio.</p>
-            <button type="submit">Ejecutar</button>
-        </form>
-
-        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="limpiar_antiguos">
-            <h3>Limpiar antiguos</h3>
-            <p>Elimina registros RAW y Limpio mayores a 14 días.</p>
-            <button type="submit">Ejecutar</button>
+            <p>Verifica si la conexión directa a Oracle está disponible.</p>
+            <button type="submit">Ejecutar prueba</button>
         </form>
     </div>
 </section>

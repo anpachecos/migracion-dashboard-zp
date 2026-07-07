@@ -9,6 +9,27 @@ from apps.dashboard.services.alertas_bateria_utils import (
 )
 
 
+"""
+REGLAS DE NEGOCIO ACTUALES
+
+Oracle:
+- USR_LAB.BATERIA_BLOQUE_30MIN ya tiene una fila por AMID + bloque de 30 minutos.
+- Si no hubo transmisión cercana al bloque:
+    PORCENTAJE_BATERIA = NULL
+    TIENE_DATO = 0
+- Si hubo dato real con batería 0:
+    PORCENTAJE_BATERIA = 0
+    TIENE_DATO = 1
+- La tabla se actualiza con job Oracle cada 30 minutos.
+
+Python:
+- Lee la tabla de bloques ya preparada.
+- No vuelve a calcular el registro más cercano.
+- Solo arma la estructura para HTML, gráficos y alertas.
+- El último registro / tarjetas salen desde VW_ESTATUS_ZP_DJANGO.
+"""
+
+
 def obtener_ahora_referencia():
     """
     Retorna la fecha/hora actual sin tzinfo para comparar con fechas Oracle.
@@ -69,40 +90,165 @@ def normalizar_booleano_oracle(valor):
 
     return None
 
-def obtener_registros_bateria_oracle(amid, fecha_inicio):
-    """
-    Obtiene registros de batería directamente desde Oracle 11g.
 
-    No usa Django ORM porque el backend Oracle de Django actual exige Oracle 19+,
-    pero python-oracledb en modo thick sí permite conectarse a Oracle 11g.
+def formatear_bateria_entera(valor):
+    """
+    Normaliza batería para mostrarla sin decimales.
+
+    Reglas:
+    - None o vacío quedan como "" para que el HTML muestre "-".
+    - 80.0 queda como 80.
+    - 0 queda como 0, porque sí es un dato real.
+    """
+    if valor is None or valor == "":
+        return ""
+
+    try:
+        numero = float(valor)
+    except (ValueError, TypeError):
+        return ""
+
+    return int(round(numero))
+
+
+def obtener_rango_fechas_panel(cantidad_dias):
+    """
+    Retorna rango calendario para consultar bloques.
+
+    Ejemplo:
+    cantidad_dias = 1
+    -> hoy 00:00 hasta mañana 00:00
+
+    cantidad_dias = 14
+    -> hoy - 13 días a las 00:00 hasta mañana 00:00
+    """
+    hoy = obtener_ahora_referencia().date()
+    fecha_inicio = datetime.combine(
+        hoy - timedelta(days=cantidad_dias - 1),
+        datetime.min.time()
+    )
+    fecha_fin = datetime.combine(
+        hoy + timedelta(days=1),
+        datetime.min.time()
+    )
+
+    return fecha_inicio, fecha_fin
+
+
+def obtener_ultimo_registro_bateria_oracle(amid):
+    """
+    Obtiene el último registro real del AMID desde la vista original.
+
+    Esta consulta alimenta las tarjetas:
+    - Batería actual
+    - Última descarga
+    - Último estatus
+    - Identificación
+    - Sensor batería
+    """
+    query = """
+        SELECT *
+        FROM (
+            SELECT
+                ID,
+                AMID,
+                FEC_DESCARGA,
+                FEC_ESTADO,
+                BUSID,
+                OP,
+                VERSION,
+                PATENTE,
+                TD01,
+                TD04,
+                FECHA_HORA,
+                PORCENTAJE_BATERIA,
+                IS_CONTIENE_BATERIA,
+                IS_ERROR_OBTENER_BATERIA
+            FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
+            WHERE AMID = :amid
+            ORDER BY FECHA_HORA DESC
+        )
+        WHERE ROWNUM = 1
     """
 
+    with obtener_conexion_oracle() as conexion:
+        with conexion.cursor() as cursor:
+            cursor.execute(query, {"amid": int(amid)})
+
+            fila = cursor.fetchone()
+
+            if not fila:
+                return None
+
+            columnas = [col[0].lower() for col in cursor.description]
+            datos = dict(zip(columnas, fila))
+
+            return SimpleNamespace(
+                id=datos.get("id"),
+                amid=datos.get("amid"),
+
+                fec_descarga=normalizar_fecha_para_comparar(
+                    datos.get("fec_descarga")
+                ),
+                fec_estado=normalizar_fecha_para_comparar(
+                    datos.get("fec_estado")
+                ),
+                fecha_hora=normalizar_fecha_para_comparar(
+                    datos.get("fecha_hora")
+                ),
+
+                busid=datos.get("busid"),
+                op=datos.get("op"),
+                version=datos.get("version"),
+                patente=datos.get("patente"),
+                td01=datos.get("td01"),
+                td04=datos.get("td04"),
+
+                porcentaje_bateria=formatear_bateria_entera(
+                    datos.get("porcentaje_bateria")
+                ),
+
+                is_contiene_bateria=normalizar_booleano_oracle(
+                    datos.get("is_contiene_bateria")
+                ),
+                is_error_obtener_bateria=normalizar_booleano_oracle(
+                    datos.get("is_error_obtener_bateria")
+                ),
+            )
+
+
+def obtener_bloques_bateria_oracle(amid, fecha_inicio, fecha_fin):
+    """
+    Obtiene los bloques de batería ya preparados en Oracle.
+
+    Esta consulta alimenta:
+    - tabla por media hora
+    - gráfico diario
+    - gráfico período
+    - alertas de caída del período
+    """
     fecha_inicio = normalizar_fecha_para_comparar(fecha_inicio)
-    fecha_inicio_texto = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
+    fecha_fin = normalizar_fecha_para_comparar(fecha_fin)
 
     query = """
         SELECT
-            ID,
             AMID,
-            FEC_DESCARGA,
-            FEC_ESTADO,
-            BUSID,
-            OP,
-            VERSION,
-            PATENTE,
-            TD01,
-            TD04,
-            FECHA_HORA,
+            FECHA_HORA_BLOQUE,
+            FECHA_BLOQUE,
+            HORA_BLOQUE,
             PORCENTAJE_BATERIA,
-            IS_CONTIENE_BATERIA,
-            IS_ERROR_OBTENER_BATERIA
-        FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
+            FECHA_HORA_ORIGINAL,
+            ID_ORACLE,
+            DIFERENCIA_MINUTOS,
+            TIENE_DATO
+        FROM USR_LAB.BATERIA_BLOQUE_30MIN
         WHERE AMID = :amid
-          AND FECHA_HORA >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
-        ORDER BY FECHA_HORA
+          AND FECHA_HORA_BLOQUE >= :fecha_inicio
+          AND FECHA_HORA_BLOQUE < :fecha_fin
+        ORDER BY FECHA_HORA_BLOQUE
     """
 
-    registros = []
+    bloques = []
 
     with obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
@@ -110,7 +256,8 @@ def obtener_registros_bateria_oracle(amid, fecha_inicio):
                 query,
                 {
                     "amid": int(amid),
-                    "fecha_inicio": fecha_inicio_texto,
+                    "fecha_inicio": fecha_inicio,
+                    "fecha_fin": fecha_fin,
                 }
             )
 
@@ -119,40 +266,34 @@ def obtener_registros_bateria_oracle(amid, fecha_inicio):
             for fila in cursor.fetchall():
                 datos = dict(zip(columnas, fila))
 
-                registros.append(
+                fecha_hora_bloque = normalizar_fecha_para_comparar(
+                    datos.get("fecha_hora_bloque")
+                )
+                fecha_hora_original = normalizar_fecha_para_comparar(
+                    datos.get("fecha_hora_original")
+                )
+
+                bloques.append(
                     SimpleNamespace(
-                        id=datos.get("id"),
                         amid=datos.get("amid"),
-
-                        fec_descarga=normalizar_fecha_para_comparar(
-                            datos.get("fec_descarga")
+                        fecha_hora=fecha_hora_bloque,
+                        fecha_hora_bloque=fecha_hora_bloque,
+                        fecha_bloque=normalizar_fecha_para_comparar(
+                            datos.get("fecha_bloque")
                         ),
-                        fec_estado=normalizar_fecha_para_comparar(
-                            datos.get("fec_estado")
-                        ),
-                        fecha_hora=normalizar_fecha_para_comparar(
-                            datos.get("fecha_hora")
-                        ),
-
-                        busid=datos.get("busid"),
-                        op=datos.get("op"),
-                        version=datos.get("version"),
-                        patente=datos.get("patente"),
-                        td01=datos.get("td01"),
-                        td04=datos.get("td04"),
-
-                        porcentaje_bateria=datos.get("porcentaje_bateria"),
-
-                        is_contiene_bateria=normalizar_booleano_oracle(
-                            datos.get("is_contiene_bateria")
-                        ),
-                        is_error_obtener_bateria=normalizar_booleano_oracle(
-                            datos.get("is_error_obtener_bateria")
-                        ),
+                        hora_bloque=datos.get("hora_bloque"),
+                        porcentaje_bateria=formatear_bateria_entera(
+                    datos.get("porcentaje_bateria")
+                ),
+                        fecha_hora_original=fecha_hora_original,
+                        id_oracle=datos.get("id_oracle"),
+                        diferencia_minutos=datos.get("diferencia_minutos"),
+                        tiene_dato=datos.get("tiene_dato") == 1,
                     )
                 )
 
-    return registros
+    return bloques
+
 
 def obtener_clase_tarjeta_bateria(valor):
     if valor is None or valor == "":
@@ -248,9 +389,8 @@ def detectar_caidas_drasticas(registros, umbral_caida=30, ventana_horas=2):
     """
     Detecta caídas drásticas de batería para un AMID.
 
-    Regla:
-    - La batería baja al menos `umbral_caida` puntos.
-    - La diferencia de tiempo entre mediciones es menor o igual a `ventana_horas`.
+    Se mantiene por compatibilidad, pero el panel actual usa
+    detectar_caidas_drasticas_tabla() a partir de bloques Oracle.
     """
     caidas = []
     registros_validos = []
@@ -306,31 +446,15 @@ def detectar_caidas_drasticas(registros, umbral_caida=30, ventana_horas=2):
 
     return caidas
 
-
 def obtener_contexto_baterias(request):
     amid = request.GET.get("amid", "").strip()
-    dias = request.GET.get("dias", "14")
-    hora_inicio = request.GET.get("hora_inicio", "00:00")
-    hora_fin = request.GET.get("hora_fin", "23:30")
-    usar_sugerido = request.GET.get("usar_sugerido", "")
 
-    try:
-        dias = int(dias)
-    except ValueError:
-        dias = 14
-
-    if dias not in [1, 3, 7, 14]:
-        dias = 14
-
-    if not hora_inicio:
-        hora_inicio = "00:00"
-
-    if not hora_fin:
-        hora_fin = "23:30"
-
-    if hora_inicio > hora_fin:
-        hora_inicio = "00:00"
-        hora_fin = "23:30"
+    # El panel de baterías trabaja siempre con 14 días completos.
+    # Se eliminan filtros manuales para simplificar el uso operativo.
+    dias = 14
+    hora_inicio = "00:00"
+    hora_fin = "23:30"
+    usar_sugerido = ""
 
     ultimo_registro = None
     columnas_horas = generar_columnas_media_hora(hora_inicio, hora_fin)
@@ -359,39 +483,43 @@ def obtener_contexto_baterias(request):
     alertas_periodo = []
 
     if amid:
-        fecha_inicio = obtener_ahora_referencia() - timedelta(days=dias)
-
         try:
-            registros = obtener_registros_bateria_oracle(
+            fecha_inicio_consulta, fecha_fin_consulta = obtener_rango_fechas_panel(dias)
+
+            bloques = obtener_bloques_bateria_oracle(
                 amid=amid,
-                fecha_inicio=fecha_inicio,
+                fecha_inicio=fecha_inicio_consulta,
+                fecha_fin=fecha_fin_consulta,
             )
+
+            ultimo_registro = obtener_ultimo_registro_bateria_oracle(amid=amid)
+
         except ValueError:
-            registros = []
+            bloques = []
+            ultimo_registro = None
             mensaje = "El AMID ingresado no es válido."
         except Exception as error:
-            registros = []
+            bloques = []
+            ultimo_registro = None
             mensaje = f"Error consultando datos de baterías en Oracle: {error}"
-
-        ultimo_registro = registros[-1] if registros else None
 
         if ultimo_registro:
             if usar_sugerido == "1":
                 hora_inicio, hora_fin = calcular_rango_horario_sugerido(
-                    registros=registros,
+                    bloques=bloques,
                     cantidad_dias=dias
                 )
                 horario_sugerido_aplicado = True
 
             columnas_horas, tabla_bateria = construir_tabla_bateria(
-                registros=registros,
+                bloques=bloques,
                 cantidad_dias=dias,
                 hora_inicio=hora_inicio,
                 hora_fin=hora_fin
             )
 
             datos_grafico_periodo = construir_datos_grafico_periodo(tabla_bateria)
-            datos_grafico_dia = construir_datos_grafico_dia(registros)
+            datos_grafico_dia = construir_datos_grafico_dia(bloques)
 
             clase_bateria_actual = obtener_clase_tarjeta_bateria(
                 ultimo_registro.porcentaje_bateria
@@ -422,7 +550,7 @@ def obtener_contexto_baterias(request):
                 clase_alertas_periodo = "tarjeta-ok"
 
         elif not mensaje:
-            mensaje = "No se encontraron registros para el AMID ingresado en el rango seleccionado."
+            mensaje = "No se encontraron registros para el AMID ingresado."
 
     return {
         "amid": amid,
@@ -455,7 +583,6 @@ def obtener_contexto_baterias(request):
         "alertas_periodo": alertas_periodo,
     }
 
-
 def generar_columnas_media_hora(hora_inicio="00:00", hora_fin="23:30"):
     columnas = []
     inicio = datetime.strptime(hora_inicio, "%H:%M").time()
@@ -482,54 +609,58 @@ def generar_fechas_ultimos_dias(cantidad_dias=14):
     return fechas
 
 
-def obtener_registro_mas_cercano(
-    registros_por_fecha,
-    fecha,
-    hora_texto,
-    tolerancia_minutos=15
-):
-    hora_obj = datetime.strptime(hora_texto, "%H:%M").time()
-    fecha_hora_referencia = datetime.combine(fecha, hora_obj)
-
-    registros_del_dia = registros_por_fecha.get(fecha, [])
-    mejor_registro = None
-    menor_diferencia = None
-
-    for registro in registros_del_dia:
-        if not registro.fecha_hora:
-            continue
-
-        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
-
-        diferencia = abs(
-            (fecha_registro - fecha_hora_referencia).total_seconds()
-        ) / 60
-
-        if diferencia <= tolerancia_minutos:
-            if menor_diferencia is None or diferencia < menor_diferencia:
-                menor_diferencia = diferencia
-                mejor_registro = registro
-
-    return mejor_registro
-
-
 def construir_tabla_bateria(
-    registros,
+    bloques=None,
     cantidad_dias=14,
     hora_inicio="00:00",
-    hora_fin="23:30"
+    hora_fin="23:30",
+    registros=None
 ):
+    """
+    Arma la tabla visual usando bloques ya preparados por Oracle.
+    Ya no calcula cercanía de registros en Python.
+    """
     columnas_horas = generar_columnas_media_hora(hora_inicio, hora_fin)
     fechas = generar_fechas_ultimos_dias(cantidad_dias)
-    registros_por_fecha = {}
 
-    for registro in registros:
-        if not registro.fecha_hora:
+    # Compatibilidad: views.py todavía puede llamar construir_tabla_bateria(
+    # registros=registros_objetos, ... ) para el Excel. En ese caso usamos esos
+    # registros como si fueran bloques ya asignados por fecha_hora.
+    if bloques is None:
+        bloques = registros or []
+
+    bloques_por_fecha_hora = {}
+
+    for bloque in bloques:
+        fecha_hora_bloque = getattr(bloque, "fecha_hora_bloque", None)
+
+        if fecha_hora_bloque is None:
+            fecha_hora_bloque = getattr(bloque, "fecha_hora", None)
+
+        if not fecha_hora_bloque:
             continue
 
-        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
-        fecha = fecha_registro.date()
-        registros_por_fecha.setdefault(fecha, []).append(registro)
+        fecha_hora_bloque = normalizar_fecha_para_comparar(fecha_hora_bloque)
+        fecha_bloque = fecha_hora_bloque.date()
+
+        hora_bloque = getattr(bloque, "hora_bloque", None)
+
+        if not hora_bloque:
+            minuto = fecha_hora_bloque.minute
+            hora = fecha_hora_bloque.hour
+
+            if minuto < 15:
+                hora_bloque = f"{hora:02d}:00"
+            elif minuto < 45:
+                hora_bloque = f"{hora:02d}:30"
+            else:
+                hora_siguiente = hora + 1
+                if hora_siguiente == 24:
+                    hora_bloque = "23:30"
+                else:
+                    hora_bloque = f"{hora_siguiente:02d}:00"
+
+        bloques_por_fecha_hora[(fecha_bloque, hora_bloque)] = bloque
 
     tabla = []
 
@@ -540,15 +671,13 @@ def construir_tabla_bateria(
         }
 
         for hora_texto in columnas_horas:
-            registro_cercano = obtener_registro_mas_cercano(
-                registros_por_fecha=registros_por_fecha,
-                fecha=fecha,
-                hora_texto=hora_texto,
-                tolerancia_minutos=15
-            )
+            bloque = bloques_por_fecha_hora.get((fecha, hora_texto))
 
-            if registro_cercano and registro_cercano.porcentaje_bateria is not None:
-                valor = registro_cercano.porcentaje_bateria
+            tiene_dato = getattr(bloque, "tiene_dato", True) if bloque else False
+            porcentaje_bateria = getattr(bloque, "porcentaje_bateria", None) if bloque else None
+
+            if bloque and tiene_dato and porcentaje_bateria is not None:
+                valor = formatear_bateria_entera(porcentaje_bateria)
             else:
                 valor = ""
 
@@ -582,36 +711,43 @@ def obtener_clase_bateria(valor):
     return "bateria-critica"
 
 
-def construir_datos_grafico_dia(registros, fecha_objetivo=None):
+def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
+    """
+    Construye gráfico diario desde bloques Oracle.
+
+    Mantiene la misma regla visual anterior:
+    - solo grafica desde el primer dato válido > 0
+    - genera curva esperada desde ese primer punto
+    """
     if fecha_objetivo is None:
         fecha_objetivo = obtener_ahora_referencia().date()
 
     columnas_horas = generar_columnas_media_hora("00:00", "23:30")
-    registros_por_fecha = {}
+    bloques_por_hora = {}
 
-    for registro in registros:
-        if not registro.fecha_hora:
+    for bloque in bloques:
+        if not bloque.fecha_hora_bloque:
             continue
 
-        fecha_registro = normalizar_fecha_para_comparar(registro.fecha_hora)
-        fecha = fecha_registro.date()
-        registros_por_fecha.setdefault(fecha, []).append(registro)
+        fecha_bloque = normalizar_fecha_para_comparar(
+            bloque.fecha_hora_bloque
+        ).date()
+
+        if fecha_bloque != fecha_objetivo:
+            continue
+
+        hora_bloque = bloque.hora_bloque or bloque.fecha_hora_bloque.strftime("%H:%M")
+        bloques_por_hora[hora_bloque] = bloque
 
     datos = []
 
     for hora_texto in columnas_horas:
-        registro_cercano = obtener_registro_mas_cercano(
-            registros_por_fecha=registros_por_fecha,
-            fecha=fecha_objetivo,
-            hora_texto=hora_texto,
-            tolerancia_minutos=15
-        )
-
+        bloque = bloques_por_hora.get(hora_texto)
         bateria_real = None
 
-        if registro_cercano and registro_cercano.porcentaje_bateria is not None:
+        if bloque and bloque.tiene_dato and bloque.porcentaje_bateria is not None:
             try:
-                bateria_real = float(registro_cercano.porcentaje_bateria)
+                bateria_real = float(bloque.porcentaje_bateria)
             except (ValueError, TypeError):
                 bateria_real = None
 
@@ -672,32 +808,25 @@ def construir_datos_grafico_periodo(tabla_bateria):
     return datos
 
 
-def calcular_rango_horario_sugerido(registros, cantidad_dias=14):
+def calcular_rango_horario_sugerido(bloques, cantidad_dias=14):
+    """
+    Calcula el tramo con mayor cantidad de bloques con dato real.
+    Ya no usa registros crudos; usa BATERIA_BLOQUE_30MIN.
+    """
     columnas_horas = generar_columnas_media_hora("00:00", "23:30")
     conteo_por_hora = {hora: 0 for hora in columnas_horas}
 
-    for registro in registros:
-        if not registro.fecha_hora:
+    for bloque in bloques:
+        if not bloque.tiene_dato:
             continue
 
-        fecha_hora = normalizar_fecha_para_comparar(registro.fecha_hora)
-        hora = fecha_hora.hour
-        minuto = fecha_hora.minute
+        hora_bloque = bloque.hora_bloque
 
-        if minuto < 15:
-            bloque = f"{hora:02d}:00"
-        elif minuto < 45:
-            bloque = f"{hora:02d}:30"
-        else:
-            hora_siguiente = hora + 1
+        if not hora_bloque and bloque.fecha_hora_bloque:
+            hora_bloque = bloque.fecha_hora_bloque.strftime("%H:%M")
 
-            if hora_siguiente == 24:
-                bloque = "23:30"
-            else:
-                bloque = f"{hora_siguiente:02d}:00"
-
-        if bloque in conteo_por_hora:
-            conteo_por_hora[bloque] += 1
+        if hora_bloque in conteo_por_hora:
+            conteo_por_hora[hora_bloque] += 1
 
     largo_ventana = 9
     mejor_inicio = 0

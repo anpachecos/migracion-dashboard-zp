@@ -4,9 +4,9 @@ from .services.baterias_service import (
     obtener_contexto_baterias,
     generar_columnas_media_hora,
     construir_tabla_bateria,
-    obtener_registros_bateria_oracle,
     obtener_ahora_referencia,
 )
+
 from .services.gps_service import obtener_contexto_gps
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 from .services.alertas_service import (
@@ -57,24 +57,17 @@ def ejecutar_comando_admin(request):
     accion = request.POST.get("accion")
     salida = StringIO()
 
+    acciones_antiguas_sqlite = [
+        "actualizar_validadores",
+        "importar_oracle_2h",
+        "importar_oracle_14d",
+        "cargar_limpios",
+        "limpiar_antiguos",
+    ]
+
     try:
         if accion == "probar_oracle":
             call_command("probar_oracle", stdout=salida, stderr=salida)
-
-        elif accion == "actualizar_validadores":
-            call_command("actualizar_validadores", stdout=salida, stderr=salida)
-
-        elif accion == "importar_oracle_2h":
-            call_command("importar_validadores_oracle", stdout=salida, stderr=salida)
-
-        elif accion == "importar_oracle_14d":
-            call_command("importar_validadores_oracle", dias=14, stdout=salida, stderr=salida)
-
-        elif accion == "cargar_limpios":
-            call_command("cargar_validadores_limpios", stdout=salida, stderr=salida)
-
-        elif accion == "limpiar_antiguos":
-            call_command("limpiar_registros_antiguos", stdout=salida, stderr=salida)
 
         elif accion == "importar_ubicaciones":
             archivo = request.FILES.get("archivo_version_zp")
@@ -90,17 +83,26 @@ def ejecutar_comando_admin(request):
             nombre_archivo = storage.save(archivo.name, archivo)
             ruta_archivo = storage.path(nombre_archivo)
 
-            call_command(
-                "importar_ubicaciones_esperadas",
-                ruta_archivo,
-                stdout=salida,
-                stderr=salida,
-            )
-
             try:
-                os.remove(ruta_archivo)
-            except OSError:
-                pass
+                call_command(
+                    "importar_ubicaciones_esperadas",
+                    ruta_archivo,
+                    stdout=salida,
+                    stderr=salida,
+                )
+            finally:
+                try:
+                    os.remove(ruta_archivo)
+                except OSError:
+                    pass
+
+        elif accion in acciones_antiguas_sqlite:
+            messages.warning(
+                request,
+                "Esta acción pertenece al flujo antiguo SQLite y está deshabilitada. "
+                "Los datos operativos ahora se consultan directamente desde Oracle."
+            )
+            return redirect("dashboard:panel_perfil")
 
         else:
             messages.error(request, "Acción no reconocida.")

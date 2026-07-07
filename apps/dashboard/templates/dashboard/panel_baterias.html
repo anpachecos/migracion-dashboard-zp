@@ -32,71 +32,18 @@
                 >
             </div>
 
-            <div class="grupo-filtro">
-                <label for="dias">Días</label>
-                <select id="dias" name="dias">
-                    <option value="1" {% if dias == 1 %}selected{% endif %}>1 día</option>
-                    <option value="3" {% if dias == 3 %}selected{% endif %}>3 días</option>
-                    <option value="7" {% if dias == 7 %}selected{% endif %}>7 días</option>
-                    <option value="14" {% if dias == 14 %}selected{% endif %}>14 días</option>
-                </select>
-            </div>
-
-            <div class="grupo-filtro">
-                <label for="hora_inicio">Desde</label>
-                <input 
-                    type="time" 
-                    id="hora_inicio" 
-                    name="hora_inicio" 
-                    step="1800"
-                    value="{{ hora_inicio }}"
-                >
-            </div>
-
-            <div class="grupo-filtro">
-                <label for="hora_fin">Hasta</label>
-                <input 
-                    type="time" 
-                    id="hora_fin" 
-                    name="hora_fin" 
-                    step="1800"
-                    value="{{ hora_fin }}"
-                >
-            </div>
-
             <div class="grupo-filtro boton-filtro">
-                <button type="submit">Aplicar filtros</button>
-            </div>
-
-            <div class="grupo-filtro boton-filtro boton-secundario">
-                <button 
-                    type="submit" 
-                    name="usar_sugerido" 
-                    value="1"
-                    title="Filtra automáticamente la tabla al tramo de 4 horas con mayor cantidad de datos registrados para este AMID."
-                >
-                    Horario sugerido ⓘ
+                <button type="submit">
+                    Buscar
                 </button>
-            </div>
-
-            <div class="grupo-filtro boton-filtro boton-limpiar">
-                {% if amid %}
-                    <a class="btn-limpiar" href="{% url 'dashboard:panel_baterias' %}?amid={{ amid }}&dias=14&hora_inicio=00:00&hora_fin=23:30">
-                        Borrar filtros
-                    </a>
-                {% else %}
-                    <a class="btn-limpiar" href="{% url 'dashboard:panel_baterias' %}">
-                        Borrar filtros
-                    </a>
-                {% endif %}
             </div>
 
             <div class="grupo-filtro boton-filtro boton-exportar">
                 {% if amid %}
                     <a 
                         class="btn-exportar" 
-                        href="{% url 'dashboard:exportar_baterias_excel' %}?amid={{ amid }}&dias={{ dias }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
-                        title="Exporta a Excel la tabla y los registros completos del AMID consultado."
+                        href="{% url 'dashboard:exportar_baterias_excel' %}?amid={{ amid }}&dias=14&hora_inicio=00:00&hora_fin=23:30"
+                        title="Exporta a Excel los últimos 14 días del AMID consultado."
                     >
                         Exportar Excel
                     </a>
@@ -110,9 +57,9 @@
                     </a>
                 {% endif %}
             </div>
+
         </form>
     </section>
-
     {% if mensaje %}
         <section class="mensaje">
             {{ mensaje }}
@@ -126,10 +73,10 @@
             <article class="tarjeta tarjeta-bateria {{ clase_bateria_actual }}">
                 <div class="titulo">Batería actual</div>
                 <div class="valor valor-destacado">
-                    {% if ultimo_registro.porcentaje_bateria %}
-                        {{ ultimo_registro.porcentaje_bateria }}%
-                    {% else %}
+                    {% if ultimo_registro.porcentaje_bateria == None or ultimo_registro.porcentaje_bateria == "" %}
                         -
+                    {% else %}
+                        {{ ultimo_registro.porcentaje_bateria }}%
                     {% endif %}
                 </div>
                 <div class="detalle-tarjeta">
@@ -229,8 +176,7 @@
                 <div>
                     <h2>Tabla detalle de batería</h2>
                     <p class="texto-ayuda">
-                        Período seleccionado: últimos {{ dias }} día{% if dias != 1 %}s{% endif %},
-                        desde {{ hora_inicio }} hasta {{ hora_fin }}.
+                        Período consultado: últimos 14 días, bloques de 00:00 a 23:30.
                     </p>
                 </div>
             </div>
