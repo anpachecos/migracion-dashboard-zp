@@ -75,3 +75,4 @@ probar_oracle.py
 probar_conexion_oracle_server.py
 scripts_locales/
 *.local.py
+medir_oracle.py
