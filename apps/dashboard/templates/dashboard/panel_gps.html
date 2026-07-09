@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=8">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=9">
 {% endblock %}
 
 {% block content %}
@@ -15,13 +15,13 @@
     <header class="panel-header gps-header-compacto">
         <h1>Ubicación GPS</h1>
         <p>
-            Busca un AMID para revisar si el validador está dentro de su zona esperada.
+            Busca un AMID para revisar su historial de ubicación dentro de un rango de fecha y horario.
         </p>
     </header>
 
     <div class="gps-panel">
 
-        <section class="gps-fila-superior">
+        <section class="gps-barra-filtros">
 
             <form method="get" class="gps-formulario">
 
@@ -29,42 +29,81 @@
                     <label for="amid">Buscar AMID</label>
 
                     <div class="gps-buscador">
-                        <input 
-                            type="text" 
-                            id="amid" 
-                            name="amid" 
-                            value="{{ amid }}" 
+                        <input
+                            type="text"
+                            id="amid"
+                            name="amid"
+                            value="{{ amid }}"
                             placeholder="Ej: 7500123"
                         >
-
-                        <button type="submit">
-                            Buscar
-                        </button>
                     </div>
                 </div>
 
-                <div class="gps-filtro-dias">
-                    <span class="gps-filtro-label">Días</span>
+                <div class="gps-campo-fecha">
+                    <label for="fecha_desde">Desde</label>
 
-                    <div class="gps-botones-dias">
-                        <button type="submit" name="dias" value="1" class="gps-btn-dia {% if dias == 1 %}activo{% endif %}">1</button>
-                        <button type="submit" name="dias" value="3" class="gps-btn-dia {% if dias == 3 %}activo{% endif %}">3</button>
-                        <button type="submit" name="dias" value="7" class="gps-btn-dia {% if dias == 7 %}activo{% endif %}">7</button>
-                        <button type="submit" name="dias" value="14" class="gps-btn-dia {% if dias == 14 %}activo{% endif %}">14</button>
+                    <div class="gps-fecha-hora">
+                        <input
+                            type="date"
+                            id="fecha_desde"
+                            name="fecha_desde"
+                            value="{{ fecha_desde }}"
+                        >
+
+                        <select id="hora_desde" name="hora_desde">
+                            {% for bloque in bloques_horarios %}
+                                <option value="{{ bloque }}" {% if bloque == hora_desde %}selected{% endif %}>
+                                    {{ bloque }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
 
-                <div class="gps-exportar">
+                <div class="gps-campo-fecha">
+                    <label for="fecha_hasta">Hasta</label>
+
+                    <div class="gps-fecha-hora">
+                        <input
+                            type="date"
+                            id="fecha_hasta"
+                            name="fecha_hasta"
+                            value="{{ fecha_hasta }}"
+                        >
+
+                        <select id="hora_hasta" name="hora_hasta">
+                            {% for bloque in bloques_horarios %}
+                                <option value="{{ bloque }}" {% if bloque == hora_hasta %}selected{% endif %}>
+                                    {{ bloque }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="gps-acciones-filtro">
+                    <button type="submit" class="gps-btn-buscar">
+                        Buscar
+                    </button>
+
+                    <a
+                        class="gps-btn-hoy"
+                        href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}"
+                        title="Restablece el filtro a hoy de 00:00 a 23:30"
+                    >
+                        Hoy
+                    </a>
+
                     {% if amid %}
-                        <a 
+                        <a
                             class="btn-exportar-gps"
-                            href="{% url 'dashboard:exportar_gps_excel' %}?amid={{ amid }}&dias={{ dias }}"
+                            href="{% url 'dashboard:exportar_gps_excel' %}?amid={{ amid }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&hora_desde={{ hora_desde }}&hora_hasta={{ hora_hasta }}"
                             title="Exporta a Excel los registros GPS del AMID consultado."
                         >
                             Exportar Excel
                         </a>
                     {% else %}
-                        <a 
+                        <a
                             class="btn-exportar-gps btn-exportar-gps-deshabilitado"
                             href="#"
                             title="Busca un AMID antes de exportar."
@@ -75,7 +114,11 @@
                 </div>
 
             </form>
-            
+
+        </section>
+
+        <section class="gps-fila-metricas">
+
             <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio %}gps-card-ok{% elif ubicacion_esperada %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
                 <span>Estado ubicación</span>
                 <strong>
@@ -188,7 +231,7 @@
                     <div class="gps-card gps-card-vacia">
                         <h2>Sin búsqueda activa</h2>
                         <p>
-                            Ingresa un AMID para mostrar su última coordenada GPS en el mapa.
+                            Ingresa un AMID y selecciona un rango de fecha y horario para mostrar sus coordenadas GPS.
                         </p>
                     </div>
 
@@ -229,5 +272,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=8"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=9"></script>
 {% endblock %}

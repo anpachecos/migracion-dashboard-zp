@@ -127,6 +127,79 @@ def construir_referencia_desde_fila(fila, origen_ubicacion):
     except (ValueError, TypeError):
         return None
 
+def generar_bloques_horarios():
+    bloques = []
+
+    for hora in range(24):
+        for minuto in [0, 30]:
+            bloques.append(f"{hora:02d}:{minuto:02d}")
+
+    return bloques
+
+
+def obtener_rango_fechas_gps(request):
+    """
+    Lee filtros de fecha/hora desde GET.
+
+    Por defecto:
+    hoy 00:00 hasta hoy 23:30.
+
+    Internamente fecha_fin_query suma 30 minutos para incluir
+    el último bloque seleccionado.
+    """
+
+    hoy = obtener_ahora_referencia().date()
+
+    fecha_desde_texto = request.GET.get("fecha_desde", "")
+    fecha_hasta_texto = request.GET.get("fecha_hasta", "")
+    hora_desde = request.GET.get("hora_desde", "00:00")
+    hora_hasta = request.GET.get("hora_hasta", "23:30")
+
+    bloques_validos = generar_bloques_horarios()
+
+    if hora_desde not in bloques_validos:
+        hora_desde = "00:00"
+
+    if hora_hasta not in bloques_validos:
+        hora_hasta = "23:30"
+
+    try:
+        fecha_desde = datetime.strptime(fecha_desde_texto, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        fecha_desde = hoy
+
+    try:
+        fecha_hasta = datetime.strptime(fecha_hasta_texto, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        fecha_hasta = hoy
+
+    hora_desde_obj = datetime.strptime(hora_desde, "%H:%M").time()
+    hora_hasta_obj = datetime.strptime(hora_hasta, "%H:%M").time()
+
+    fecha_inicio = datetime.combine(fecha_desde, hora_desde_obj)
+    fecha_fin_bloque = datetime.combine(fecha_hasta, hora_hasta_obj)
+
+    if fecha_inicio > fecha_fin_bloque:
+        fecha_desde = hoy
+        fecha_hasta = hoy
+        hora_desde = "00:00"
+        hora_hasta = "23:30"
+        fecha_inicio = datetime.combine(hoy, time.min)
+        fecha_fin_bloque = datetime.combine(hoy, time(hour=23, minute=30))
+
+    fecha_fin_query = fecha_fin_bloque + timedelta(minutes=30)
+
+    return {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "fecha_desde_input": fecha_desde.strftime("%Y-%m-%d"),
+        "fecha_hasta_input": fecha_hasta.strftime("%Y-%m-%d"),
+        "hora_desde": hora_desde,
+        "hora_hasta": hora_hasta,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin_query,
+        "bloques_horarios": bloques_validos,
+    }
 
 def obtener_rango_fechas_periodo(dias):
     hoy = obtener_ahora_referencia().date()
@@ -137,14 +210,11 @@ def obtener_rango_fechas_periodo(dias):
 
     return inicio, fin
 
-
-def obtener_registros_gps_oracle(amid, dias):
+def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
     """
-    Obtiene registros GPS directamente desde Oracle.
-    Usa la vista VW_ESTATUS_ZP_DJANGO.
+    Obtiene registros GPS directamente desde Oracle usando rango exacto
+    de fecha/hora.
     """
-
-    fecha_inicio, fecha_fin = obtener_rango_fechas_periodo(dias)
 
     query = """
         SELECT
@@ -199,7 +269,6 @@ def obtener_registros_gps_oracle(amid, dias):
                 )
 
     return registros
-
 
 def obtener_historial_ubicacion_amid(cursor, amid):
     """
@@ -411,18 +480,37 @@ def crear_resumen_gps(dias):
         "texto_ultima_ubicacion": "-",
     }
 
+def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
+    if fecha_desde == fecha_hasta:
+        texto_periodo = f"{fecha_desde.strftime('%d-%m-%Y')} {hora_desde} a {hora_hasta}"
+    else:
+        texto_periodo = (
+            f"{fecha_desde.strftime('%d-%m-%Y')} {hora_desde} "
+            f"a {fecha_hasta.strftime('%d-%m-%Y')} {hora_hasta}"
+        )
+
+    return {
+        "errores_gps_periodo": 0,
+        "clase_errores_gps_periodo": "gps-estado-ok",
+
+        "registros_periodo": 0,
+        "registros_dentro_periodo": 0,
+        "registros_fuera_periodo": 0,
+        "porcentaje_cumplimiento_periodo": None,
+        "clase_cumplimiento_periodo": "",
+
+        "texto_periodo": texto_periodo,
+        "texto_cumplimiento": "Cumplimiento período",
+        "texto_dentro": "Dentro período",
+        "texto_fuera": "Fuera período",
+
+        "clase_ultima_ubicacion": "",
+        "texto_ultima_ubicacion": "-",
+    }
 
 def obtener_contexto_gps(request):
     amid = request.GET.get("amid", "").strip()
-    dias = request.GET.get("dias", "1")
-
-    try:
-        dias = int(dias)
-    except ValueError:
-        dias = 1
-
-    if dias not in [1, 3, 7, 14]:
-        dias = 1
+    filtros_fecha = obtener_rango_fechas_gps(request)
 
     ultimo_registro = None
     mensaje = ""
@@ -438,13 +526,19 @@ def obtener_contexto_gps(request):
         "radio_metros": RADIO_LABORATORIO_ZP,
     }
 
-    resumen_gps = crear_resumen_gps(dias)
+    resumen_gps = crear_resumen_gps_rango(
+        fecha_desde=filtros_fecha["fecha_desde"],
+        fecha_hasta=filtros_fecha["fecha_hasta"],
+        hora_desde=filtros_fecha["hora_desde"],
+        hora_hasta=filtros_fecha["hora_hasta"],
+    )
 
     if amid:
         try:
             registros_periodo_base = obtener_registros_gps_oracle(
                 amid=amid,
-                dias=dias,
+                fecha_inicio=filtros_fecha["fecha_inicio"],
+                fecha_fin=filtros_fecha["fecha_fin"],
             )
         except ValueError:
             mensaje = "El AMID ingresado no es válido."
@@ -500,7 +594,6 @@ def obtener_contexto_gps(request):
                 if distancia is not None:
                     dentro_radio = distancia <= referencia_esperada["radio_metros"]
 
-                if distancia is not None:
                     resumen_gps["registros_periodo"] += 1
 
                     if dentro_radio:
@@ -583,14 +676,20 @@ def obtener_contexto_gps(request):
                     }
 
             elif not mensaje:
-                mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el período seleccionado."
+                mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el rango seleccionado."
 
         except Exception as error:
             mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
 
     return {
         "amid": amid,
-        "dias": dias,
+
+        "fecha_desde": filtros_fecha["fecha_desde_input"],
+        "fecha_hasta": filtros_fecha["fecha_hasta_input"],
+        "hora_desde": filtros_fecha["hora_desde"],
+        "hora_hasta": filtros_fecha["hora_hasta"],
+        "bloques_horarios": filtros_fecha["bloques_horarios"],
+
         "ultimo_registro": ultimo_registro,
         "mensaje": mensaje,
         "latitud": latitud,
