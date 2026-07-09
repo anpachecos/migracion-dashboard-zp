@@ -69,3 +69,9 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Scripts locales / pruebas
+probar_oracle.py
+probar_conexion_oracle_server.py
+scripts_locales/
+*.local.py
