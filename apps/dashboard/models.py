@@ -47,21 +47,42 @@ class EstadoValidador(models.Model):
     def __str__(self):
         return f"{self.amid} - {self.porcentaje_bateria}"
 
+
 class LogImportacion(models.Model):
     ORIGEN_CHOICES = [
-        ("CSV", "CSV"),
-        ("ORACLE", "Oracle"),
-        ("LIMPIEZA", "Limpieza"),
+        ("PROBAR_ORACLE", "Probar conexión Oracle"),
+        ("UBICACIONES_ORACLE", "Ubicaciones esperadas Oracle"),
+        ("BATERIA_BLOQUES_ORACLE", "Batería bloques Oracle"),
+        ("ESTADO_ORACLE", "Estado general Oracle"),
+        ("EXPORT_EXCEL", "Exportación Excel"),
+        ("SCHEDULER", "Scheduler"),
+        ("SISTEMA", "Sistema"),
 
+        # Orígenes antiguos, se mantienen para no romper logs históricos.
+        ("CSV", "CSV"),
+        ("ORACLE", "Oracle antiguo"),
+        ("LIMPIEZA", "Limpieza antigua"),
+        ("EXCEL_UBICACIONES", "Excel ubicaciones antiguo"),
     ]
 
     ESTADO_CHOICES = [
         ("OK", "OK"),
         ("ERROR", "Error"),
+        ("ADVERTENCIA", "Advertencia"),
+        ("INFO", "Información"),
     ]
 
-    origen = models.CharField(max_length=20, choices=ORIGEN_CHOICES)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    origen = models.CharField(
+        max_length=50,
+        choices=ORIGEN_CHOICES,
+        help_text="Proceso que generó el log."
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        help_text="Resultado del proceso."
+    )
 
     fecha_inicio = models.DateTimeField()
     fecha_fin = models.DateTimeField(null=True, blank=True)
@@ -72,9 +93,19 @@ class LogImportacion(models.Model):
 
     mensaje = models.TextField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["origen"]),
+            models.Index(fields=["estado"]),
+            models.Index(fields=["fecha_inicio"]),
+            models.Index(fields=["origen", "fecha_inicio"]),
+        ]
+        verbose_name = "Log de importación"
+        verbose_name_plural = "Logs de importación"
+
     def __str__(self):
         return f"{self.origen} - {self.estado} - {self.fecha_inicio}"
-    
+
 #Datos directos de Oracle
 class EstadoValidadorRaw(models.Model):
     amid = models.BigIntegerField()
@@ -247,6 +278,7 @@ class HistorialUbicacionEsperadaValidador(models.Model):
 
     def __str__(self):
         return f"{self.amid} - {self.nombre} - {self.fecha_inicio_vigencia}"
+
 class EstatusZP(models.Model):
     id = models.CharField(db_column="ID", max_length=50, primary_key=True)
 
