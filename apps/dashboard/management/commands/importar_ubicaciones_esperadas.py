@@ -21,7 +21,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
-
+from apps.dashboard.services.logs_service import registrar_log_importacion
 
 LATITUD_LABORATORIO_ZP = -33.437191
 LONGITUD_LABORATORIO_ZP = -70.656102
@@ -172,8 +172,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        fecha_inicio_log = timezone.now()
         fecha_carga = self.ahora_oracle()
         ruta_excel = options["ruta_excel"]
+
+        creados_vigente = 0
+        actualizados_vigente = 0
+        omitidos = 0
+        nuevos_historial = 0
+        cerrados_historial = 0
+        sin_cambios_historial = 0
+        movidos_laboratorio = 0
+        filas_excel = 0
 
         if ruta_excel:
             ruta_excel = Path(ruta_excel)
@@ -181,8 +191,18 @@ class Command(BaseCommand):
             ruta_excel = Path(settings.BASE_DIR) / "VERSION ZONA PAGA.xlsx"
 
         if not ruta_excel.exists():
+            mensaje = f"No se encontró el archivo: {ruta_excel}"
+
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                mensaje=mensaje,
+            )
+
             self.stderr.write(
-                self.style.ERROR(f"No se encontró el archivo: {ruta_excel}")
+                self.style.ERROR(mensaje)
             )
             return
 
@@ -196,10 +216,37 @@ class Command(BaseCommand):
         try:
             df = pd.read_excel(ruta_excel, sheet_name="Version_DB")
         except ValueError:
+            mensaje = "No se encontró la hoja Version_DB en el Excel."
+
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                mensaje=f"{mensaje} Archivo: {archivo_origen}",
+            )
+
             self.stderr.write(
-                self.style.ERROR("No se encontró la hoja Version_DB en el Excel.")
+                self.style.ERROR(mensaje)
             )
             return
+        except Exception as error:
+            mensaje = f"Error leyendo Excel de ubicaciones: {error}"
+
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                mensaje=f"{mensaje}. Archivo: {archivo_origen}",
+            )
+
+            self.stderr.write(
+                self.style.ERROR(mensaje)
+            )
+            return
+
+        filas_excel = len(df)
 
         df = self.normalizar_dataframe(df)
 
@@ -216,17 +263,21 @@ class Command(BaseCommand):
         faltantes = [col for col in columnas_requeridas if col not in df.columns]
 
         if faltantes:
+            mensaje = f"Faltan columnas requeridas en el Excel: {faltantes}"
+
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                filas_obtenidas=filas_excel,
+                mensaje=f"{mensaje}. Archivo: {archivo_origen}",
+            )
+
             self.stderr.write(
-                self.style.ERROR(f"Faltan columnas requeridas en el Excel: {faltantes}")
+                self.style.ERROR(mensaje)
             )
             return
-
-        creados_vigente = 0
-        actualizados_vigente = 0
-        omitidos = 0
-        nuevos_historial = 0
-        cerrados_historial = 0
-        sin_cambios_historial = 0
 
         amids_excel = set()
 
@@ -289,15 +340,53 @@ class Command(BaseCommand):
                 conexion.commit()
 
         except Exception as error:
+            mensaje = f"Error importando ubicaciones a Oracle: {error}"
+
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                filas_obtenidas=filas_excel,
+                filas_creadas=creados_vigente,
+                filas_eliminadas=movidos_laboratorio,
+                mensaje=mensaje,
+            )
+
             self.stderr.write(
-                self.style.ERROR(f"Error importando ubicaciones a Oracle: {error}")
+                self.style.ERROR(mensaje)
             )
             return
+
+        mensaje = (
+            f"Importación completada en Oracle. "
+            f"Archivo: {archivo_origen}. "
+            f"Versión ZP: {version_zp or 'Sin versión'}. "
+            f"Vigentes creados: {creados_vigente}. "
+            f"Vigentes actualizados: {actualizados_vigente}. "
+            f"Omitidos: {omitidos}. "
+            f"Historial nuevos: {nuevos_historial}. "
+            f"Historial cerrados: {cerrados_historial}. "
+            f"Historial sin cambios: {sin_cambios_historial}. "
+            f"Movidos a laboratorio: {movidos_laboratorio}."
+        )
+
+        registrar_log_importacion(
+            origen="UBICACIONES_ORACLE",
+            estado="OK",
+            fecha_inicio=fecha_inicio_log,
+            fecha_fin=timezone.now(),
+            filas_obtenidas=filas_excel,
+            filas_creadas=creados_vigente,
+            filas_eliminadas=movidos_laboratorio,
+            mensaje=mensaje,
+        )
 
         self.stdout.write(self.style.SUCCESS("Importación completada en Oracle."))
         self.stdout.write(f"Fecha carga: {fecha_carga.strftime('%d-%m-%Y %H:%M:%S')}")
         self.stdout.write(f"Archivo origen: {archivo_origen}")
         self.stdout.write(f"Versión ZP: {version_zp or 'Sin versión'}")
+        self.stdout.write(f"Filas Excel: {filas_excel}")
         self.stdout.write(f"Vigentes creados: {creados_vigente}")
         self.stdout.write(f"Vigentes actualizados: {actualizados_vigente}")
         self.stdout.write(f"Omitidos: {omitidos}")
@@ -305,7 +394,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Historial cerrados: {cerrados_historial}")
         self.stdout.write(f"Historial sin cambios: {sin_cambios_historial}")
         self.stdout.write(f"Movidos a laboratorio por no venir en Excel: {movidos_laboratorio}")
-
+    
     def ahora_oracle(self):
         ahora = timezone.localtime(timezone.now())
 
