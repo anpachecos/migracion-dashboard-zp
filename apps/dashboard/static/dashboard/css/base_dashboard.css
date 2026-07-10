@@ -19,6 +19,10 @@ body {
     margin-right: 260px;
 }
 
+/* =========================
+   Sidebar general
+   ========================= */
+
 .dashboard-sidebar {
     position: fixed;
     top: 0;
@@ -34,24 +38,36 @@ body {
     flex-direction: column;
 }
 
-.sidebar-brand h2 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 700;
+/* =========================
+   Título sidebar
+   ========================= */
+
+.sidebar-title-block {
+    margin-bottom: 24px;
 }
 
-.sidebar-brand p {
-    margin: 6px 0 0;
-    font-size: 13px;
-    color: #9ca3af;
+.sidebar-title-block h2 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
 }
+
+.sidebar-title-block p {
+    margin: 5px 0 0;
+    font-size: 12px;
+    color: #aeb8c8;
+}
+
+/* =========================
+   Navegación
+   ========================= */
 
 .sidebar-nav {
-    margin-top: 32px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    flex: 1;
 }
 
 .sidebar-link {
@@ -61,6 +77,7 @@ body {
     color: #d1d5db;
     text-decoration: none;
     font-size: 15px;
+    font-weight: 600;
     transition: 0.2s ease;
 }
 
@@ -69,6 +86,97 @@ body {
     background: #2563eb;
     color: #ffffff;
 }
+
+/* =========================
+   Estado del sistema
+   ========================= */
+
+.sidebar-status-section {
+    margin-top: 24px;
+}
+
+.sidebar-status-title {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sidebar-status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+}
+
+.sidebar-status-card {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 10px;
+    align-items: center;
+
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+}
+
+.sidebar-status-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 17px;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-status-text {
+    min-width: 0;
+}
+
+.sidebar-status-text span {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #aeb8c8;
+}
+
+.sidebar-status-text strong {
+    display: block;
+    font-size: 13px;
+    line-height: 1.25;
+    color: #ffffff;
+    font-weight: 800;
+    white-space: normal;
+}
+
+.sidebar-status-blue .sidebar-status-icon {
+    color: #60a5fa;
+    background: rgba(37, 99, 235, 0.16);
+}
+
+.sidebar-status-green .sidebar-status-icon {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.14);
+}
+
+.sidebar-status-purple .sidebar-status-icon {
+    color: #a78bfa;
+    background: rgba(124, 58, 237, 0.15);
+}
+
+/* =========================
+   Header de paneles
+   ========================= */
 
 .panel-header {
     margin-bottom: 24px;
@@ -84,6 +192,10 @@ body {
     color: #6b7280;
 }
 
+/* =========================
+   Cards generales
+   ========================= */
+
 .placeholder-card {
     background: #ffffff;
     border-radius: 16px;
@@ -91,10 +203,14 @@ body {
     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
+/* =========================
+   Footer sidebar
+   ========================= */
+
 .sidebar-footer {
-    margin-top: auto;
+    margin-top: 18px;
     padding: 14px 12px;
-    border-radius: 8px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
     font-size: 10px;
@@ -105,29 +221,6 @@ body {
 
 .sidebar-footer p {
     margin: 3px 0;
-}
-
-.sidebar-update-info {
-    margin-top: 14px;
-    padding: 10px 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.sidebar-update-info span {
-    margin-top: 0;
-    font-size: 10px;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.sidebar-update-info strong {
-    font-size: 12px;
-    color: #d1d5db;
-    font-weight: 600;
 }
 
 /* =========================
@@ -180,7 +273,8 @@ body {
         padding: 10px;
     }
 
-    .sidebar-brand,
+    .sidebar-title-block,
+    .sidebar-status-section,
     .sidebar-footer {
         display: none;
     }
@@ -196,5 +290,91 @@ body {
         font-size: 13px;
         padding: 10px;
         text-align: center;
+    }
+}
+
+/* =========================
+   Ajuste sidebar en pantallas bajas
+   ========================= */
+
+.dashboard-sidebar {
+    gap: 0;
+}
+
+.sidebar-title-block,
+.sidebar-nav,
+.sidebar-status-section,
+.sidebar-footer {
+    flex-shrink: 0;
+}
+
+.sidebar-status-section {
+    margin-top: 22px;
+    margin-bottom: 18px;
+}
+
+@media (max-height: 780px) {
+    .dashboard-sidebar {
+        padding-top: 18px;
+        padding-bottom: 18px;
+    }
+
+    .sidebar-title-block {
+        margin-bottom: 18px;
+    }
+
+    .sidebar-nav {
+        gap: 8px;
+    }
+
+    .sidebar-link {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+
+    .sidebar-status-section {
+        margin-top: 18px;
+        margin-bottom: 14px;
+    }
+
+    .sidebar-status-list {
+        gap: 8px;
+    }
+
+    .sidebar-status-card {
+        grid-template-columns: 30px 1fr;
+        padding: 8px;
+        border-radius: 12px;
+    }
+
+    .sidebar-status-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        font-size: 15px;
+    }
+
+    .sidebar-status-text span {
+        font-size: 10px;
+    }
+
+    .sidebar-status-text strong {
+        font-size: 12px;
+    }
+
+    .sidebar-footer {
+        margin-top: 14px;
+        padding: 11px 10px;
+        font-size: 9px;
+    }
+
+    .sidebar-logout-form {
+        margin-top: 9px;
+        padding-top: 9px;
+    }
+
+    .sidebar-logout-button {
+        padding: 8px 9px;
+        font-size: 11px;
     }
 }

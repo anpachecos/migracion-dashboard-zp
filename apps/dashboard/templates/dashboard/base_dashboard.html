@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}Dashboard Zonas Pagas{% endblock %}</title>
 
-    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=15">
 
     {% block extra_css %}{% endblock %}
     <link rel="icon" type="image/png" href="{% static 'dashboard/img/zp3.png' %}">
@@ -21,37 +21,10 @@
     </main>
 
     <aside class="dashboard-sidebar">
-        <div class="sidebar-brand">
+
+        <div class="sidebar-title-block">
             <h2>Dashboard ZP</h2>
-            <p>Validadores MK 2.0    
-            </p>
-
-            <p class="sidebar-update-line">
-                <span>Última actualización</span>
-                <strong>{{ ultima_actualizacion_dashboard|date:"d-m-Y H:i" }}</strong>
-            </p>
-
-            <p class="sidebar-update-line">
-                <span>Último dato recibido</span>
-                <strong>
-                    {% if ultima_carga_datos %}
-                        {{ ultima_carga_datos|date:"d-m-Y H:i" }}
-                    {% else %}
-                        Sin datos
-                    {% endif %}
-                </strong>
-            </p>
-
-            <p class="sidebar-update-line">
-                <span>Última versión</span>
-                <strong>
-                    {% if ultima_actualizacion_version_zp %}
-                        {{ ultima_actualizacion_version_zp|date:"d-m-Y H:i" }}
-                    {% else %}
-                        Sin datos
-                    {% endif %}
-                </strong>
-            </p>
+            <p>Validadores MK 2.0</p>
         </div>
 
         <nav class="sidebar-nav">
@@ -70,14 +43,65 @@
             <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}">
                 Perfil
             </a>
-
-            
         </nav>
+
+        <section class="sidebar-status-section">
+            <p class="sidebar-status-title">Estado del sistema</p>
+
+            <div class="sidebar-status-list">
+
+                <div class="sidebar-status-card sidebar-status-blue">
+                    <div class="sidebar-status-icon">
+                        ↻
+                    </div>
+
+                    <div class="sidebar-status-text">
+                        <span>Última actualización</span>
+                        <strong>{{ ultima_actualizacion_dashboard|date:"d-m-Y H:i" }}</strong>
+                    </div>
+                </div>
+
+                <div class="sidebar-status-card sidebar-status-green">
+                    <div class="sidebar-status-icon">
+                        ▤
+                    </div>
+
+                    <div class="sidebar-status-text">
+                        <span>Último bloque con datos</span>
+                        <strong>
+                            {% if ultima_carga_datos %}
+                                {{ ultima_carga_datos|date:"d-m-Y H:i" }}
+                            {% else %}
+                                Sin datos
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+
+                <div class="sidebar-status-card sidebar-status-purple">
+                    <div class="sidebar-status-icon">
+                        ⟡
+                    </div>
+
+                    <div class="sidebar-status-text">
+                        <span>Última versión</span>
+                        <strong>
+                            {% if ultima_actualizacion_version_zp %}
+                                {{ ultima_actualizacion_version_zp|date:"d-m-Y H:i" }}
+                            {% else %}
+                                Sin datos
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+
+            </div>
+        </section>
 
         <div class="sidebar-footer">
             <p>Sistema de Monitoreo ZP</p>
             <p>Desarrollado por Antonia Pacheco</p>
-            <p>Versión 1.2.0 · 2026</p>
+            <p>Versión 1.3.0 · 2026</p>
 
             <form method="post" action="{% url 'logout' %}" class="sidebar-logout-form">
                 {% csrf_token %}
@@ -86,6 +110,7 @@
                 </button>
             </form>
         </div>
+
     </aside>
 
 </div>

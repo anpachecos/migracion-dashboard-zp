@@ -10,7 +10,7 @@ CACHE_KEY_ULTIMA_CARGA_DATOS = "dashboard_ultima_carga_datos_oracle"
 CACHE_KEY_ULTIMA_VERSION_ZP = "dashboard_ultima_version_zp_oracle"
 CACHE_MISS = object()
 
-CACHE_TIMEOUT_SEGUNDOS = 60
+CACHE_TIMEOUT_SEGUNDOS = 300
 
 _warmup_thread_running = False
 _warmup_thread_lock = threading.Lock()
@@ -35,7 +35,7 @@ def normalizar_fecha_oracle(fecha):
 
 def obtener_ultima_carga_datos_oracle():
     """
-    Obtiene la fecha del último dato recibido desde Oracle.
+    Obtiene el último bloque horario con datos desde Oracle.
 
     Se cachea por 60 segundos para evitar abrir conexión Oracle en cada cambio
     de página.
@@ -47,8 +47,9 @@ def obtener_ultima_carga_datos_oracle():
         return valor_cache
 
     query = """
-        SELECT MAX(FECHA_HORA)
-        FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
+        SELECT MAX(FECHA_HORA_BLOQUE)
+        FROM USR_LAB.BATERIA_BLOQUE_30MIN
+        WHERE TIENE_DATO = 1
     """
 
     ultima_carga = None
