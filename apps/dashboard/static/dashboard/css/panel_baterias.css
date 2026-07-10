@@ -542,6 +542,14 @@ th.hora-diagonal > span {
     transform: translateY(-1px);
 }
 
+.btn-deshabilitado {
+    background: #9ca3af;
+    border-color: #9ca3af;
+    pointer-events: none;
+    cursor: not-allowed;
+    color: white;
+}
+
 
 /* =========================================================
    12. Responsive

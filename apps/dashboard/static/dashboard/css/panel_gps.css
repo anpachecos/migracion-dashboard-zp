@@ -93,14 +93,15 @@
     gap: 8px;
     align-items: end;
     justify-content: flex-end;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .gps-btn-buscar,
 .gps-btn-hoy,
 .btn-exportar-gps {
     height: 38px;
-    padding: 0 14px;
+    padding: 0 12px;
     border-radius: 10px;
     font-size: 13px;
     font-weight: 800;
@@ -111,6 +112,7 @@
     white-space: nowrap;
     cursor: pointer;
     transition: 0.2s ease;
+    min-width: 0;
 }
 
 .gps-btn-buscar {
@@ -354,13 +356,25 @@
    Responsive
    ========================= */
 
+@media (max-width: 1400px) {
+    .gps-formulario {
+        grid-template-columns: minmax(190px, 0.8fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
+        gap: 10px;
+    }
+
+    .gps-btn-buscar,
+    .gps-btn-hoy,
+    .btn-exportar-gps {
+        padding: 0 10px;
+        font-size: 12px;
+    }
+}
+
 @media (max-width: 1300px) {
     .gps-fila-mapa {
         grid-template-columns: 280px 1fr;
     }
-}
 
-@media (max-width: 1250px) {
     .gps-formulario {
         grid-template-columns: 1fr 1fr;
     }
@@ -368,6 +382,12 @@
     .gps-acciones-filtro {
         grid-column: 1 / -1;
         justify-content: flex-start;
+    }
+
+    .gps-btn-buscar,
+    .gps-btn-hoy,
+    .btn-exportar-gps {
+        min-width: 120px;
     }
 }
 
@@ -392,7 +412,19 @@
     }
 
     .gps-acciones-filtro {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .gps-btn-buscar,
+    .gps-btn-hoy,
+    .btn-exportar-gps {
+        width: 100%;
+        min-width: 0;
+        padding: 0 8px;
+        font-size: 12px;
     }
 
     .gps-fila-metricas {
@@ -420,5 +452,25 @@
     .gps-controles-mapa button {
         font-size: 11px;
         padding: 7px 10px;
+    }
+}
+
+@media (max-width: 560px) {
+    .gps-formulario {
+        padding: 12px;
+    }
+
+    .gps-fecha-hora {
+        grid-template-columns: 1fr;
+    }
+
+    .gps-acciones-filtro {
+        grid-template-columns: 1fr;
+    }
+
+    .gps-btn-buscar,
+    .gps-btn-hoy,
+    .btn-exportar-gps {
+        height: 36px;
     }
 }
