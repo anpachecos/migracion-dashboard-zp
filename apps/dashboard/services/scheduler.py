@@ -8,17 +8,16 @@ from django.core.management import call_command
 from django.db import OperationalError
 from django.utils import timezone
 
-from apps.dashboard.models import LogImportacion
+from apps.dashboard.services.logs_service import registrar_log_importacion
 
-# Para importar ubicaciones esperadas desde Excel manualmente, se ejecuta el comando:
-# python manage.py importar_ubicaciones_esperadas
+job_ubicaciones_running = False
+job_estado_oracle_running = False
 
 logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
 scheduler_started = False
 
-job_validadores_running = False
 job_ubicaciones_running = False
 
 
@@ -33,13 +32,10 @@ def ejecutar_comando_con_reintentos(nombre_comando, *args, max_intentos=3, esper
     """
     Ejecuta un comando Django con reintentos solo si falla por 'database is locked'.
 
-    Ejemplo:
-    - intento 1 falla
-    - espera 10 segundos
-    - intento 2 falla
-    - espera 20 segundos
-    - intento 3 falla
-    - lanza el error final
+    Esto se mantiene porque SQLite todavía se usa para:
+    - usuarios
+    - sesiones
+    - logs internos
     """
 
     if esperas is None:
@@ -108,51 +104,39 @@ def ejecutar_comando_con_reintentos(nombre_comando, *args, max_intentos=3, esper
     raise ultimo_error
 
 
-def actualizar_validadores_job():
-    global job_validadores_running
-
-    if job_validadores_running:
-        logger.warning("La actualización de validadores ya está en ejecución. Se omite esta corrida.")
-        return
-
-    job_validadores_running = True
-    inicio = timezone.now()
-
-    try:
-        logger.info("Iniciando actualización automática de validadores...")
-
-        ejecutar_comando_con_reintentos(
-            "actualizar_validadores",
-            max_intentos=3,
-            esperas=[10, 20, 30],
-        )
-
-        logger.info("Actualización automática de validadores finalizada correctamente.")
-
-    except Exception as error:
-        logger.exception("Error en actualización automática de validadores.")
-
-        LogImportacion.objects.create(
-            origen="ORACLE",
-            estado="ERROR",
-            fecha_inicio=inicio,
-            fecha_fin=timezone.now(),
-            mensaje=f"Error en scheduler automático de validadores: {error}",
-        )
-
-    finally:
-        job_validadores_running = False
-
-
 def importar_ubicaciones_esperadas_job():
+    """
+    Importa diariamente las ubicaciones esperadas desde el Excel base.
+
+    Nota:
+    El comando importar_ubicaciones_esperadas ya registra el detalle del proceso
+    en SQLite con origen UBICACIONES_ORACLE.
+    Este job solo registra errores propios del scheduler, por ejemplo:
+    - archivo no encontrado
+    - excepción al ejecutar el comando
+    """
+
     global job_ubicaciones_running
 
     if job_ubicaciones_running:
-        logger.warning("La importación de ubicaciones esperadas ya está en ejecución. Se omite esta corrida.")
+        logger.warning(
+            "La importación de ubicaciones esperadas ya está en ejecución. "
+            "Se omite esta corrida."
+        )
+
+        registrar_log_importacion(
+            origen="SCHEDULER",
+            estado="ADVERTENCIA",
+            mensaje=(
+                "Se omitió la importación automática de ubicaciones porque "
+                "ya había una ejecución en curso."
+            ),
+        )
+
         return
 
     job_ubicaciones_running = True
-    inicio = timezone.now()
+    fecha_inicio = timezone.now()
 
     try:
         ruta_excel = Path(settings.BASE_DIR) / "VERSION ZONA PAGA.xlsx"
@@ -161,16 +145,20 @@ def importar_ubicaciones_esperadas_job():
             mensaje = f"No se encontró el archivo de ubicaciones esperadas: {ruta_excel}"
             logger.warning(mensaje)
 
-            LogImportacion.objects.create(
-                origen="EXCEL_UBICACIONES",
+            registrar_log_importacion(
+                origen="SCHEDULER",
                 estado="ERROR",
-                fecha_inicio=inicio,
+                fecha_inicio=fecha_inicio,
                 fecha_fin=timezone.now(),
                 mensaje=mensaje,
             )
+
             return
 
-        logger.info(f"Iniciando importación automática de ubicaciones esperadas desde: {ruta_excel}")
+        logger.info(
+            "Iniciando importación automática de ubicaciones esperadas desde: %s",
+            ruta_excel,
+        )
 
         ejecutar_comando_con_reintentos(
             "importar_ubicaciones_esperadas",
@@ -179,15 +167,18 @@ def importar_ubicaciones_esperadas_job():
             esperas=[10, 20, 30],
         )
 
-        logger.info("Importación automática de ubicaciones esperadas finalizada correctamente.")
+        logger.info(
+            "Importación automática de ubicaciones esperadas finalizada. "
+            "El detalle quedó registrado por el comando UBICACIONES_ORACLE."
+        )
 
     except Exception as error:
         logger.exception("Error en importación automática de ubicaciones esperadas.")
 
-        LogImportacion.objects.create(
-            origen="EXCEL_UBICACIONES",
+        registrar_log_importacion(
+            origen="SCHEDULER",
             estado="ERROR",
-            fecha_inicio=inicio,
+            fecha_inicio=fecha_inicio,
             fecha_fin=timezone.now(),
             mensaje=f"Error en scheduler automático de ubicaciones esperadas: {error}",
         )
@@ -195,18 +186,80 @@ def importar_ubicaciones_esperadas_job():
     finally:
         job_ubicaciones_running = False
 
+def registrar_estado_oracle_job():
+    """
+    Registra periódicamente el estado de las tablas Oracle usadas por el dashboard.
+
+    Este job no modifica Oracle.
+    Solo ejecuta el comando registrar_estado_oracle, que guarda logs en SQLite.
+    """
+
+    global job_estado_oracle_running
+
+    if job_estado_oracle_running:
+        logger.warning(
+            "El registro de estado Oracle ya está en ejecución. "
+            "Se omite esta corrida."
+        )
+
+        registrar_log_importacion(
+            origen="SCHEDULER",
+            estado="ADVERTENCIA",
+            mensaje=(
+                "Se omitió el registro de estado Oracle porque "
+                "ya había una ejecución en curso."
+            ),
+        )
+
+        return
+
+    job_estado_oracle_running = True
+    fecha_inicio = timezone.now()
+
+    try:
+        logger.info("Iniciando registro automático de estado Oracle...")
+
+        ejecutar_comando_con_reintentos(
+            "registrar_estado_oracle",
+            max_intentos=3,
+            esperas=[10, 20, 30],
+        )
+
+        logger.info("Registro automático de estado Oracle finalizado correctamente.")
+
+    except Exception as error:
+        logger.exception("Error registrando estado Oracle desde scheduler.")
+
+        registrar_log_importacion(
+            origen="SCHEDULER",
+            estado="ERROR",
+            fecha_inicio=fecha_inicio,
+            fecha_fin=timezone.now(),
+            mensaje=f"Error registrando estado Oracle desde scheduler: {error}",
+        )
+
+    finally:
+        job_estado_oracle_running = False
 
 def iniciar_scheduler():
+    """
+    Inicia los jobs internos del dashboard.
+
+    Actualmente:
+    - Estado Oracle: cada 30 minutos.
+    - Ubicaciones esperadas: todos los días a las 18:45.
+    """
+
     global scheduler_started
 
     if scheduler_started:
         return
 
     scheduler.add_job(
-        actualizar_validadores_job,
+        registrar_estado_oracle_job,
         trigger="cron",
-        minute="0,30",
-        id="actualizar_validadores_cada_30_min",
+        minute="5,35",
+        id="registrar_estado_oracle_cada_30_min",
         replace_existing=True,
         max_instances=1,
     )
@@ -225,5 +278,15 @@ def iniciar_scheduler():
     scheduler_started = True
 
     logger.info("Scheduler iniciado.")
-    logger.info("Job validadores: cada 30 minutos.")
+    logger.info("Job estado Oracle: cada 30 minutos, minutos 5 y 35.")
     logger.info("Job ubicaciones esperadas: todos los días a las 18:45.")
+
+    registrar_log_importacion(
+        origen="SCHEDULER",
+        estado="INFO",
+        mensaje=(
+            "Scheduler iniciado. "
+            "Job estado Oracle programado cada 30 minutos. "
+            "Job ubicaciones esperadas programado todos los días a las 18:45."
+        ),
+    )
