@@ -327,3 +327,18 @@
         width: 100%;
     }
 }
+
+.badge-estado.advertencia {
+    background: #fff3cd;
+    color: #92400e;
+}
+
+.badge-estado.info {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.badge-estado.neutro {
+    background: #e5e7eb;
+    color: #374151;
+}

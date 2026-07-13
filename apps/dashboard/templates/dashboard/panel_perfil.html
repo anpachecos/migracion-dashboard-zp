@@ -195,8 +195,14 @@
                         <td>
                             {% if log.estado == "OK" %}
                                 <span class="badge-estado activo">OK</span>
-                            {% else %}
+                            {% elif log.estado == "ERROR" %}
                                 <span class="badge-estado inactivo">Error</span>
+                            {% elif log.estado == "ADVERTENCIA" %}
+                                <span class="badge-estado advertencia">Advertencia</span>
+                            {% elif log.estado == "INFO" %}
+                                <span class="badge-estado info">Info</span>
+                            {% else %}
+                                <span class="badge-estado neutro">{{ log.estado }}</span>
                             {% endif %}
                         </td>
                         <td>{{ log.fecha_inicio|date:"d-m-Y H:i" }}</td>

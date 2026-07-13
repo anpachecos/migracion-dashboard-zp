@@ -3,12 +3,6 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.dashboard.models import (
-    EstadoValidadorLimpio,
-    UbicacionEsperadaValidador,
-    HistorialUbicacionEsperadaValidador,
-)
-
 from apps.dashboard.services.gps_service import calcular_distancia_metros
 from apps.dashboard.services.alertas_bateria_utils import (
     preparar_puntos_bateria_desde_registros,
