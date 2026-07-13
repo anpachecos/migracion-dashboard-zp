@@ -1,49 +1,42 @@
-﻿from django.shortcuts import render
-from urllib.parse import urlencode
-from .services.baterias_service import (
-    obtener_contexto_baterias,
-    generar_columnas_media_hora,
-    construir_tabla_bateria,
-    obtener_ahora_referencia,
-)
-
-from .services.gps_service import obtener_contexto_gps
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
-from .services.alertas_service import (
-    obtener_alertas_gps_cero,
-    obtener_alertas_caidas_bateria,
-    obtener_alertas_fuera_radio,
-    obtener_opciones_ubicacion_esperada,
-)
-
-from django.contrib.auth.models import User, Group
-
-#Para exportar excel
-from django.http import HttpResponse
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from django.utils import timezone
-from .models import EstadoValidadorLimpio
-
-from io import BytesIO
-
-from datetime import datetime, timedelta
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
-
-import os
+﻿import os
+from datetime import datetime
 from io import BytesIO, StringIO
+
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group, User
 from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
-from django.shortcuts import redirect
-from .models import EstadoValidadorLimpio, LogImportacion
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
+from django.utils import timezone
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+
+from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+
+from .models import LogImportacion
+from .services.alertas_service import (
+    obtener_alertas_caidas_bateria,
+    obtener_alertas_fuera_radio,
+    obtener_alertas_gps_cero,
+)
+from .services.baterias_service import (
+    construir_tabla_bateria,
+    obtener_ahora_referencia,
+    obtener_bloques_bateria_oracle,
+    obtener_contexto_baterias,
+    obtener_rango_fechas_panel,
+)
+from .services.gps_service import obtener_contexto_gps
 
 
 def usuario_es_admin(user):
     return user.is_superuser or user.groups.filter(name="Admin").exists()
+
 
 @login_required
 def ejecutar_comando_admin(request):
@@ -117,11 +110,17 @@ def ejecutar_comando_admin(request):
 
     return redirect("dashboard:panel_perfil")
 
+
 @login_required
 def panel_alertas(request):
-    return render(request, "dashboard/panel_alertas_mantencion.html", {
-        "active_page": "alertas",
-    })
+    return render(
+        request,
+        "dashboard/panel_alertas_mantencion.html",
+        {
+            "active_page": "alertas",
+        },
+    )
+
 
 @login_required
 def exportar_alertas_excel(request):
@@ -252,11 +251,12 @@ def exportar_alertas_excel(request):
 
     response = HttpResponse(
         output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     return response
+
 
 @login_required
 def panel_baterias(request):
@@ -264,52 +264,52 @@ def panel_baterias(request):
     contexto["active_page"] = "baterias"
     return render(request, "dashboard/panel_baterias.html", contexto)
 
+
 @login_required
 def panel_gps(request):
     contexto = obtener_contexto_gps(request)
     contexto["active_page"] = "gps"
     return render(request, "dashboard/panel_gps.html", contexto)
 
+
 @login_required
 def exportar_gps_excel(request):
     """
-    Exporta el mismo Excel completo que Baterías, pero desde el botón GPS.
-    Consulta directo Oracle, no SQLite.
+    Exporta el Excel estándar del AMID desde el botón GPS.
+
+    Por ahora, igual que Baterías:
+    - siempre exporta 14 días completos
+    - no usa filtros de fecha/hora del panel GPS
     """
 
     amid = request.GET.get("amid", "").strip()
-    dias = request.GET.get("dias", "1")
 
     if not amid:
         return HttpResponse("Debe indicar un AMID para exportar.", status=400)
 
-    try:
-        dias = int(dias)
-    except ValueError:
-        dias = 1
-
-    if dias not in [1, 3, 7, 14]:
-        dias = 1
+    dias = 14
+    hora_inicio = "00:00"
+    hora_fin = "23:30"
 
     try:
         wb = crear_excel_completo_amid(
             amid=amid,
             dias=dias,
-            hora_inicio="00:00",
-            hora_fin="23:30",
+            hora_inicio=hora_inicio,
+            hora_fin=hora_fin,
         )
     except ValueError:
         return HttpResponse("El AMID ingresado no es válido.", status=400)
     except Exception as error:
         return HttpResponse(
             f"Error consultando datos en Oracle: {error}",
-            status=500
+            status=500,
         )
 
     if wb is None:
         return HttpResponse(
-            f"No existen registros para el AMID {amid} en el rango seleccionado.",
-            status=404
+            f"No existen registros para el AMID {amid} en los últimos 14 días.",
+            status=404,
         )
 
     output = BytesIO()
@@ -318,23 +318,25 @@ def exportar_gps_excel(request):
     output.seek(0)
 
     fecha_exportacion = obtener_ahora_referencia().strftime("%Y%m%d_%H%M%S")
-    filename = f"datos_amid_{amid}_{dias}_dias_{fecha_exportacion}.xlsx"
+    filename = f"datos_amid_{amid}_14_dias_{fecha_exportacion}.xlsx"
 
     response = HttpResponse(
         output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     return response
 
-def obtener_registros_completos_oracle(amid, fecha_inicio):
+
+def obtener_registros_completos_oracle(amid, fecha_inicio, fecha_fin):
     """
-    Obtiene todos los datos relevantes del AMID desde Oracle.
-    Sirve para exportar el mismo Excel desde Baterías o GPS.
+    Obtiene todos los datos relevantes del AMID desde Oracle
+    para la hoja 'Registros completos'.
     """
 
-    fecha_inicio = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
+    fecha_inicio_texto = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
+    fecha_fin_texto = fecha_fin.strftime("%Y-%m-%d %H:%M:%S")
 
     query = """
         SELECT
@@ -365,6 +367,7 @@ def obtener_registros_completos_oracle(amid, fecha_inicio):
         FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
         WHERE AMID = :amid
           AND FECHA_HORA >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
+          AND FECHA_HORA < TO_DATE(:fecha_fin, 'YYYY-MM-DD HH24:MI:SS')
         ORDER BY FECHA_HORA
     """
 
@@ -376,47 +379,219 @@ def obtener_registros_completos_oracle(amid, fecha_inicio):
                 query,
                 {
                     "amid": int(amid),
-                    "fecha_inicio": fecha_inicio,
-                }
+                    "fecha_inicio": fecha_inicio_texto,
+                    "fecha_fin": fecha_fin_texto,
+                },
             )
 
             columnas = [col[0].lower() for col in cursor.description]
 
             for fila in cursor.fetchall():
                 datos = dict(zip(columnas, fila))
-
                 registros.append(datos)
 
     return registros
 
-def obtener_attr_registro(registro, campo):
-    """
-    Permite usar registros tipo dict o registros tipo objeto.
-    Sirve para reutilizar construir_tabla_bateria().
-    """
 
-    if isinstance(registro, dict):
-        return registro.get(campo)
-
-    return getattr(registro, campo, None)
-class RegistroExportacion:
+def convertir_numero_excel(valor):
     """
-    Objeto simple para que construir_tabla_bateria pueda leer:
-    registro.fecha_hora, registro.porcentaje_bateria, etc.
+    Convierte valores numéricos Oracle/Python a float.
+    Sirve para cálculos del resumen.
     """
 
-    def __init__(self, datos):
-        for clave, valor in datos.items():
-            setattr(self, clave, valor)
+    if valor is None or valor == "":
+        return None
 
-def convertir_a_objetos_exportacion(registros):
-    return [RegistroExportacion(registro) for registro in registros]
+    try:
+        return float(valor)
+    except (ValueError, TypeError):
+        return None
 
-def crear_excel_completo_amid(amid, dias, hora_inicio="00:00", hora_fin="23:30"):
+
+def es_gps_cero(registro):
     """
-    Crea un Excel único para Baterías y GPS.
-    Hoja 1: tabla batería.
-    Hoja 2: registros completos desde Oracle.
+    Detecta registros GPS 0,0.
+    """
+
+    latitud = convertir_numero_excel(registro.get("latitud"))
+    longitud = convertir_numero_excel(registro.get("longitud"))
+
+    return latitud == 0 and longitud == 0
+
+
+def construir_resumen_exportacion(
+    amid,
+    registros_dict,
+    fecha_inicio,
+    fecha_fin,
+    hora_inicio,
+    hora_fin,
+):
+    """
+    Construye indicadores generales para la hoja Resumen.
+    """
+
+    fechas = [
+        preparar_valor_excel(registro.get("fecha_hora"))
+        for registro in registros_dict
+        if registro.get("fecha_hora")
+    ]
+
+    baterias = [
+        convertir_numero_excel(registro.get("porcentaje_bateria"))
+        for registro in registros_dict
+        if convertir_numero_excel(registro.get("porcentaje_bateria")) is not None
+    ]
+
+    registros_con_gps = [
+        registro
+        for registro in registros_dict
+        if registro.get("latitud") is not None
+        and registro.get("longitud") is not None
+    ]
+
+    registros_gps_cero = [
+        registro
+        for registro in registros_con_gps
+        if es_gps_cero(registro)
+    ]
+
+    ultimo_registro = registros_dict[-1] if registros_dict else None
+
+    resumen = {
+        "AMID": amid,
+        "Periodo exportado": (
+            f"{fecha_inicio.strftime('%d-%m-%Y %H:%M')} "
+            f"a {fecha_fin.strftime('%d-%m-%Y %H:%M')}"
+        ),
+        "Horario tabla batería": f"{hora_inicio} a {hora_fin}",
+        "Fecha exportación": obtener_ahora_referencia(),
+        "Total registros completos": len(registros_dict),
+        "Total registros con batería": len(baterias),
+        "Total registros con GPS": len(registros_con_gps),
+        "Total GPS 0,0": len(registros_gps_cero),
+        "Primera fecha/hora registrada": min(fechas) if fechas else None,
+        "Última fecha/hora registrada": max(fechas) if fechas else None,
+        "Batería mínima": min(baterias) if baterias else None,
+        "Batería máxima": max(baterias) if baterias else None,
+        "Última batería registrada": preparar_valor_excel(
+            ultimo_registro.get("porcentaje_bateria")
+        ) if ultimo_registro else None,
+        "Última latitud": preparar_valor_excel(
+            ultimo_registro.get("latitud")
+        ) if ultimo_registro else None,
+        "Última longitud": preparar_valor_excel(
+            ultimo_registro.get("longitud")
+        ) if ultimo_registro else None,
+    }
+
+    return resumen
+
+
+def obtener_diccionario_variables_exportacion():
+    """
+    Diccionario de variables de la hoja 'Registros completos'.
+    Se muestra en la hoja Resumen para que el Excel sea autoexplicativo.
+    """
+
+    return [
+        ("ID", "Identificador interno del registro en Oracle."),
+        ("AMID", "Identificador del validador."),
+        ("Fecha hora", "Fecha y hora del registro reportado por el validador."),
+        ("Fecha descarga", "Última fecha de descarga registrada para el validador."),
+        ("Fecha estado", "Última fecha de estado registrada para el validador."),
+        ("BUSID", "Identificador del bus o equipo asociado, cuando existe."),
+        ("OP", "Operador asociado al validador."),
+        ("Versión", "Versión registrada del equipo o configuración."),
+        ("Patente", "Patente asociada al bus, cuando existe."),
+        ("TD01", "Contador o dato técnico TD01 informado por el equipo."),
+        ("TD04", "Contador o dato técnico TD04 informado por el equipo."),
+        ("Tabla", "Número de tabla de difusión consultada."),
+        ("Ver tabla", "Versión de la tabla de difusión."),
+        ("Latitud", "Latitud GPS reportada por el validador."),
+        ("Longitud", "Longitud GPS reportada por el validador."),
+        ("Porcentaje batería", "Porcentaje de batería reportado por el validador."),
+        ("Tiempo vida", "Fecha/hora o valor asociado al tiempo de vida reportado por el equipo."),
+        ("Fecha registro", "Fecha en que el dato fue registrado en la consulta o proceso."),
+        ("Contiene batería", "Indica si el mensaje contenía información de batería."),
+        ("Contiene GPS", "Indica si el mensaje contenía información GPS."),
+        ("Contiene tiempo vida", "Indica si el mensaje contenía información de tiempo de vida."),
+        ("Error obtener batería", "Indica si hubo error al obtener batería."),
+        ("Error obtener GPS", "Indica si hubo error al obtener GPS."),
+        ("Error obtener tiempo vida", "Indica si hubo error al obtener tiempo de vida."),
+    ]
+
+
+def crear_hoja_resumen(
+    wb,
+    amid,
+    registros_dict,
+    fecha_inicio,
+    fecha_fin,
+    hora_inicio,
+    hora_fin,
+):
+    """
+    Crea la hoja Resumen del Excel estándar.
+    """
+
+    ws_resumen = wb.active
+    ws_resumen.title = "Resumen"
+
+    resumen = construir_resumen_exportacion(
+        amid=amid,
+        registros_dict=registros_dict,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        hora_inicio=hora_inicio,
+        hora_fin=hora_fin,
+    )
+
+    ws_resumen.append(["Indicador", "Valor"])
+
+    for indicador, valor in resumen.items():
+        ws_resumen.append([
+            indicador,
+            preparar_valor_excel(valor),
+        ])
+
+    ws_resumen.append([])
+    ws_resumen.append(["Notas", "Descripción"])
+    ws_resumen.append([
+        "Tabla batería",
+        "Las celdas vacías significan que no hubo dato real para ese bloque horario. El valor 0 sí es un dato real reportado.",
+    ])
+    ws_resumen.append([
+        "GPS 0,0",
+        "Si Latitud = 0 y Longitud = 0, se considera GPS inválido reportado por el equipo, no ubicación real.",
+    ])
+
+    ws_resumen.append([])
+    ws_resumen.append(["Diccionario de variables", ""])
+    ws_resumen.append(["Variable", "Significado"])
+
+    for variable, significado in obtener_diccionario_variables_exportacion():
+        ws_resumen.append([variable, significado])
+
+    aplicar_estilo_hoja(ws_resumen)
+
+    ws_resumen.column_dimensions["A"].width = 34
+    ws_resumen.column_dimensions["B"].width = 90
+
+    for row in ws_resumen.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    return ws_resumen
+
+
+def crear_excel_completo_amid(amid, dias=14, hora_inicio="00:00", hora_fin="23:30"):
+    """
+    Crea un Excel estándar para Baterías y GPS.
+
+    Hoja 1: Resumen
+    Hoja 2: Tabla batería
+    Hoja 3: Registros completos
     """
 
     if not hora_inicio:
@@ -429,35 +604,54 @@ def crear_excel_completo_amid(amid, dias, hora_inicio="00:00", hora_fin="23:30")
         hora_inicio = "00:00"
         hora_fin = "23:30"
 
-    fecha_inicio = obtener_ahora_referencia() - timedelta(days=dias)
+    dias = 14
+
+    fecha_inicio, fecha_fin = obtener_rango_fechas_panel(dias)
 
     registros_dict = obtener_registros_completos_oracle(
         amid=amid,
         fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
     )
 
     if not registros_dict:
         return None
 
-    registros_objetos = convertir_a_objetos_exportacion(registros_dict)
+    bloques_bateria = obtener_bloques_bateria_oracle(
+        amid=amid,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+    )
 
     columnas_horas, tabla_bateria = construir_tabla_bateria(
-        registros=registros_objetos,
+        bloques=bloques_bateria,
         cantidad_dias=dias,
         hora_inicio=hora_inicio,
-        hora_fin=hora_fin
+        hora_fin=hora_fin,
     )
 
     wb = Workbook()
 
     # =========================
-    # Hoja 1: tabla batería
+    # Hoja 1: resumen
     # =========================
-    ws_tabla = wb.active
-    ws_tabla.title = "Tabla bateria"
+    crear_hoja_resumen(
+        wb=wb,
+        amid=amid,
+        registros_dict=registros_dict,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        hora_inicio=hora_inicio,
+        hora_fin=hora_fin,
+    )
+
+    # =========================
+    # Hoja 2: tabla batería
+    # =========================
+    ws_tabla = wb.create_sheet("Tabla bateria")
 
     ws_tabla.append(["AMID", amid])
-    ws_tabla.append(["Periodo", f"Últimos {dias} día(s)"])
+    ws_tabla.append(["Periodo", "Últimos 14 días"])
     ws_tabla.append(["Horario", f"{hora_inicio} a {hora_fin}"])
     ws_tabla.append([])
 
@@ -475,7 +669,7 @@ def crear_excel_completo_amid(amid, dias, hora_inicio="00:00", hora_fin="23:30")
     aplicar_estilo_tabla_bateria(ws_tabla)
 
     # =========================
-    # Hoja 2: registros completos
+    # Hoja 3: registros completos
     # =========================
     ws_datos = wb.create_sheet("Registros completos")
 
@@ -539,6 +733,7 @@ def crear_excel_completo_amid(amid, dias, hora_inicio="00:00", hora_fin="23:30")
     aplicar_estilo_hoja(ws_datos)
 
     return wb
+
 
 @login_required
 def panel_perfil(request):
@@ -611,28 +806,25 @@ def panel_perfil(request):
 
     return render(request, "dashboard/panel_perfil.html", context)
 
+
 @login_required
 def exportar_baterias_excel(request):
     """
-    Exporta Excel completo del AMID desde Oracle.
-    Se usa tanto para análisis de batería como para datos generales.
+    Exporta el Excel estándar del AMID desde el botón Baterías.
+
+    Por ahora:
+    - siempre exporta 14 días completos
+    - horario completo 00:00 a 23:30
     """
 
     amid = request.GET.get("amid", "").strip()
-    dias = request.GET.get("dias", "14")
-    hora_inicio = request.GET.get("hora_inicio", "00:00")
-    hora_fin = request.GET.get("hora_fin", "23:30")
 
     if not amid:
         return HttpResponse("Debe indicar un AMID para exportar.", status=400)
 
-    try:
-        dias = int(dias)
-    except ValueError:
-        dias = 14
-
-    if dias not in [1, 3, 7, 14]:
-        dias = 14
+    dias = 14
+    hora_inicio = "00:00"
+    hora_fin = "23:30"
 
     try:
         wb = crear_excel_completo_amid(
@@ -646,13 +838,13 @@ def exportar_baterias_excel(request):
     except Exception as error:
         return HttpResponse(
             f"Error consultando datos en Oracle: {error}",
-            status=500
+            status=500,
         )
 
     if wb is None:
         return HttpResponse(
-            f"No existen registros para el AMID {amid} en el rango seleccionado.",
-            status=404
+            f"No existen registros para el AMID {amid} en los últimos 14 días.",
+            status=404,
         )
 
     output = BytesIO()
@@ -661,30 +853,16 @@ def exportar_baterias_excel(request):
     output.seek(0)
 
     fecha_exportacion = obtener_ahora_referencia().strftime("%Y%m%d_%H%M%S")
-    filename = f"datos_amid_{amid}_{dias}_dias_{fecha_exportacion}.xlsx"
+    filename = f"datos_amid_{amid}_14_dias_{fecha_exportacion}.xlsx"
 
     response = HttpResponse(
         output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     return response
 
-def preparar_fecha_excel(valor):
-    """
-    Convierte fechas con zona horaria a fechas compatibles con Excel.
-    Excel no acepta datetimes con tzinfo.
-    """
-
-    if not valor:
-        return None
-
-    if timezone.is_aware(valor):
-        valor = timezone.localtime(valor)
-        valor = valor.replace(tzinfo=None)
-
-    return valor
 
 def aplicar_estilo_hoja(ws):
     """
@@ -694,12 +872,12 @@ def aplicar_estilo_hoja(ws):
     fill_header = PatternFill(
         start_color="1F4E78",
         end_color="1F4E78",
-        fill_type="solid"
+        fill_type="solid",
     )
 
     font_header = Font(
         color="FFFFFF",
-        bold=True
+        bold=True,
     )
 
     border = Border(
@@ -733,7 +911,8 @@ def aplicar_estilo_hoja(ws):
 
         adjusted_width = min(max_length + 2, 35)
         ws.column_dimensions[column_letter].width = adjusted_width
-        
+
+
 def preparar_valor_excel(valor):
     """
     Prepara valores para Excel.
@@ -751,6 +930,7 @@ def preparar_valor_excel(valor):
         return valor.replace(tzinfo=None)
 
     return valor
+
 
 def aplicar_estilo_tabla_bateria(ws):
     """
@@ -791,7 +971,12 @@ def aplicar_estilo_tabla_bateria(ws):
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Colores de batería en celdas numéricas
-    for row in ws.iter_rows(min_row=fila_header + 1, max_row=ws.max_row, min_col=2, max_col=ws.max_column):
+    for row in ws.iter_rows(
+        min_row=fila_header + 1,
+        max_row=ws.max_row,
+        min_col=2,
+        max_col=ws.max_column,
+    ):
         for cell in row:
             valor = cell.value
 
