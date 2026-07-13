@@ -10,6 +10,13 @@ from django.utils import timezone
 
 from apps.dashboard.services.logs_service import registrar_log_importacion
 
+'''
+Retención actual:
+- BATERIA_BLOQUE_30MIN: 16 días, limpiado por PRC_ACTUALIZAR_BATERIA_BLOQUES.
+- HISTORIAL_UBICACION_ESPERADA: 16 días para registros cerrados, limpiado por PRC_LIMPIAR_HIST_UBICACION.
+- UBICACION_ESPERADA_VALIDADOR: tabla vigente, no se limpia por fecha.
+- SQLite: solo usuarios, sesiones, permisos, admin, migraciones y logs.
+'''
 job_ubicaciones_running = False
 job_estado_oracle_running = False
 

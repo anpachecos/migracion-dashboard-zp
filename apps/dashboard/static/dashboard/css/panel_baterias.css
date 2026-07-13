@@ -6,7 +6,8 @@
    - Filtros en una línea cuando haya espacio
    - Tarjetas diagnóstico
    - Tabla compacta por media hora
-   - Gráfico principal dinámico
+   - Gráfico principal 14 días
+   - Gráfico secundario de hoy vs curva esperada
 ========================================================= */
 
 
@@ -487,8 +488,20 @@ th.hora-diagonal > span {
 
 
 /* =========================================================
-   11. Gráfico principal de batería
+   11. Gráficos de batería
 ========================================================= */
+
+.grid-graficos-bateria {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: stretch;
+    margin-top: 12px;
+}
+
+.grid-graficos-bateria-50 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
 .grafico-card {
     min-width: 0;
@@ -499,8 +512,22 @@ th.hora-diagonal > span {
     background-color: #ffffff;
 }
 
-.grafico-card-principal {
-    margin-top: 12px;
+.grafico-card-principal,
+.grafico-card-hoy {
+    margin-top: 0;
+}
+
+.grafico-card-header h3 {
+    margin: 0 0 4px 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #222;
+}
+
+.grafico-card-header .texto-ayuda {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    line-height: 1.35;
 }
 
 .contenedor-grafico {
@@ -510,12 +537,34 @@ th.hora-diagonal > span {
     min-width: 0;
 }
 
+.contenedor-grafico-hoy {
+    height: 280px;
+}
+
 .contenedor-grafico canvas {
     width: 100% !important;
     height: 100% !important;
 }
 
-/*Boton Exportar Excel*/
+.grafico-sin-datos {
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    color: #64748b;
+    font-weight: 600;
+    background: #f8fafc;
+    text-align: center;
+    padding: 20px;
+}
+
+
+/* =========================================================
+   12. Botón Exportar Excel
+========================================================= */
+
 .btn-exportar {
     height: 32px;
     padding: 0 12px;
@@ -552,7 +601,7 @@ th.hora-diagonal > span {
 
 
 /* =========================================================
-   12. Responsive
+   13. Responsive
 ========================================================= */
 
 /* Pantallas medianas: tarjetas pasan de 6 a 3 columnas */
@@ -566,6 +615,10 @@ th.hora-diagonal > span {
 @media (max-width: 1150px) {
     .form-filtros {
         flex-wrap: wrap;
+    }
+
+    .grid-graficos-bateria {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -589,7 +642,8 @@ th.hora-diagonal > span {
     .grupo-filtro input,
     .grupo-filtro select,
     .boton-filtro button,
-    .btn-limpiar {
+    .btn-limpiar,
+    .btn-exportar {
         width: 100%;
     }
 
@@ -601,8 +655,10 @@ th.hora-diagonal > span {
         min-width: 100%;
     }
 
-    .contenedor-grafico {
+    .contenedor-grafico,
+    .contenedor-grafico-hoy,
+    .grafico-sin-datos {
         height: 280px;
+        min-height: 280px;
     }
 }
-

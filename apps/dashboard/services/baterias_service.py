@@ -713,11 +713,16 @@ def obtener_clase_bateria(valor):
 
 def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
     """
-    Construye gráfico diario desde bloques Oracle.
+    Construye gráfico de hoy desde bloques Oracle.
 
-    Mantiene la misma regla visual anterior:
-    - solo grafica desde el primer dato válido > 0
-    - genera curva esperada desde ese primer punto
+    Reglas:
+    - Solo considera bloques del día actual.
+    - La serie real muestra todos los datos reales, incluyendo batería 0.
+    - La curva esperada parte desde el primer dato real mayor a 0.
+    - Si el primer dato real del día es 0, la curva esperada parte desde
+      el siguiente dato mayor a 0.
+    - La curva esperada descuenta 4 puntos por cada bloque de 30 minutos.
+    - Si hoy no hay datos reales, retorna lista vacía.
     """
     if fecha_objetivo is None:
         fecha_objetivo = obtener_ahora_referencia().date()
@@ -726,17 +731,23 @@ def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
     bloques_por_hora = {}
 
     for bloque in bloques:
-        if not bloque.fecha_hora_bloque:
+        fecha_hora_bloque = getattr(bloque, "fecha_hora_bloque", None)
+
+        if not fecha_hora_bloque:
             continue
 
         fecha_bloque = normalizar_fecha_para_comparar(
-            bloque.fecha_hora_bloque
+            fecha_hora_bloque
         ).date()
 
         if fecha_bloque != fecha_objetivo:
             continue
 
-        hora_bloque = bloque.hora_bloque or bloque.fecha_hora_bloque.strftime("%H:%M")
+        hora_bloque = (
+            getattr(bloque, "hora_bloque", None)
+            or fecha_hora_bloque.strftime("%H:%M")
+        )
+
         bloques_por_hora[hora_bloque] = bloque
 
     datos = []
@@ -745,7 +756,12 @@ def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
         bloque = bloques_por_hora.get(hora_texto)
         bateria_real = None
 
-        if bloque and bloque.tiene_dato and bloque.porcentaje_bateria is not None:
+        if (
+            bloque
+            and getattr(bloque, "tiene_dato", False)
+            and getattr(bloque, "porcentaje_bateria", None) is not None
+            and getattr(bloque, "porcentaje_bateria", "") != ""
+        ):
             try:
                 bateria_real = float(bloque.porcentaje_bateria)
             except (ValueError, TypeError):
@@ -757,28 +773,37 @@ def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
             "bateria_esperada": None,
         })
 
-    indices_validos = [
-        i for i, punto in enumerate(datos)
-        if punto["bateria_real"] is not None and punto["bateria_real"] > 0
+    indices_con_dato_real = [
+        indice
+        for indice, punto in enumerate(datos)
+        if punto["bateria_real"] is not None
     ]
 
-    if not indices_validos:
+    if not indices_con_dato_real:
         return []
 
-    indice_inicio = indices_validos[0]
-    indice_fin = indices_validos[-1]
-    bateria_inicio = datos[indice_inicio]["bateria_real"]
+    indices_validos_para_curva = [
+        indice
+        for indice, punto in enumerate(datos)
+        if punto["bateria_real"] is not None
+        and punto["bateria_real"] > 0
+    ]
 
-    for indice in range(indice_inicio, indice_fin + 1):
-        bloques_transcurridos = indice - indice_inicio
-        datos[indice]["bateria_esperada"] = max(
-            bateria_inicio - bloques_transcurridos * 3,
-            0
-        )
+    if indices_validos_para_curva:
+        indice_inicio_curva = indices_validos_para_curva[0]
+        bateria_inicio = datos[indice_inicio_curva]["bateria_real"]
 
-    return datos[indice_inicio:indice_fin + 1]
+        for indice in range(indice_inicio_curva, len(datos)):
+            bloques_transcurridos = indice - indice_inicio_curva
+            datos[indice]["bateria_esperada"] = max(
+                bateria_inicio - bloques_transcurridos * 3,
+                0
+            )
 
+    primer_indice_real = indices_con_dato_real[0]
+    ultimo_indice_real = indices_con_dato_real[-1]
 
+    return datos[primer_indice_real:ultimo_indice_real + 1]
 def construir_datos_grafico_periodo(tabla_bateria):
     datos = []
 

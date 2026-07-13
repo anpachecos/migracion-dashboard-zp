@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
     configurarFiltrosAutomaticos();
+    crearGraficoBateriaHoy();
     crearGraficoBateriaPrincipal();
 });
 
@@ -46,11 +47,22 @@ function obtenerDatosJsonScript(id) {
     }
 }
 
-function crearGraficoBateriaPrincipal() {
-    const canvas = document.getElementById("grafico-bateria-principal");
+function valorEsNulo(valor) {
+    return valor === null || valor === undefined || Number.isNaN(valor);
+}
+
+function formatearPorcentaje(valor) {
+    if (valorEsNulo(valor)) {
+        return "sin dato";
+    }
+
+    return valor + "%";
+}
+
+function crearGraficoBateriaHoy() {
+    const canvas = document.getElementById("grafico-bateria-hoy");
 
     if (!canvas) {
-        console.warn("No se encontró el canvas grafico-bateria-principal");
         return;
     }
 
@@ -59,16 +71,6 @@ function crearGraficoBateriaPrincipal() {
         return;
     }
 
-    const dias = parseInt(canvas.dataset.dias || "14", 10);
-
-    if (dias === 1) {
-        crearGraficoModoDia(canvas);
-    } else {
-        crearGraficoModoPeriodo(canvas);
-    }
-}
-
-function crearGraficoModoDia(canvas) {
     const datos = obtenerDatosJsonScript("datos-grafico-dia");
 
     if (!datos || datos.length === 0) {
@@ -89,8 +91,8 @@ function crearGraficoModoDia(canvas) {
                     data: bateriaReal,
                     tension: 0.3,
                     spanGaps: true,
-                    pointRadius: 2,
-                    pointHoverRadius: 5
+                    pointRadius: 3,
+                    pointHoverRadius: 6
                 },
                 {
                     label: "Curva esperada",
@@ -98,12 +100,28 @@ function crearGraficoModoDia(canvas) {
                     tension: 0.3,
                     borderDash: [6, 6],
                     pointRadius: 0,
+                    pointHoverRadius: 4,
                     spanGaps: true
                 }
             ]
         },
-        options: obtenerOpcionesGraficoDia()
+        options: obtenerOpcionesGraficoHoy()
     });
+}
+
+function crearGraficoBateriaPrincipal() {
+    const canvas = document.getElementById("grafico-bateria-principal");
+
+    if (!canvas) {
+        return;
+    }
+
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js no está cargado.");
+        return;
+    }
+
+    crearGraficoModoPeriodo(canvas);
 }
 
 function crearGraficoModoPeriodo(canvas) {
@@ -135,7 +153,7 @@ function crearGraficoModoPeriodo(canvas) {
     });
 }
 
-function obtenerOpcionesGraficoDia() {
+function obtenerOpcionesGraficoHoy() {
     return {
         responsive: true,
         maintainAspectRatio: false,
@@ -149,10 +167,17 @@ function obtenerOpcionesGraficoDia() {
             },
             tooltip: {
                 callbacks: {
+                    title: function (tooltipItems) {
+                        if (!tooltipItems || tooltipItems.length === 0) {
+                            return "";
+                        }
+
+                        return "Hora " + tooltipItems[0].label;
+                    },
                     label: function (context) {
                         const valor = context.parsed.y;
 
-                        if (valor === null || valor === undefined) {
+                        if (valorEsNulo(valor)) {
                             return context.dataset.label + ": sin dato";
                         }
 
@@ -177,7 +202,7 @@ function obtenerOpcionesGraficoDia() {
                 },
                 ticks: {
                     autoSkip: true,
-                    maxTicksLimit: 16,
+                    maxTicksLimit: 8,
                     maxRotation: 45,
                     minRotation: 45
                 }
@@ -213,7 +238,7 @@ function obtenerOpcionesGraficoPeriodo(datos) {
                     label: function (context) {
                         const valor = context.parsed.y;
 
-                        if (valor === null || valor === undefined) {
+                        if (valorEsNulo(valor)) {
                             return "Batería real: sin dato";
                         }
 

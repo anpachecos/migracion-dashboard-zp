@@ -4,8 +4,7 @@
 {% block title %}Baterías | Dashboard ZP{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=15">
-
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=16">
 {% endblock %}
 
 {% block content %}
@@ -23,11 +22,11 @@
 
             <div class="grupo-filtro grupo-amid">
                 <label for="amid">Buscar AMID</label>
-                <input 
-                    type="text" 
-                    id="amid" 
-                    name="amid" 
-                    value="{{ amid }}" 
+                <input
+                    type="text"
+                    id="amid"
+                    name="amid"
+                    value="{{ amid }}"
                     placeholder="Ej: 7500123"
                 >
             </div>
@@ -40,16 +39,16 @@
 
             <div class="grupo-filtro boton-filtro boton-exportar">
                 {% if amid %}
-                    <a 
-                        class="btn-exportar" 
+                    <a
+                        class="btn-exportar"
                         href="{% url 'dashboard:exportar_baterias_excel' %}?amid={{ amid }}&dias=14&hora_inicio=00:00&hora_fin=23:30"
                         title="Exporta a Excel los últimos 14 días del AMID consultado."
                     >
                         Exportar Excel
                     </a>
                 {% else %}
-                    <a 
-                        class="btn-exportar btn-deshabilitado" 
+                    <a
+                        class="btn-exportar btn-deshabilitado"
                         href="#"
                         title="Busca un AMID antes de exportar."
                     >
@@ -60,6 +59,7 @@
 
         </form>
     </section>
+
     {% if mensaje %}
         <section class="mensaje">
             {{ mensaje }}
@@ -142,31 +142,22 @@
                     </span>
                 </div>
             </article>
-
-            
-
         </section>
-        <!-- Alertas / ver como hacer que se oculte si no hay alertas-->
+
+        <!-- Alertas -->
         {% if total_caidas_drasticas > 0 %}
             <section class="seccion bloque-alertas">
-                {% if total_caidas_drasticas > 0 %}
-                    <h2>Alertas del período</h2>
-                    
-                    <ul class="lista-alertas">
-                        {% for alerta in alertas_periodo %}
-                            <li>
-                                Entre {{ alerta.fecha_anterior|date:"d-m-Y H:i" }} y {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
-                                batería bajó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%
-                                (caída de {{ alerta.caida }} puntos en {{ alerta.tiempo_transcurrido }}).
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <h2>Alertas del período</h2>
-                    <p class="sin-alertas">
-                        No se detectaron caídas drásticas de batería en el período seleccionado.
-                    </p>
-                {% endif %}
+                <h2>Alertas del período</h2>
+
+                <ul class="lista-alertas">
+                    {% for alerta in alertas_periodo %}
+                        <li>
+                            Entre {{ alerta.fecha_anterior|date:"d-m-Y H:i" }} y {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
+                            batería bajó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%
+                            (caída de {{ alerta.caida }} puntos en {{ alerta.tiempo_transcurrido }}).
+                        </li>
+                    {% endfor %}
+                </ul>
             </section>
         {% endif %}
 
@@ -180,7 +171,7 @@
                     </p>
                 </div>
             </div>
-            <!-- Buscar como hacer fuente más grande-->
+
             <div class="tabla-scroll">
                 <table class="tabla-bateria">
                     <thead>
@@ -215,32 +206,61 @@
                 </table>
             </div>
         </section>
-        
-        <!-- Gráfico de Tendencia -->
+
+        <!-- Gráficos de batería -->
         <section class="seccion">
             <div class="titulo-tabla">
                 <div>
                     <h2>Análisis gráfico de batería</h2>
-
-                    {% if dias == 1 %}
-                        <p class="texto-ayuda">
-                            Evolución del día seleccionado con comparación entre batería real y curva esperada.
-                        </p>
-                    {% else %}
-                        <p class="texto-ayuda">
-                            Evolución de batería del período seleccionado. El eje X muestra los días y el detalle de hora aparece al pasar el mouse.
-                        </p>
-                    {% endif %}
+                    <p class="texto-ayuda">
+                        Comparación de la batería real de hoy contra una curva de descarga esperada y evolución completa de los últimos 14 días.
+                    </p>
                 </div>
             </div>
 
-            <div class="grafico-card grafico-card-principal">
-                <div class="contenedor-grafico">
-                    <canvas 
-                        id="grafico-bateria-principal"
-                        data-dias="{{ dias }}"
-                    ></canvas>
+            <div class="grid-graficos-bateria grid-graficos-bateria-50">
+
+                <!-- Gráfico pequeño: Hoy -->
+                <div class="grafico-card grafico-card-hoy">
+                    <div class="grafico-card-header">
+                        <div>
+                            <h3>Hoy vs curva esperada</h3>
+                            <p class="texto-ayuda">
+                                La curva esperada parte desde el primer valor real mayor a 0 y descuenta 3 puntos por bloque.
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if datos_grafico_dia %}
+                        <div class="contenedor-grafico contenedor-grafico-hoy">
+                            <canvas id="grafico-bateria-hoy"></canvas>
+                        </div>
+                    {% else %}
+                        <div class="grafico-sin-datos">
+                            Sin datos de batería para hoy.
+                        </div>
+                    {% endif %}
                 </div>
+
+                <!-- Gráfico grande: período -->
+                <div class="grafico-card grafico-card-principal">
+                    <div class="grafico-card-header">
+                        <div>
+                            <h3>Últimos 14 días</h3>
+                            <p class="texto-ayuda">
+                                Evolución de batería del período. El detalle de fecha y hora aparece al pasar el mouse.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="contenedor-grafico">
+                        <canvas
+                            id="grafico-bateria-principal"
+                            data-dias="{{ dias }}"
+                        ></canvas>
+                    </div>
+                </div>
+
             </div>
         </section>
 
@@ -277,6 +297,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'dashboard/js/panel_baterias.js' %}"></script>
-
+<script src="{% static 'dashboard/js/panel_baterias.js' %}?v=16"></script>
 {% endblock %}
