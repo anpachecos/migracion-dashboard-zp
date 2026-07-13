@@ -25,6 +25,13 @@
 
             <form method="get" class="gps-formulario">
 
+                <input
+                    type="hidden"
+                    id="rango_manual"
+                    name="rango_manual"
+                    value="{{ rango_manual|default:'0' }}"
+                >
+
                 <div class="gps-campo-busqueda">
                     <label for="amid">Buscar AMID</label>
 
@@ -88,7 +95,7 @@
 
                     <a
                         class="gps-btn-hoy"
-                        href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}"
+                        href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}&rango_manual=0"
                         title="Restablece el filtro a hoy de 00:00 a 23:30"
                     >
                         Hoy
@@ -119,14 +126,16 @@
 
         <section class="gps-fila-metricas">
 
-            <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio %}gps-card-ok{% elif ubicacion_esperada %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
+            <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio == True %}gps-card-ok{% elif ubicacion_esperada and ubicacion_esperada.dentro_radio == False %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
                 <span>Estado ubicación</span>
                 <strong>
                     {% if ubicacion_esperada %}
-                        {% if ubicacion_esperada.dentro_radio %}
+                        {% if ubicacion_esperada.dentro_radio == True %}
                             Dentro del radio
-                        {% else %}
+                        {% elif ubicacion_esperada.dentro_radio == False %}
                             Fuera del radio
+                        {% else %}
+                            Sin GPS válido
                         {% endif %}
                     {% else %}
                         Sin referencia
@@ -188,7 +197,13 @@
 
                                 <div>
                                     <span>Distancia</span>
-                                    <strong>{{ ubicacion_esperada.distancia_metros }} m</strong>
+                                    <strong>
+                                        {% if ubicacion_esperada.distancia_metros is not None %}
+                                            {{ ubicacion_esperada.distancia_metros }} m
+                                        {% else %}
+                                            No calculable
+                                        {% endif %}
+                                    </strong>
                                 </div>
                             </div>
                         {% else %}
@@ -205,8 +220,24 @@
                         </div>
 
                         <div class="gps-dato">
-                            <span>Cantidad registros GPS</span>
-                            <strong>{{ ubicaciones_gps|length }}</strong>
+                            <span>Registros GPS reportados</span>
+                            <strong>{{ resumen_gps.registros_gps_reportados_periodo }}</strong>
+                        </div>
+
+                        <div class="gps-dato gps-dato-doble">
+                            <div>
+                                <span>GPS válidos</span>
+                                <strong class="gps-estado-ok">
+                                    {{ resumen_gps.registros_gps_validos_periodo }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>GPS 0,0</span>
+                                <strong class="gps-estado-advertencia">
+                                    {{ resumen_gps.registros_gps_cero_periodo }}
+                                </strong>
+                            </div>
                         </div>
 
                         <div class="gps-dato gps-dato-doble">
@@ -272,5 +303,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=9"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=19"></script>
 {% endblock %}

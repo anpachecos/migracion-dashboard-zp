@@ -1,4 +1,97 @@
 document.addEventListener("DOMContentLoaded", function () {
+    configurarFormularioGps();
+    inicializarMapaGps();
+});
+
+function obtenerFechaHoyTexto() {
+    const hoy = new Date();
+    const anio = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+    const dia = String(hoy.getDate()).padStart(2, "0");
+
+    return `${anio}-${mes}-${dia}`;
+}
+
+function configurarFormularioGps() {
+    const formulario = document.querySelector(".gps-formulario");
+
+    if (!formulario) {
+        return;
+    }
+
+    const inputAmid = formulario.querySelector('input[name="amid"]');
+    const inputFechaDesde = formulario.querySelector('input[name="fecha_desde"]');
+    const inputFechaHasta = formulario.querySelector('input[name="fecha_hasta"]');
+    const inputHoraDesde = formulario.querySelector('select[name="hora_desde"]');
+    const inputHoraHasta = formulario.querySelector('select[name="hora_hasta"]');
+    const inputRangoManual = formulario.querySelector('input[name="rango_manual"]');
+
+    let usuarioCambioRango = false;
+
+    function marcarRangoManual() {
+        usuarioCambioRango = true;
+
+        if (inputRangoManual) {
+            inputRangoManual.value = "1";
+        }
+    }
+
+    if (inputFechaDesde) {
+        inputFechaDesde.addEventListener("change", marcarRangoManual);
+    }
+
+    if (inputFechaHasta) {
+        inputFechaHasta.addEventListener("change", marcarRangoManual);
+    }
+
+    if (inputHoraDesde) {
+        inputHoraDesde.addEventListener("change", marcarRangoManual);
+    }
+
+    if (inputHoraHasta) {
+        inputHoraHasta.addEventListener("change", marcarRangoManual);
+    }
+
+    formulario.addEventListener("submit", function () {
+        const amidActual = inputAmid ? inputAmid.value.trim() : "";
+
+        if (!amidActual) {
+            return;
+        }
+
+        /*
+            Regla:
+            - Si el usuario NO tocó fecha/hora en esta carga de página,
+              siempre volvemos a consultar hoy.
+            - Si el usuario SÍ tocó fecha/hora, respetamos su rango manual.
+        */
+        if (!usuarioCambioRango) {
+            const hoyTexto = obtenerFechaHoyTexto();
+
+            if (inputFechaDesde) {
+                inputFechaDesde.value = hoyTexto;
+            }
+
+            if (inputFechaHasta) {
+                inputFechaHasta.value = hoyTexto;
+            }
+
+            if (inputHoraDesde) {
+                inputHoraDesde.value = "00:00";
+            }
+
+            if (inputHoraHasta) {
+                inputHoraHasta.value = "23:30";
+            }
+
+            if (inputRangoManual) {
+                inputRangoManual.value = "0";
+            }
+        }
+    });
+}
+
+function inicializarMapaGps() {
     const mapaElemento = document.getElementById("mapa-gps");
 
     if (!mapaElemento) {
@@ -10,11 +103,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const amidElemento = document.getElementById("gps-amid");
     const ubicacionesElemento = document.getElementById("gps-ubicaciones");
     const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
+
     const ubicacionLaboratorio = {
         nombre: "Laboratorio Zonas Pagas",
         latitud: -33.437191,
         longitud: -70.656102,
-        radio_metros: 70
+        radio_metros: 150
     };
 
     const latitud = latitudElemento ? JSON.parse(latitudElemento.textContent) : null;
@@ -57,7 +151,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const esCoordenadaCero = ubicacion.coordenada_cero === true;
 
-            puntosRuta.push([lat, lon]);
+            if (!esCoordenadaCero) {
+                puntosRuta.push([lat, lon]);
+            }
 
             let colorPunto = "#9ca3af";
             let radioPunto = 5;
@@ -102,7 +198,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ${avisoCoordenada}
             `);
 
-            if (esUltima) {
+            if (esUltima && !esCoordenadaCero) {
                 marcador.openPopup();
             }
         });
@@ -118,10 +214,22 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (ubicacionEsperada) {
+        const estadoEsperado = ubicacionEsperada.dentro_radio === true
+            ? true
+            : ubicacionEsperada.dentro_radio === false
+                ? false
+                : null;
+
+        const colorEsperado = estadoEsperado === true
+            ? "#2563eb"
+            : estadoEsperado === false
+                ? "#dc2626"
+                : "#6b7280";
+
         L.circle([ubicacionEsperada.latitud, ubicacionEsperada.longitud], {
             radius: ubicacionEsperada.radio_metros,
-            color: ubicacionEsperada.dentro_radio ? "#2563eb" : "#dc2626",
-            fillColor: ubicacionEsperada.dentro_radio ? "#2563eb" : "#dc2626",
+            color: colorEsperado,
+            fillColor: colorEsperado,
             fillOpacity: 0.12,
             weight: 2,
         }).addTo(mapa);
@@ -139,7 +247,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 ${ubicacionEsperada.nombre || "-"}<br>
                 Radio: ${ubicacionEsperada.radio_metros} m<br>
                 Distancia al GPS real: ${ubicacionEsperada.distancia_metros ?? "-"} m<br>
-                Estado: ${ubicacionEsperada.dentro_radio ? "Dentro del radio" : "Fuera del radio"}
+                Estado: ${estadoEsperado === true
+                    ? "Dentro del radio"
+                    : estadoEsperado === false
+                        ? "Fuera del radio"
+                        : "Sin GPS válido"
+                }
             `);
     }
 
@@ -186,4 +299,4 @@ document.addEventListener("DOMContentLoaded", function () {
             moverMapaAUbicacion(ubicacionEsperada, 17);
         });
     }
-});
+}
