@@ -124,140 +124,17 @@ def panel_alertas(request):
 
 @login_required
 def exportar_alertas_excel(request):
-    dias = request.GET.get("dias", 1)
+    """
+    Exportación de alertas deshabilitada temporalmente.
 
-    contexto_gps_cero = obtener_alertas_gps_cero(
-        dias=dias,
-        mostrar_todo=True,
-        ubicaciones_seleccionadas=None,
+    El panel de Alertas está en mantención y el flujo antiguo dependía
+    de EstadoValidadorLimpio en SQLite.
+    """
+    return HttpResponse(
+        "La exportación de alertas está temporalmente en mantención. "
+        "Los datos operativos ahora se consultan desde Oracle.",
+        status=503,
     )
-
-    contexto_caidas_bateria = obtener_alertas_caidas_bateria(
-        dias=dias,
-        mostrar_todo=True,
-        umbral_caida=30,
-        ventana_horas=2,
-    )
-
-    contexto_fuera_radio = obtener_alertas_fuera_radio(
-        dias=dias,
-        mostrar_todo=True,
-        ubicaciones_seleccionadas=None,
-    )
-
-    try:
-        dias_int = int(dias)
-    except ValueError:
-        dias_int = 1
-
-    wb = Workbook()
-
-    # =========================
-    # Hoja 1: GPS 0
-    # =========================
-    ws_gps = wb.active
-    ws_gps.title = "GPS 0"
-
-    ws_gps.append([
-        "AMID",
-        "Ubicación esperada",
-        "Registros GPS 0",
-        "Primera detección",
-        "Última detección",
-        "Última batería",
-        "Frecuencia",
-    ])
-
-    for item in contexto_gps_cero["resumen_gps_cero"]:
-        ws_gps.append([
-            item.get("amid"),
-            item.get("ubicacion_esperada"),
-            item.get("cantidad_registros"),
-            preparar_valor_excel(item.get("primera_deteccion")),
-            preparar_valor_excel(item.get("ultima_deteccion")),
-            item.get("ultima_bateria"),
-            item.get("estado_alerta"),
-        ])
-
-    aplicar_estilo_hoja(ws_gps)
-
-    # =========================
-    # Hoja 2: Caídas batería
-    # =========================
-    ws_caidas = wb.create_sheet("Caidas bateria")
-
-    ws_caidas.append([
-        "AMID",
-        "Caídas detectadas",
-        "Mayor caída",
-        "Última caída",
-        "Batería anterior",
-        "Batería actual",
-        "Tiempo transcurrido",
-    ])
-
-    for item in contexto_caidas_bateria["resumen_caidas_bateria"]:
-        ws_caidas.append([
-            item.get("amid"),
-            item.get("cantidad_caidas"),
-            item.get("mayor_caida"),
-            preparar_valor_excel(item.get("ultima_caida")),
-            item.get("bateria_anterior"),
-            item.get("bateria_actual"),
-            item.get("tiempo_transcurrido"),
-        ])
-
-    aplicar_estilo_hoja(ws_caidas)
-
-    # =========================
-    # Hoja 3: Fuera de radio
-    # =========================
-    ws_fuera = wb.create_sheet("Fuera de radio")
-
-    ws_fuera.append([
-        "AMID",
-        "Registros fuera",
-        "Última detección",
-        "Ubicación esperada",
-        "Distancia metros",
-        "Radio metros",
-        "Exceso metros",
-        "Mayor distancia",
-        "Última batería",
-    ])
-
-    for item in contexto_fuera_radio["resumen_fuera_radio"]:
-        ws_fuera.append([
-            item.get("amid"),
-            item.get("cantidad_registros"),
-            preparar_valor_excel(item.get("ultima_deteccion")),
-            item.get("nombre_ubicacion"),
-            item.get("distancia_metros"),
-            item.get("radio_metros"),
-            item.get("exceso_metros"),
-            item.get("mayor_distancia"),
-            item.get("ultima_bateria"),
-        ])
-
-    aplicar_estilo_hoja(ws_fuera)
-
-    output = BytesIO()
-    wb.save(output)
-    wb.close()
-    output.seek(0)
-
-    fecha_exportacion = timezone.localtime(timezone.now()).strftime("%Y%m%d_%H%M%S")
-    filename = f"alertas_{dias_int}_dias_{fecha_exportacion}.xlsx"
-
-    response = HttpResponse(
-        output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    return response
-
-
 @login_required
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)
