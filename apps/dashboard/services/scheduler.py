@@ -20,6 +20,7 @@ scheduler_started = False
 
 job_ubicaciones_running = False
 
+job_limpieza_historial_ubicacion_running = False
 
 def es_error_database_locked(error):
     """
@@ -241,6 +242,63 @@ def registrar_estado_oracle_job():
     finally:
         job_estado_oracle_running = False
 
+def limpiar_historial_ubicacion_oracle_job():
+    """
+    Limpia diariamente el historial cerrado antiguo de ubicaciones esperadas en Oracle.
+
+    No borra vigencias actuales porque el procedure Oracle solo elimina registros
+    con FECHA_FIN_VIGENCIA IS NOT NULL.
+    """
+
+    global job_limpieza_historial_ubicacion_running
+
+    if job_limpieza_historial_ubicacion_running:
+        logger.warning(
+            "La limpieza de historial de ubicaciones Oracle ya está en ejecución. "
+            "Se omite esta corrida."
+        )
+
+        registrar_log_importacion(
+            origen="SCHEDULER",
+            estado="ADVERTENCIA",
+            mensaje=(
+                "Se omitió la limpieza de historial de ubicaciones Oracle "
+                "porque ya había una ejecución en curso."
+            ),
+        )
+
+        return
+
+    job_limpieza_historial_ubicacion_running = True
+    fecha_inicio = timezone.now()
+
+    try:
+        logger.info("Iniciando limpieza automática de historial de ubicaciones Oracle...")
+
+        ejecutar_comando_con_reintentos(
+            "limpiar_historial_ubicacion_oracle",
+            "--dias-retencion",
+            "16",
+            max_intentos=3,
+            esperas=[10, 20, 30],
+        )
+
+        logger.info("Limpieza automática de historial de ubicaciones Oracle finalizada.")
+
+    except Exception as error:
+        logger.exception("Error limpiando historial de ubicaciones Oracle desde scheduler.")
+
+        registrar_log_importacion(
+            origen="SCHEDULER",
+            estado="ERROR",
+            fecha_inicio=fecha_inicio,
+            fecha_fin=timezone.now(),
+            mensaje=f"Error limpiando historial de ubicaciones Oracle desde scheduler: {error}",
+        )
+
+    finally:
+        job_limpieza_historial_ubicacion_running = False
+
 def iniciar_scheduler():
     """
     Inicia los jobs internos del dashboard.
@@ -273,6 +331,16 @@ def iniciar_scheduler():
         replace_existing=True,
         max_instances=1,
     )
+    
+    scheduler.add_job(
+        limpiar_historial_ubicacion_oracle_job,
+        trigger="cron",
+        hour=19,
+        minute=10,
+        id="limpiar_historial_ubicacion_oracle_diario",
+        replace_existing=True,
+        max_instances=1,
+    )
 
     scheduler.start()
     scheduler_started = True
@@ -280,7 +348,7 @@ def iniciar_scheduler():
     logger.info("Scheduler iniciado.")
     logger.info("Job estado Oracle: cada 30 minutos, minutos 5 y 35.")
     logger.info("Job ubicaciones esperadas: todos los días a las 18:45.")
-
+    logger.info("Job limpieza historial ubicaciones Oracle: todos los días a las 19:10.")
     registrar_log_importacion(
         origen="SCHEDULER",
         estado="INFO",
