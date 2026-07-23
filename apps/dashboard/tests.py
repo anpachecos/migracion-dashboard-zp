@@ -7,6 +7,10 @@ from apps.dashboard.context_processors import (
     CACHE_MISS,
     datos_actualizacion_dashboard,
 )
+from apps.dashboard.services.reglas_alertas_service import (
+    actualizar_reglas_alertas,
+    usuario_puede_editar_reglas,
+)
 
 
 class ContextProcessorTests(SimpleTestCase):
@@ -25,3 +29,22 @@ class ContextProcessorTests(SimpleTestCase):
         self.assertIsNone(context["ultima_carga_datos"])
         self.assertIsNone(context["ultima_actualizacion_version_zp"])
         mock_precarga.assert_called_once()
+
+
+class ReglasAlertasServiceTests(SimpleTestCase):
+    def test_usuario_puede_editar_reglas_accepts_admin_group(self):
+        class GrupoAdmin:
+            def filter(self, name):
+                self.name = name
+                return self
+
+            def exists(self):
+                return self.name == "Admin"
+
+        user = SimpleNamespace(is_superuser=False, groups=GrupoAdmin())
+
+        self.assertTrue(usuario_puede_editar_reglas(user))
+
+    def test_actualizar_reglas_alertas_rejects_unknown_keys(self):
+        with self.assertRaises(ValueError):
+            actualizar_reglas_alertas({"regla_CLAVE_DESCONOCIDA": "3"})

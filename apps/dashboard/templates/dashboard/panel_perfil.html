@@ -142,6 +142,88 @@
 
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
+        <h2>Configuración de reglas de alertas</h2>
+        <p>
+            Estos valores alimentan el procedure Oracle PRC_UPD_ALERTAS_VAL. Si solo guardas,
+            se aplicarán en la próxima ejecución del job. Si guardas y recalculas,
+            se aplican inmediatamente.
+        </p>
+    </div>
+
+    {% if reglas_alertas_error %}
+        <div class="admin-mensaje error">{{ reglas_alertas_error }}</div>
+    {% endif %}
+
+    {% if puede_editar_reglas %}
+        <form method="post" class="form-reglas-alertas">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="guardar_reglas_alertas">
+
+            <div class="reglas-alertas-grid">
+                <div class="reglas-alertas-grupo">
+                    <h3>GPS</h3>
+                    <div class="reglas-alertas-tabla">
+                        <div class="regla-alerta-header">
+                            <span>Regla</span>
+                            <span>Valor</span>
+                        </div>
+                        {% for regla in reglas_alertas.GPS %}
+                            <label class="regla-alerta-row">
+                                <span>
+                                    <strong>{{ regla.clave }}</strong>
+                                    <small>{{ regla.descripcion }}</small>
+                                    {% if regla.fecha_actualizacion %}
+                                        <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
+                                    {% endif %}
+                                </span>
+                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero }}">
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="reglas-alertas-grupo">
+                    <h3>Batería</h3>
+                    <div class="reglas-alertas-tabla">
+                        <div class="regla-alerta-header">
+                            <span>Regla</span>
+                            <span>Valor</span>
+                        </div>
+                        {% for regla in reglas_alertas.BATERIA %}
+                            <label class="regla-alerta-row">
+                                <span>
+                                    <strong>{{ regla.clave }}</strong>
+                                    <small>{{ regla.descripcion }}</small>
+                                    {% if regla.fecha_actualizacion %}
+                                        <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
+                                    {% endif %}
+                                </span>
+                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero }}">
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="reglas-alertas-acciones">
+                <button type="submit" class="btn-reglas-guardar">Guardar reglas</button>
+                <button type="submit" name="action" value="guardar_y_recalcular_alertas" class="btn-reglas-recalcular">Guardar y recalcular ahora</button>
+            </div>
+
+            {% if log_recalculo %}
+                <div class="reglas-alertas-log">
+                    <h4>Log de recálculo</h4>
+                    <pre>{{ log_recalculo }}</pre>
+                </div>
+            {% endif %}
+        </form>
+    {% else %}
+        <p class="texto-vacio">No tienes permisos para editar estas reglas.</p>
+    {% endif %}
+</section>
+
+<section class="perfil-bloque">
+    <div class="perfil-bloque-header">
         <h2>Cargar ubicaciones esperadas</h2>
         <p>Sube el Excel de Versión Zonas Pagas. Debe contener la hoja Version_DB.</p>
     </div>

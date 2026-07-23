@@ -22,6 +22,13 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from apps.dashboard.services.alertas_service import obtener_contexto_alertas
+from apps.dashboard.services.reglas_alertas_service import (
+    actualizar_reglas_alertas,
+    iniciar_recalculo_en_segundo_plano,
+    leer_log_recalculo,
+    obtener_reglas_alertas,
+    usuario_puede_editar_reglas,
+)
 
 from .models import LogImportacion
 
@@ -612,10 +619,7 @@ def crear_excel_completo_amid(amid, dias=14, hora_inicio="00:00", hora_fin="23:3
 def panel_perfil(request):
     usuario_actual = request.user
 
-    es_admin = (
-        usuario_actual.is_superuser
-        or usuario_actual.groups.filter(name="Admin").exists()
-    )
+    es_admin = usuario_es_admin(usuario_actual)
 
     roles_usuario_actual = usuario_actual.groups.values_list("name", flat=True)
     roles_usuario_actual = ", ".join(roles_usuario_actual)
@@ -626,6 +630,24 @@ def panel_perfil(request):
         "usuario_actual": usuario_actual,
         "roles_usuario_actual": roles_usuario_actual or "Sin rol asignado",
     }
+
+    if request.method == "POST" and es_admin:
+        accion = request.POST.get("action")
+
+        if accion in {"guardar_reglas_alertas", "guardar_y_recalcular_alertas"}:
+            try:
+                actualizar_reglas_alertas(request.POST)
+                if accion == "guardar_y_recalcular_alertas":
+                    iniciar_recalculo_en_segundo_plano()
+                    messages.success(request, "Reglas guardadas y el recálculo se inició en segundo plano.")
+                else:
+                    messages.success(request, "Reglas de alertas actualizadas correctamente.")
+            except ValueError as error:
+                messages.error(request, str(error))
+            except Exception as error:
+                messages.error(request, f"No fue posible actualizar las reglas: {error}")
+
+            return redirect("dashboard:panel_perfil")
 
     if es_admin:
         usuarios = User.objects.all().order_by("username")
@@ -666,6 +688,14 @@ def panel_perfil(request):
                 "es_admin": usuario.is_superuser,
             })
 
+        try:
+            reglas_alertas = obtener_reglas_alertas()
+        except Exception as error:
+            reglas_alertas = {"GPS": [], "BATERIA": []}
+            context["reglas_alertas_error"] = str(error)
+
+        log_recalculo = leer_log_recalculo()
+
         context.update({
             "total_usuarios": total_usuarios,
             "usuarios_activos": usuarios_activos,
@@ -675,6 +705,9 @@ def panel_perfil(request):
             "lista_usuarios": lista_usuarios,
             "ultimos_logs": ultimos_logs,
             "resultado_comando_admin": resultado_comando_admin,
+            "reglas_alertas": reglas_alertas,
+            "puede_editar_reglas": usuario_puede_editar_reglas(usuario_actual),
+            "log_recalculo": log_recalculo,
         })
 
     return render(request, "dashboard/panel_perfil.html", context)

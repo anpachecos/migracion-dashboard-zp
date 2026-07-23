@@ -288,6 +288,131 @@
     margin-bottom: 16px;
 }
 
+.form-reglas-alertas {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.reglas-alertas-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.reglas-alertas-grupo {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.reglas-alertas-grupo h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    color: #111827;
+}
+
+.reglas-alertas-tabla {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.regla-alerta-header,
+.regla-alerta-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px;
+    gap: 12px;
+    align-items: center;
+}
+
+.regla-alerta-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.regla-alerta-row {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+}
+
+.regla-alerta-row span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.regla-alerta-row strong {
+    font-size: 13px;
+    color: #111827;
+}
+
+.regla-alerta-row small {
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.regla-alerta-row input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.reglas-alertas-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.btn-reglas-guardar,
+.btn-reglas-recalcular {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-reglas-guardar {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.btn-reglas-recalcular {
+    background: #0f766e;
+    color: #ffffff;
+}
+
+.reglas-alertas-log {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: #111827;
+    color: #f9fafb;
+}
+
+.reglas-alertas-log h4 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.reglas-alertas-log pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
 .admin-mensaje {
     padding: 12px;
     border-radius: 10px;
@@ -315,6 +440,15 @@
 
 @media (max-width: 700px) {
     .admin-comandos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .reglas-alertas-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .regla-alerta-header,
+    .regla-alerta-row {
         grid-template-columns: 1fr;
     }
 
