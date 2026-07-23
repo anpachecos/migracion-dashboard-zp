@@ -65,18 +65,23 @@ def obtener_reglas_alertas():
         with obtener_conexion_oracle() as conexion:
             with conexion.cursor() as cursor:
                 cursor.execute(query, parametros)
+                columnas = [col[0].lower() for col in cursor.description]
                 filas = cursor.fetchall()
 
         reglas = []
         for fila in filas:
-            clave, valor_numero, descripcion, activo, fecha_actualizacion = fila
+            datos = dict(zip(columnas, fila))
+            valor_numero = datos.get("valor_numero")
+            if valor_numero is None:
+                valor_numero = datos.get("valor")
+
             reglas.append(
                 {
-                    "clave": clave,
+                    "clave": datos.get("clave"),
                     "valor_numero": valor_numero,
-                    "descripcion": descripcion or "",
-                    "activo": activo,
-                    "fecha_actualizacion": fecha_actualizacion,
+                    "descripcion": datos.get("descripcion") or "",
+                    "activo": datos.get("activo"),
+                    "fecha_actualizacion": datos.get("fecha_actualizacion"),
                 }
             )
 

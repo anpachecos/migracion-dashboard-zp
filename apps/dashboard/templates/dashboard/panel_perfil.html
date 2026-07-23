@@ -4,7 +4,7 @@
 {% block title %}Perfil{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil.css' %}">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil.css' %}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -176,7 +176,7 @@
                                         <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
                                     {% endif %}
                                 </span>
-                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero }}">
+                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero|default_if_none:'' }}">
                             </label>
                         {% endfor %}
                     </div>
@@ -198,7 +198,7 @@
                                         <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
                                     {% endif %}
                                 </span>
-                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero }}">
+                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero|default_if_none:'' }}">
                             </label>
                         {% endfor %}
                     </div>

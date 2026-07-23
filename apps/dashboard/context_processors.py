@@ -141,6 +141,22 @@ def _iniciar_precarga_datos_actualizacion():
     threading.Thread(target=_ejecutar_precarga, daemon=True).start()
 
 
+def _asegurar_datos_actualizacion_disponibles():
+    """
+    Asegura que los valores de Oracle estén cargados en caché para la petición actual.
+    Si estaban vacíos, los obtiene de forma síncrona para que el sidebar no quede en blanco.
+    """
+
+    datos_carga = cache.get(CACHE_KEY_ULTIMA_CARGA_DATOS, CACHE_MISS)
+    datos_version = cache.get(CACHE_KEY_ULTIMA_VERSION_ZP, CACHE_MISS)
+
+    if datos_carga is CACHE_MISS:
+        obtener_ultima_carga_datos_oracle()
+
+    if datos_version is CACHE_MISS:
+        obtener_ultima_version_zp_oracle()
+
+
 def datos_actualizacion_dashboard(request):
     """
     Variables globales disponibles en el sidebar del dashboard.
@@ -154,6 +170,8 @@ def datos_actualizacion_dashboard(request):
         return {}
 
     ultima_actualizacion = timezone.localtime(timezone.now())
+
+    _asegurar_datos_actualizacion_disponibles()
 
     datos_carga = cache.get(CACHE_KEY_ULTIMA_CARGA_DATOS, CACHE_MISS)
     datos_version = cache.get(CACHE_KEY_ULTIMA_VERSION_ZP, CACHE_MISS)
