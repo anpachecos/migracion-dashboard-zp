@@ -1,316 +1,246 @@
-{% extends 'dashboard/base_dashboard.html' %}
+{% extends "dashboard/base_dashboard.html" %}
+
 {% load static %}
 
-{% block title %}Alertas | Dashboard ZP{% endblock %}
+{% block title %}Panel de Alertas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=1">
 {% endblock %}
 
 {% block content %}
 
-<section class="panel-alertas">
+<div class="alertas-page">
 
-    <header class="panel-header">
+    <div class="alertas-header">
         <div>
-            <h1>Alertas</h1>
-            <p>Validadores que requieren revisión operativa.</p>
+            <h1>Panel de Alertas</h1>
+            <p>
+                Alertas calculadas desde Oracle.
+                Última actualización:
+                {% if resumen_alertas.ultima_actualizacion %}
+                    {{ resumen_alertas.ultima_actualizacion|date:"d-m-Y H:i:s" }}
+                {% else %}
+                    Sin información
+                {% endif %}
+            </p>
         </div>
-    </header>
+    </div>
 
-    <section class="filtros-alertas">
-
-        <div class="filtros-dias-grupo">
-            <span class="filtro-label">Días</span>
-
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=1&tipo={{ tipo_alerta }}"
-               class="btn-dia {% if dias == 1 %}activo{% endif %}">
-                1
-            </a>
-
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=3&tipo={{ tipo_alerta }}"
-               class="btn-dia {% if dias == 3 %}activo{% endif %}">
-                3
-            </a>
-
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=7&tipo={{ tipo_alerta }}"
-               class="btn-dia {% if dias == 7 %}activo{% endif %}">
-                7
-            </a>
-
-            <a href="{% url 'dashboard:panel_alertas' %}?dias=14&tipo={{ tipo_alerta }}"
-               class="btn-dia {% if dias == 14 %}activo{% endif %}">
-                14
-            </a>
+    <div class="alertas-cards">
+        <div class="alerta-card">
+            <span>Total validadores</span>
+            <strong>{{ resumen_alertas.total_validadores }}</strong>
         </div>
 
-        <a class="btn-exportar-alertas"
-           href="{% url 'dashboard:exportar_alertas_excel' %}?dias={{ dias }}">
-            Exportar Excel
-        </a>
+        <div class="alerta-card alerta-card-total">
+            <span>Con alerta</span>
+            <strong>{{ resumen_alertas.total_alertas }}</strong>
+        </div>
 
-    </section>
+        <div class="alerta-card alerta-card-critica">
+            <span>Críticas</span>
+            <strong>{{ resumen_alertas.total_criticas }}</strong>
+        </div>
 
-    <section class="resumen-alertas">
+        <div class="alerta-card alerta-card-alta">
+            <span>Altas</span>
+            <strong>{{ resumen_alertas.total_altas }}</strong>
+        </div>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero"
-           class="alerta-card alerta-card-link {% if tipo_alerta == 'gps_cero' %}activa{% endif %}">
-            <span class="alerta-card-label">GPS 0</span>
+        <div class="alerta-card alerta-card-advertencia">
+            <span>Advertencias</span>
+            <strong>{{ resumen_alertas.total_advertencias }}</strong>
+        </div>
 
-            <strong>{{ total_amids_gps_cero }}</strong>
+        <div class="alerta-card">
+            <span>GPS</span>
+            <strong>{{ resumen_alertas.total_gps }}</strong>
+        </div>
 
-            <p>AMIDs únicos con latitud y longitud igual a 0.</p>
+        <div class="alerta-card">
+            <span>Batería</span>
+            <strong>{{ resumen_alertas.total_bateria }}</strong>
+        </div>
+    </div>
 
-            <span class="detalle-card">
-                {{ total_registros_gps_cero }} registros GPS 0 en total
-            </span>
-        </a>
+    <form method="get" class="alertas-filtros">
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria"
-           class="alerta-card alerta-card-link {% if tipo_alerta == 'caidas_bateria' %}activa{% endif %}">
-            <span class="alerta-card-label">Caídas batería</span>
+        <div class="campo-filtro">
+            <label for="amid">AMID</label>
+            <input
+                type="text"
+                id="amid"
+                name="amid"
+                value="{{ filtro_amid }}"
+                placeholder="Ej: 7500679"
+            >
+        </div>
 
-            <strong>{{ total_amids_caidas_bateria }}</strong>
+        <div class="campo-filtro">
+            <label for="nivel">Prioridad</label>
+            <select id="nivel" name="nivel">
+                <option value="">Todas</option>
+                <option value="CRITICA" {% if filtro_nivel == "CRITICA" %}selected{% endif %}>Crítica</option>
+                <option value="ALTA" {% if filtro_nivel == "ALTA" %}selected{% endif %}>Alta</option>
+                <option value="ADVERTENCIA" {% if filtro_nivel == "ADVERTENCIA" %}selected{% endif %}>Advertencia</option>
+                <option value="OK" {% if filtro_nivel == "OK" %}selected{% endif %}>OK</option>
+            </select>
+        </div>
 
-            <p>AMIDs con caídas drásticas de batería.</p>
+        <div class="campo-filtro">
+            <label for="tipo_alerta">Tipo</label>
+            <select id="tipo_alerta" name="tipo_alerta">
+                <option value="">Todas</option>
+                <option value="GPS" {% if filtro_tipo_alerta == "GPS" %}selected{% endif %}>GPS</option>
+                <option value="BATERIA" {% if filtro_tipo_alerta == "BATERIA" %}selected{% endif %}>Batería</option>
+            </select>
+        </div>
 
-            <span class="detalle-card">
-                {{ total_eventos_caidas_bateria }} eventos detectados
-            </span>
-        </a>
+        <div class="campo-check">
+            <label>
+                <input
+                    type="checkbox"
+                    name="mostrar_todos"
+                    value="1"
+                    {% if mostrar_todos %}checked{% endif %}
+                >
+                Mostrar también validadores sin alerta
+            </label>
+        </div>
 
-        <a href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio"
-           class="alerta-card alerta-card-link {% if tipo_alerta == 'fuera_radio' %}activa{% endif %}">
-            <span class="alerta-card-label">Fuera de radio</span>
+        <div class="acciones-filtro">
+            <button type="submit">Buscar</button>
+            <a href="{% url 'dashboard:panel_alertas' %}">Limpiar</a>
+        </div>
 
-            <strong>{{ total_amids_fuera_radio }}</strong>
+    </form>
 
-            <p>AMIDs fuera de su ubicación esperada.</p>
+    <div class="alertas-tabla-contenedor">
 
-            <span class="detalle-card">
-                {{ total_eventos_fuera_radio }} registros fuera de radio
-            </span>
-        </a>
+        <table class="alertas-tabla">
+            <thead>
+                <tr>
+                    <th>Prioridad</th>
+                    <th>AMID</th>
+                    <th>Último estatus</th>
+                    <th>Problema principal</th>
+                    <th>GPS</th>
+                    <th>Batería</th>
+                    <th>Acción</th>
+                    <th>Revisar</th>
+                </tr>
+            </thead>
 
-    </section>
+            <tbody>
+                {% for alerta in alertas %}
+                    <tr>
+                        <td>
+                            <span class="badge-prioridad badge-{{ alerta.nivel_alerta_global|lower }}">
+                                {{ alerta.nivel_alerta_global }}
+                            </span>
+                        </td>
 
-    {% if tipo_alerta == "gps_cero" %}
+                        <td>
+                            <strong>{{ alerta.amid }}</strong>
+                        </td>
 
-        <section class="tabla-card">
-            <div class="tabla-header">
-                <div>
-                    <h2>Validadores con GPS 0</h2>
-                    <p>
-                        AMIDs que registraron latitud y longitud igual a 0 dentro de los últimos
-                        {{ dias }} día{% if dias != 1 %}s{% endif %}.
-                    </p>
-                </div>
+                        <td>
+                            {% if alerta.ultimo_estatus %}
+                                {{ alerta.ultimo_estatus|date:"d-m-Y H:i" }}
+                            {% else %}
+                                Sin dato
+                            {% endif %}
+                        </td>
 
-                {% if hay_mas_registros and not mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero&ver=todo">
-                        Ver más
-                    </a>
-                {% endif %}
+                        <td>
+                            <strong>{{ alerta.motivo_principal }}</strong>
+                            <div class="texto-secundario">
+                                GPS: {{ alerta.motivo_alerta_gps }}<br>
+                                Batería: {{ alerta.motivo_alerta_bateria }}
+                            </div>
+                        </td>
 
-                {% if mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=gps_cero">
-                        Ver solo 5
-                    </a>
-                {% endif %}
-            </div>
+                        <td>
+                            <div>
+                                <strong>0,0 hoy:</strong> {{ alerta.gps_cero_hoy }}
+                            </div>
+                            <div>
+                                <strong>0,0 hist.:</strong> {{ alerta.gps_cero_hist }}
+                            </div>
+                            <div>
+                                <strong>% hist.:</strong> {{ alerta.gps_cero_porc_hist }}%
+                            </div>
+                            <div>
+                                <strong>Último 0,0:</strong>
+                                {% if alerta.ultimo_gps_es_cero == 1 %}
+                                    Sí
+                                {% else %}
+                                    No
+                                {% endif %}
+                            </div>
+                            <div>
+                                <strong>Racha:</strong> {{ alerta.racha_max_gps_cero }}
+                            </div>
+                        </td>
 
-            <div class="tabla-responsive">
-                <table class="tabla-alertas">
-                    <thead>
-                        <tr>
-                            <th>AMID</th>
-                            <th>Ubicación esperada</th>
-                            <th>Registros GPS 0</th>
-                            <th>Primera detección</th>
-                            <th>Última detección</th>
-                            <th>Última batería</th>
-                            <th>Frecuencia</th>
-                        </tr>
-                    </thead>
+                        <td>
+                            <div>
+                                <strong>Actual:</strong>
+                                {% if alerta.bateria_actual is not None %}
+                                    {{ alerta.bateria_actual|floatformat:0 }}%
+                                {% else %}
+                                    Sin dato
+                                {% endif %}
+                            </div>
+                            <div>
+                                <strong>Caídas:</strong>
+                                {{ alerta.caidas_hoy }} hoy / {{ alerta.caidas_hist }} hist.
+                            </div>
+                            <div>
+                                <strong>Bat. 0:</strong>
+                                {{ alerta.bateria_cero_hoy }} hoy / {{ alerta.bateria_cero_hist }} hist.
+                            </div>
+                            <div>
+                                <strong>Última caída:</strong>
+                                {% if alerta.ultima_fecha_caida %}
+                                    {{ alerta.ultima_caida_desde|floatformat:0 }}% → {{ alerta.ultima_caida_hasta|floatformat:0 }}%
+                                    (-{{ alerta.ultima_caida_dif|floatformat:0 }})
+                                    <br>
+                                    {{ alerta.ultima_fecha_caida|date:"d-m-Y H:i" }}
+                                {% else %}
+                                    Sin caída
+                                {% endif %}
+                            </div>
+                        </td>
 
-                    <tbody>
-                        {% for item in resumen_gps_cero %}
-                            <tr>
-                                <td>{{ item.amid }}</td>
-                                <td>{{ item.ubicacion_esperada|default:"-" }}</td>
-                                <td>{{ item.cantidad_registros }}</td>
-                                <td>{{ item.primera_deteccion|date:"d-m-Y H:i" }}</td>
-                                <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
+                        <td>
+                            {{ alerta.accion_sugerida }}
+                        </td>
 
-                                <td>
-                                    {% if item.ultima_bateria is not None %}
-                                        {{ item.ultima_bateria }}%
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
+                        <td>
+                            <div class="acciones-revision">
+                                <a href="{% url 'dashboard:panel_gps' %}?amid={{ alerta.amid }}">
+                                    GPS
+                                </a>
+                                <a href="{% url 'dashboard:panel_baterias' %}?amid={{ alerta.amid }}">
+                                    Batería
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="sin-alertas">
+                            No hay alertas con los filtros seleccionados.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-                                <td>
-                                    <span class="badge-alerta badge-{{ item.estado_alerta|lower }}">
-                                        {{ item.estado_alerta }}
-                                    </span>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7" class="sin-datos">
-                                    No se encontraron AMIDs con GPS 0 en el período seleccionado.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+    </div>
 
-    {% elif tipo_alerta == "caidas_bateria" %}
-
-        <section class="tabla-card">
-            <div class="tabla-header">
-                <div>
-                    <h2>Caídas drásticas de batería</h2>
-                    <p>
-                        AMIDs que bajaron {{ umbral_caida }} puntos o más de batería
-                        en un máximo de {{ ventana_horas }} horas, dentro de los últimos
-                        {{ dias }} día{% if dias != 1 %}s{% endif %}.
-                    </p>
-                </div>
-
-                {% if hay_mas_caidas_bateria and not mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria&ver=todo">
-                        Ver más
-                    </a>
-                {% endif %}
-
-                {% if mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=caidas_bateria">
-                        Ver solo 5
-                    </a>
-                {% endif %}
-            </div>
-
-            <div class="tabla-responsive">
-                <table class="tabla-alertas">
-                    <thead>
-                        <tr>
-                            <th>AMID</th>
-                            <th>Caídas detectadas</th>
-                            <th>Mayor caída</th>
-                            <th>Última caída</th>
-                            <th>Batería anterior</th>
-                            <th>Batería actual</th>
-                            <th>Tiempo</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for item in resumen_caidas_bateria %}
-                            <tr>
-                                <td>{{ item.amid }}</td>
-                                <td>{{ item.cantidad_caidas }}</td>
-                                <td>{{ item.mayor_caida }} pts</td>
-                                <td>{{ item.ultima_caida|date:"d-m-Y H:i" }}</td>
-                                <td>{{ item.bateria_anterior }}%</td>
-                                <td>{{ item.bateria_actual }}%</td>
-                                <td>{{ item.tiempo_transcurrido }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7" class="sin-datos">
-                                    No se encontraron caídas drásticas de batería en el período seleccionado.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-    {% elif tipo_alerta == "fuera_radio" %}
-
-        <section class="tabla-card">
-            <div class="tabla-header">
-                <div>
-                    <h2>Validadores fuera de radio</h2>
-                    <p>
-                        AMIDs con coordenadas válidas, distintas de 0, pero fuera del radio
-                        definido para su ubicación esperada durante los últimos
-                        {{ dias }} día{% if dias != 1 %}s{% endif %}.
-                    </p>
-                </div>
-
-                {% if hay_mas_fuera_radio and not mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio&ver=todo">
-                        Ver más
-                    </a>
-                {% endif %}
-
-                {% if mostrar_todo %}
-                    <a class="btn-ver-mas"
-                       href="{% url 'dashboard:panel_alertas' %}?dias={{ dias }}&tipo=fuera_radio">
-                        Ver solo 5
-                    </a>
-                {% endif %}
-            </div>
-
-            <div class="tabla-responsive">
-                <table class="tabla-alertas">
-                    <thead>
-                        <tr>
-                            <th>AMID</th>
-                            <th>Registros fuera</th>
-                            <th>Última detección</th>
-                            <th>Ubicación esperada</th>
-                            <th>Distancia</th>
-                            <th>Radio</th>
-                            <th>Exceso</th>
-                            <th>Última batería</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for item in resumen_fuera_radio %}
-                            <tr>
-                                <td>{{ item.amid }}</td>
-                                <td>{{ item.cantidad_registros }}</td>
-                                <td>{{ item.ultima_deteccion|date:"d-m-Y H:i" }}</td>
-                                <td>{{ item.nombre_ubicacion|default:"-" }}</td>
-                                <td>{{ item.distancia_metros }} m</td>
-                                <td>{{ item.radio_metros }} m</td>
-                                <td>{{ item.exceso_metros }} m</td>
-
-                                <td>
-                                    {% if item.ultima_bateria is not None %}
-                                        {{ item.ultima_bateria }}%
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="8" class="sin-datos">
-                                    No se encontraron AMIDs fuera de radio en el período seleccionado.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-    {% endif %}
-
-</section>
+</div>
 
 {% endblock %}

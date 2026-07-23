@@ -18,12 +18,13 @@ from openpyxl.utils import get_column_letter
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+
+from apps.dashboard.services.alertas_service import obtener_contexto_alertas
+
 from .models import LogImportacion
-from .services.alertas_service import (
-    obtener_alertas_caidas_bateria,
-    obtener_alertas_fuera_radio,
-    obtener_alertas_gps_cero,
-)
+
 from .services.baterias_service import (
     construir_tabla_bateria,
     obtener_ahora_referencia,
@@ -113,13 +114,8 @@ def ejecutar_comando_admin(request):
 
 @login_required
 def panel_alertas(request):
-    return render(
-        request,
-        "dashboard/panel_alertas_mantencion.html",
-        {
-            "active_page": "alertas",
-        },
-    )
+    contexto = obtener_contexto_alertas(request)
+    return render(request, "dashboard/panel_alertas.html", contexto)
 
 
 @login_required

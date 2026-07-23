@@ -76,3 +76,6 @@ probar_conexion_oracle_server.py
 scripts_locales/
 *.local.py
 medir_oracle.py
+
+# Instructivo
+como activar.txt
