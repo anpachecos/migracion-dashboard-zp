@@ -5,7 +5,7 @@
 {% block title %}Panel de Alertas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=1">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=3">
 {% endblock %}
 
 {% block content %}
@@ -97,6 +97,19 @@
             </select>
         </div>
 
+        <div class="campo-filtro">
+            <label for="problema">Problema</label>
+            <select id="problema" name="problema">
+                <option value="">Todos</option>
+                <option value="gps_cero_hoy" {% if filtro_problema == "gps_cero_hoy" %}selected{% endif %}>GPS 0,0 hoy</option>
+                <option value="gps_historico" {% if filtro_problema == "gps_historico" %}selected{% endif %}>GPS 0,0 histórico</option>
+                <option value="gps_racha" {% if filtro_problema == "gps_racha" %}selected{% endif %}>Racha GPS 0,0</option>
+                <option value="bateria_caida" {% if filtro_problema == "bateria_caida" %}selected{% endif %}>Caída batería</option>
+                <option value="bateria_cero" {% if filtro_problema == "bateria_cero" %}selected{% endif %}>Batería 0</option>
+                <option value="ambos" {% if filtro_problema == "ambos" %}selected{% endif %}>GPS y batería</option>
+            </select>
+        </div>
+
         <div class="campo-check">
             <label>
                 <input
@@ -146,11 +159,17 @@
                         </td>
 
                         <td>
-                            {% if alerta.ultimo_estatus %}
-                                {{ alerta.ultimo_estatus|date:"d-m-Y H:i" }}
-                            {% else %}
-                                Sin dato
-                            {% endif %}
+                            <div class="chip-estatus {{ alerta.clase_estatus }}">
+                                <span class="chip-dot"></span>
+                                {{ alerta.texto_estatus }}
+                            </div>
+                            <div class="texto-secundario">
+                                {% if alerta.ultimo_estatus %}
+                                    {{ alerta.texto_fecha_estatus }}
+                                {% else %}
+                                    Sin dato
+                                {% endif %}
+                            </div>
                         </td>
 
                         <td>
@@ -162,30 +181,33 @@
                         </td>
 
                         <td>
-                            <div>
-                                <strong>0,0 hoy:</strong> {{ alerta.gps_cero_hoy }}
+                            <div class="chip-alerta chip-gps chip-{{ alerta.nivel_alerta_gps|lower }}">
+                                {{ alerta.nivel_alerta_gps }}
                             </div>
-                            <div>
-                                <strong>0,0 hist.:</strong> {{ alerta.gps_cero_hist }}
+                            <div class="texto-secundario">
+                                {{ alerta.motivo_alerta_gps|default:"Sin detalle" }}
                             </div>
-                            <div>
-                                <strong>% hist.:</strong> {{ alerta.gps_cero_porc_hist }}%
-                            </div>
-                            <div>
-                                <strong>Último 0,0:</strong>
-                                {% if alerta.ultimo_gps_es_cero == 1 %}
-                                    Sí
-                                {% else %}
-                                    No
-                                {% endif %}
-                            </div>
-                            <div>
-                                <strong>Racha:</strong> {{ alerta.racha_max_gps_cero }}
-                            </div>
+                            <details class="detalle-alerta">
+                                <summary>Ver detalle</summary>
+                                <ul>
+                                    <li>GPS 0,0 hoy: {{ alerta.gps_cero_hoy }}</li>
+                                    <li>GPS 0,0 histórico: {{ alerta.gps_cero_hist }}</li>
+                                    <li>% GPS 0,0 hoy: {{ alerta.gps_cero_porc_hoy }}%</li>
+                                    <li>% GPS 0,0 histórico: {{ alerta.gps_cero_porc_hist }}%</li>
+                                    <li>Último GPS 0,0: {% if alerta.ultimo_gps_es_cero == 1 %}Sí{% else %}No{% endif %}</li>
+                                    <li>Racha máxima GPS 0,0: {{ alerta.racha_max_gps_cero }}</li>
+                                </ul>
+                            </details>
                         </td>
 
                         <td>
-                            <div>
+                            <div class="chip-alerta chip-bateria chip-{{ alerta.nivel_alerta_bateria|lower }}">
+                                {{ alerta.nivel_alerta_bateria }}
+                            </div>
+                            <div class="texto-secundario">
+                                {{ alerta.motivo_alerta_bateria|default:"Sin detalle" }}
+                            </div>
+                            <div class="texto-secundario">
                                 <strong>Actual:</strong>
                                 {% if alerta.bateria_actual is not None %}
                                     {{ alerta.bateria_actual|floatformat:0 }}%
@@ -193,25 +215,14 @@
                                     Sin dato
                                 {% endif %}
                             </div>
-                            <div>
-                                <strong>Caídas:</strong>
-                                {{ alerta.caidas_hoy }} hoy / {{ alerta.caidas_hist }} hist.
-                            </div>
-                            <div>
-                                <strong>Bat. 0:</strong>
-                                {{ alerta.bateria_cero_hoy }} hoy / {{ alerta.bateria_cero_hist }} hist.
-                            </div>
-                            <div>
-                                <strong>Última caída:</strong>
-                                {% if alerta.ultima_fecha_caida %}
-                                    {{ alerta.ultima_caida_desde|floatformat:0 }}% → {{ alerta.ultima_caida_hasta|floatformat:0 }}%
-                                    (-{{ alerta.ultima_caida_dif|floatformat:0 }})
-                                    <br>
-                                    {{ alerta.ultima_fecha_caida|date:"d-m-Y H:i" }}
-                                {% else %}
-                                    Sin caída
-                                {% endif %}
-                            </div>
+                            <details class="detalle-alerta">
+                                <summary>Ver detalle</summary>
+                                <ul>
+                                    <li>Caídas hoy / histórico: {{ alerta.caidas_hoy }} / {{ alerta.caidas_hist }}</li>
+                                    <li>Batería 0 hoy / histórico: {{ alerta.bateria_cero_hoy }} / {{ alerta.bateria_cero_hist }}</li>
+                                    <li>Última caída: {% if alerta.ultima_fecha_caida %}{{ alerta.ultima_caida_desde|floatformat:0 }}% → {{ alerta.ultima_caida_hasta|floatformat:0 }}% ({{ alerta.ultima_fecha_caida|date:"d-m-Y H:i" }}){% else %}Sin caída{% endif %}</li>
+                                </ul>
+                            </details>
                         </td>
 
                         <td>
@@ -240,6 +251,26 @@
         </table>
 
     </div>
+
+    {% if page_obj.total > 1 %}
+        <div class="paginacion-alertas">
+            {% if page_obj.has_previous %}
+                <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_obj.previous_page_number }}{% else %}?page={{ page_obj.previous_page_number }}{% endif %}">Anterior</a>
+            {% endif %}
+
+            {% for page_number in page_obj.page_range %}
+                {% if page_number == page_obj.numero %}
+                    <span class="actual">{{ page_number }}</span>
+                {% else %}
+                    <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_number }}{% else %}?page={{ page_number }}{% endif %}">{{ page_number }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_obj.next_page_number }}{% else %}?page={{ page_obj.next_page_number }}{% endif %}">Siguiente</a>
+            {% endif %}
+        </div>
+    {% endif %}
 
 </div>
 
