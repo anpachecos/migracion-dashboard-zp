@@ -5,7 +5,7 @@
 {% block title %}Panel de Alertas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=5">
 {% endblock %}
 
 {% block content %}
@@ -33,33 +33,37 @@
             <strong>{{ resumen_alertas.total_validadores }}</strong>
         </div>
 
-        <div class="alerta-card alerta-card-total">
-            <span>Con alerta</span>
-            <strong>{{ resumen_alertas.total_alertas }}</strong>
-        </div>
-
-        <div class="alerta-card alerta-card-critica">
+        <a class="alerta-card alerta-card-critica card-filtro {% if filtro_nivel == 'CRITICA' %}card-activa{% endif %}"
+           href="{% if cards_filtros.critica %}?{{ cards_filtros.critica }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}">
             <span>Críticas</span>
             <strong>{{ resumen_alertas.total_criticas }}</strong>
-        </div>
+        </a>
 
-        <div class="alerta-card alerta-card-alta">
+        <a class="alerta-card alerta-card-alta card-filtro {% if filtro_nivel == 'ALTA' %}card-activa{% endif %}"
+           href="{% if cards_filtros.alta %}?{{ cards_filtros.alta }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}">
             <span>Altas</span>
             <strong>{{ resumen_alertas.total_altas }}</strong>
-        </div>
+        </a>
 
-        <div class="alerta-card alerta-card-advertencia">
+        <a class="alerta-card alerta-card-advertencia card-filtro {% if filtro_nivel == 'ADVERTENCIA' %}card-activa{% endif %}"
+           href="{% if cards_filtros.advertencia %}?{{ cards_filtros.advertencia }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}">
             <span>Advertencias</span>
             <strong>{{ resumen_alertas.total_advertencias }}</strong>
-        </div>
+        </a>
+
+        <a class="alerta-card alerta-card-ok card-filtro {% if filtro_nivel == 'OK' %}card-activa{% endif %}"
+           href="{% if cards_filtros.ok %}?{{ cards_filtros.ok }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}">
+            <span>OK</span>
+            <strong>{{ resumen_alertas.total_ok }}</strong>
+        </a>
 
         <div class="alerta-card">
-            <span>GPS</span>
+            <span>Alertas GPS</span>
             <strong>{{ resumen_alertas.total_gps }}</strong>
         </div>
 
         <div class="alerta-card">
-            <span>Batería</span>
+            <span>Alertas batería</span>
             <strong>{{ resumen_alertas.total_bateria }}</strong>
         </div>
     </div>
@@ -110,6 +114,16 @@
             </select>
         </div>
 
+        <div class="campo-filtro">
+            <label for="estatus">Último estatus</label>
+            <select id="estatus" name="estatus">
+                <option value="">Todos</option>
+                <option value="CON_ESTATUS" {% if filtro_estatus == "CON_ESTATUS" %}selected{% endif %}>Con estatus</option>
+                <option value="ANTIGUO" {% if filtro_estatus == "ANTIGUO" %}selected{% endif %}>Hace más de 1 hora</option>
+                <option value="SIN_ESTATUS" {% if filtro_estatus == "SIN_ESTATUS" %}selected{% endif %}>Sin estatus hoy</option>
+            </select>
+        </div>
+
         <div class="campo-check">
             <label>
                 <input
@@ -137,11 +151,8 @@
                     <th>Prioridad</th>
                     <th>AMID</th>
                     <th>Último estatus</th>
-                    <th>Problema principal</th>
                     <th>GPS</th>
                     <th>Batería</th>
-                    <th>Acción</th>
-                    <th>Revisar</th>
                 </tr>
             </thead>
 
@@ -167,16 +178,8 @@
                                 {% if alerta.ultimo_estatus %}
                                     {{ alerta.texto_fecha_estatus }}
                                 {% else %}
-                                    Sin dato
+                                    Sin dato de hoy
                                 {% endif %}
-                            </div>
-                        </td>
-
-                        <td>
-                            <strong>{{ alerta.motivo_principal }}</strong>
-                            <div class="texto-secundario">
-                                GPS: {{ alerta.motivo_alerta_gps }}<br>
-                                Batería: {{ alerta.motivo_alerta_bateria }}
                             </div>
                         </td>
 
@@ -184,29 +187,31 @@
                             <div class="chip-alerta chip-gps chip-{{ alerta.nivel_alerta_gps|lower }}">
                                 {{ alerta.nivel_alerta_gps }}
                             </div>
-                            <div class="texto-secundario">
-                                {{ alerta.motivo_alerta_gps|default:"Sin detalle" }}
+
+                            {% if alerta.nivel_alerta_gps != "OK" %}
+                                <div class="texto-secundario">
+                                    {{ alerta.motivo_alerta_gps|default:"Sin detalle" }}
+                                </div>
+                            {% endif %}
+
+                            <div class="acciones-revision acciones-en-celda">
+                                <a href="{% url 'dashboard:panel_gps' %}?amid={{ alerta.amid }}">
+                                    Revisar GPS
+                                </a>
                             </div>
-                            <details class="detalle-alerta">
-                                <summary>Ver detalle</summary>
-                                <ul>
-                                    <li>GPS 0,0 hoy: {{ alerta.gps_cero_hoy }}</li>
-                                    <li>GPS 0,0 histórico: {{ alerta.gps_cero_hist }}</li>
-                                    <li>% GPS 0,0 hoy: {{ alerta.gps_cero_porc_hoy }}%</li>
-                                    <li>% GPS 0,0 histórico: {{ alerta.gps_cero_porc_hist }}%</li>
-                                    <li>Último GPS 0,0: {% if alerta.ultimo_gps_es_cero == 1 %}Sí{% else %}No{% endif %}</li>
-                                    <li>Racha máxima GPS 0,0: {{ alerta.racha_max_gps_cero }}</li>
-                                </ul>
-                            </details>
                         </td>
 
                         <td>
                             <div class="chip-alerta chip-bateria chip-{{ alerta.nivel_alerta_bateria|lower }}">
                                 {{ alerta.nivel_alerta_bateria }}
                             </div>
-                            <div class="texto-secundario">
-                                {{ alerta.motivo_alerta_bateria|default:"Sin detalle" }}
-                            </div>
+
+                            {% if alerta.nivel_alerta_bateria != "OK" %}
+                                <div class="texto-secundario">
+                                    {{ alerta.motivo_alerta_bateria|default:"Sin detalle" }}
+                                </div>
+                            {% endif %}
+
                             <div class="texto-secundario">
                                 <strong>Actual:</strong>
                                 {% if alerta.bateria_actual is not None %}
@@ -215,34 +220,17 @@
                                     Sin dato
                                 {% endif %}
                             </div>
-                            <details class="detalle-alerta">
-                                <summary>Ver detalle</summary>
-                                <ul>
-                                    <li>Caídas hoy / histórico: {{ alerta.caidas_hoy }} / {{ alerta.caidas_hist }}</li>
-                                    <li>Batería 0 hoy / histórico: {{ alerta.bateria_cero_hoy }} / {{ alerta.bateria_cero_hist }}</li>
-                                    <li>Última caída: {% if alerta.ultima_fecha_caida %}{{ alerta.ultima_caida_desde|floatformat:0 }}% → {{ alerta.ultima_caida_hasta|floatformat:0 }}% ({{ alerta.ultima_fecha_caida|date:"d-m-Y H:i" }}){% else %}Sin caída{% endif %}</li>
-                                </ul>
-                            </details>
-                        </td>
 
-                        <td>
-                            {{ alerta.accion_sugerida }}
-                        </td>
-
-                        <td>
-                            <div class="acciones-revision">
-                                <a href="{% url 'dashboard:panel_gps' %}?amid={{ alerta.amid }}">
-                                    GPS
-                                </a>
+                            <div class="acciones-revision acciones-en-celda">
                                 <a href="{% url 'dashboard:panel_baterias' %}?amid={{ alerta.amid }}">
-                                    Batería
+                                    Revisar batería
                                 </a>
                             </div>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="sin-alertas">
+                        <td colspan="5" class="sin-alertas">
                             No hay alertas con los filtros seleccionados.
                         </td>
                     </tr>
@@ -255,19 +243,17 @@
     {% if page_obj.total > 1 %}
         <div class="paginacion-alertas">
             {% if page_obj.has_previous %}
+                <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page=1{% else %}?page=1{% endif %}">1</a>
                 <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_obj.previous_page_number }}{% else %}?page={{ page_obj.previous_page_number }}{% endif %}">Anterior</a>
             {% endif %}
 
-            {% for page_number in page_obj.page_range %}
-                {% if page_number == page_obj.numero %}
-                    <span class="actual">{{ page_number }}</span>
-                {% else %}
-                    <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_number }}{% else %}?page={{ page_number }}{% endif %}">{{ page_number }}</a>
-                {% endif %}
-            {% endfor %}
+            <span class="actual">
+                Página {{ page_obj.numero }} de {{ page_obj.total }}
+            </span>
 
             {% if page_obj.has_next %}
                 <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_obj.next_page_number }}{% else %}?page={{ page_obj.next_page_number }}{% endif %}">Siguiente</a>
+                <a href="{% if querystring_sin_page %}?{{ querystring_sin_page }}&page={{ page_obj.total }}{% else %}?page={{ page_obj.total }}{% endif %}">{{ page_obj.total }}</a>
             {% endif %}
         </div>
     {% endif %}

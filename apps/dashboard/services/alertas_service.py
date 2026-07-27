@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
@@ -42,20 +43,54 @@ def construir_condicion_problema(problema):
     return mapping.get(problema)
 
 
+def construir_condicion_estatus(estatus):
+    """Convierte el filtro de último estatus a una condición SQL."""
+
+    if not estatus:
+        return None
+
+    estatus = estatus.upper()
+
+    mapping = {
+        # Tiene estatus de hoy y además fue recibido hace una hora o menos.
+        "CON_ESTATUS": "ULTIMO_ESTATUS >= TRUNC(SYSDATE) AND ULTIMO_ESTATUS >= SYSDATE - (1/24)",
+
+        # Tiene estatus de hoy, pero el último fue recibido hace más de una hora.
+        "ANTIGUO": "ULTIMO_ESTATUS >= TRUNC(SYSDATE) AND ULTIMO_ESTATUS < SYSDATE - (1/24)",
+
+        # No tiene estatus de hoy. Incluye NULL o último estatus de días anteriores.
+        "SIN_ESTATUS": "ULTIMO_ESTATUS IS NULL OR ULTIMO_ESTATUS < TRUNC(SYSDATE)",
+    }
+
+    return mapping.get(estatus)
+
+
 def calcular_estado_estatus(ultimo_estatus):
-    """Devuelve el estado visual para la celda de último estatus."""
+    """
+    Devuelve el estado visual para la celda de último estatus.
+
+    Criterios:
+    - Con estatus: tiene estatus de hoy y fue recibido hace una hora o menos.
+    - Hace más de 1 hora: tiene estatus de hoy, pero fue recibido hace más de una hora.
+    - Sin estatus hoy: no tiene estatus o el último estatus no corresponde al día actual.
+    """
 
     if ultimo_estatus is None:
         return {
             "estado_estatus": "sin_estatus",
-            "texto_estatus": "Sin estatus",
+            "texto_estatus": "Sin estatus hoy",
             "clase_estatus": "estatus-sin",
         }
 
-    try:
-        ahora = datetime.now()
-    except TypeError:
-        ahora = datetime.utcnow()
+    ahora = datetime.now()
+    inicio_hoy = datetime.combine(ahora.date(), datetime.min.time())
+
+    if ultimo_estatus < inicio_hoy:
+        return {
+            "estado_estatus": "sin_estatus",
+            "texto_estatus": "Sin estatus hoy",
+            "clase_estatus": "estatus-sin",
+        }
 
     if ultimo_estatus < ahora - timedelta(hours=1):
         return {
@@ -71,7 +106,14 @@ def calcular_estado_estatus(ultimo_estatus):
     }
 
 
-def _armar_filtros_alertas(amid=None, nivel=None, tipo_alerta=None, problema=None, solo_con_alerta=True):
+def _armar_filtros_alertas(
+    amid=None,
+    nivel=None,
+    tipo_alerta=None,
+    problema=None,
+    estatus=None,
+    solo_con_alerta=True,
+):
     filtros = []
     params = {}
 
@@ -95,15 +137,27 @@ def _armar_filtros_alertas(amid=None, nivel=None, tipo_alerta=None, problema=Non
     if condicion_problema:
         filtros.append(f"({condicion_problema})")
 
+    condicion_estatus = construir_condicion_estatus(estatus)
+    if condicion_estatus:
+        filtros.append(f"({condicion_estatus})")
+
     return filtros, params
 
 
-def contar_alertas_validadores(amid=None, nivel=None, tipo_alerta=None, problema=None, solo_con_alerta=True):
+def contar_alertas_validadores(
+    amid=None,
+    nivel=None,
+    tipo_alerta=None,
+    problema=None,
+    estatus=None,
+    solo_con_alerta=True,
+):
     filtros, params = _armar_filtros_alertas(
         amid=amid,
         nivel=nivel,
         tipo_alerta=tipo_alerta,
         problema=problema,
+        estatus=estatus,
         solo_con_alerta=solo_con_alerta,
     )
 
@@ -130,6 +184,7 @@ def obtener_alertas_validadores(
     nivel=None,
     tipo_alerta=None,
     problema=None,
+    estatus=None,
     solo_con_alerta=True,
     limite=500,
     offset=0,
@@ -145,6 +200,7 @@ def obtener_alertas_validadores(
         nivel=nivel,
         tipo_alerta=tipo_alerta,
         problema=problema,
+        estatus=estatus,
         solo_con_alerta=solo_con_alerta,
     )
 
@@ -156,20 +212,41 @@ def obtener_alertas_validadores(
     if ordenar:
         order_sql = """
             ORDER BY
-                CASE NIVEL_ALERTA_GLOBAL
-                    WHEN 'CRITICA' THEN 1
-                    WHEN 'ALTA' THEN 2
-                    WHEN 'ADVERTENCIA' THEN 3
-                    ELSE 4
+                CASE
+                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
+                     AND NIVEL_ALERTA_GPS = 'CRITICA'
+                     AND NIVEL_ALERTA_BATERIA = 'CRITICA' THEN 1
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
+                     AND NIVEL_ALERTA_GPS = 'CRITICA' THEN 2
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
+                     AND NIVEL_ALERTA_BATERIA = 'CRITICA' THEN 3
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA' THEN 4
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
+                     AND NIVEL_ALERTA_GPS = 'ALTA'
+                     AND NIVEL_ALERTA_BATERIA = 'ALTA' THEN 5
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
+                     AND NIVEL_ALERTA_GPS = 'ALTA' THEN 6
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
+                     AND NIVEL_ALERTA_BATERIA = 'ALTA' THEN 7
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA' THEN 8
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA'
+                     AND NIVEL_ALERTA_GPS = 'ADVERTENCIA'
+                     AND NIVEL_ALERTA_BATERIA = 'ADVERTENCIA' THEN 9
+
+                    WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA' THEN 10
+
+                    ELSE 11
                 END,
                 CASE
-                    WHEN NIVEL_ALERTA_GPS <> 'OK' AND NIVEL_ALERTA_BATERIA <> 'OK' THEN 1
-                    WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 2
-                    WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 3
-                    ELSE 4
-                END,
-                CASE
-                    WHEN ULTIMO_ESTATUS IS NULL THEN 1
+                    WHEN ULTIMO_ESTATUS IS NULL OR ULTIMO_ESTATUS < TRUNC(SYSDATE) THEN 1
                     WHEN ULTIMO_ESTATUS < SYSDATE - (1/24) THEN 2
                     ELSE 3
                 END,
@@ -253,10 +330,14 @@ def obtener_alertas_validadores(
             item["nivel_alerta_gps"] = normalizar_texto(item.get("nivel_alerta_gps"), "OK")
             item["nivel_alerta_bateria"] = normalizar_texto(item.get("nivel_alerta_bateria"), "OK")
             item["motivo_principal"] = normalizar_texto(item.get("motivo_principal"), "Sin alertas")
-            item["accion_sugerida"] = normalizar_texto(item.get("accion_sugerida"), "Sin acción")
+            item["accion_sugerida"] = normalizar_texto(item.get("accion_sugerida"), "")
+
+            item["motivo_alerta_gps"] = normalizar_texto(item.get("motivo_alerta_gps"), "")
+            item["motivo_alerta_bateria"] = normalizar_texto(item.get("motivo_alerta_bateria"), "")
 
             item["gps_cero_hoy"] = normalizar_numero(item.get("gps_cero_hoy"))
             item["gps_cero_hist"] = normalizar_numero(item.get("gps_cero_hist"))
+            item["gps_cero_porc_hoy"] = normalizar_numero(item.get("gps_cero_porc_hoy"))
             item["gps_cero_porc_hist"] = normalizar_numero(item.get("gps_cero_porc_hist"))
             item["ultimo_gps_es_cero"] = normalizar_numero(item.get("ultimo_gps_es_cero"))
             item["racha_max_gps_cero"] = normalizar_numero(item.get("racha_max_gps_cero"))
@@ -293,6 +374,7 @@ def obtener_resumen_alertas():
             SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA' THEN 1 ELSE 0 END) AS total_criticas,
             SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'ALTA' THEN 1 ELSE 0 END) AS total_altas,
             SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA' THEN 1 ELSE 0 END) AS total_advertencias,
+            SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'OK' THEN 1 ELSE 0 END) AS total_ok,
             SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
             SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
             MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
@@ -311,6 +393,7 @@ def obtener_resumen_alertas():
             "total_criticas": 0,
             "total_altas": 0,
             "total_advertencias": 0,
+            "total_ok": 0,
             "total_gps": 0,
             "total_bateria": 0,
             "ultima_actualizacion": None,
@@ -322,17 +405,52 @@ def obtener_resumen_alertas():
         "total_criticas": normalizar_numero(row[2]),
         "total_altas": normalizar_numero(row[3]),
         "total_advertencias": normalizar_numero(row[4]),
-        "total_gps": normalizar_numero(row[5]),
-        "total_bateria": normalizar_numero(row[6]),
-        "ultima_actualizacion": row[7],
+        "total_ok": normalizar_numero(row[5]),
+        "total_gps": normalizar_numero(row[6]),
+        "total_bateria": normalizar_numero(row[7]),
+        "ultima_actualizacion": row[8],
     }
+
+
+def construir_querystring_filtro(
+    amid="",
+    nivel="",
+    tipo_alerta="",
+    problema="",
+    estatus="",
+    mostrar_todos=False,
+    nivel_override=None,
+):
+    params = {}
+
+    if amid:
+        params["amid"] = amid
+
+    nivel_final = nivel_override if nivel_override is not None else nivel
+    if nivel_final:
+        params["nivel"] = nivel_final
+
+    if tipo_alerta:
+        params["tipo_alerta"] = tipo_alerta
+
+    if problema:
+        params["problema"] = problema
+
+    if estatus:
+        params["estatus"] = estatus
+
+    if mostrar_todos or nivel_final == "OK":
+        params["mostrar_todos"] = "1"
+
+    return urlencode(params)
 
 
 def obtener_contexto_alertas(request):
     amid = request.GET.get("amid", "").strip()
-    nivel = request.GET.get("nivel", "").strip()
-    tipo_alerta = request.GET.get("tipo_alerta", "").strip()
+    nivel = request.GET.get("nivel", "").strip().upper()
+    tipo_alerta = request.GET.get("tipo_alerta", "").strip().upper()
     problema = request.GET.get("problema", "").strip()
+    estatus = request.GET.get("estatus", "").strip().upper()
     mostrar_todos = request.GET.get("mostrar_todos") == "1"
     page = request.GET.get("page", "1").strip()
 
@@ -343,27 +461,36 @@ def obtener_contexto_alertas(request):
 
     page_num = max(page_num, 1)
 
+    solo_con_alerta = not mostrar_todos and nivel != "OK"
+
     total_alertas = contar_alertas_validadores(
         amid=amid if amid else None,
         nivel=nivel if nivel else None,
         tipo_alerta=tipo_alerta if tipo_alerta else None,
         problema=problema if problema else None,
-        solo_con_alerta=not mostrar_todos,
+        estatus=estatus if estatus else None,
+        solo_con_alerta=solo_con_alerta,
     )
 
+    total_paginas = max(1, (total_alertas + ALERTAS_POR_PAGINA - 1) // ALERTAS_POR_PAGINA)
+
+    if page_num > total_paginas:
+        page_num = total_paginas
+
     offset = (page_num - 1) * ALERTAS_POR_PAGINA
+
     alertas = obtener_alertas_validadores(
         amid=amid if amid else None,
         nivel=nivel if nivel else None,
         tipo_alerta=tipo_alerta if tipo_alerta else None,
         problema=problema if problema else None,
-        solo_con_alerta=not mostrar_todos,
+        estatus=estatus if estatus else None,
+        solo_con_alerta=solo_con_alerta,
         limite=ALERTAS_POR_PAGINA,
         offset=offset,
         ordenar=True,
     )
 
-    total_paginas = max(1, (total_alertas + ALERTAS_POR_PAGINA - 1) // ALERTAS_POR_PAGINA)
     page_obj = {
         "numero": page_num,
         "total": total_paginas,
@@ -371,26 +498,59 @@ def obtener_contexto_alertas(request):
         "has_next": page_num < total_paginas,
         "previous_page_number": page_num - 1 if page_num > 1 else None,
         "next_page_number": page_num + 1 if page_num < total_paginas else None,
-        "page_range": range(1, total_paginas + 1),
-        "start_index": offset + 1,
+        "start_index": offset + 1 if total_alertas else 0,
         "end_index": min(offset + len(alertas), total_alertas),
     }
 
     resumen = obtener_resumen_alertas()
 
-    query_params = []
-    if amid:
-        query_params.append(f"amid={amid}")
-    if nivel:
-        query_params.append(f"nivel={nivel}")
-    if tipo_alerta:
-        query_params.append(f"tipo_alerta={tipo_alerta}")
-    if problema:
-        query_params.append(f"problema={problema}")
-    if mostrar_todos:
-        query_params.append("mostrar_todos=1")
+    querystring_sin_page = construir_querystring_filtro(
+        amid=amid,
+        nivel=nivel,
+        tipo_alerta=tipo_alerta,
+        problema=problema,
+        estatus=estatus,
+        mostrar_todos=mostrar_todos,
+    )
 
-    querystring_sin_page = "&".join(query_params)
+    cards_filtros = {
+        "critica": construir_querystring_filtro(
+            amid=amid,
+            nivel=nivel,
+            tipo_alerta=tipo_alerta,
+            problema=problema,
+            estatus=estatus,
+            mostrar_todos=mostrar_todos,
+            nivel_override="CRITICA",
+        ),
+        "alta": construir_querystring_filtro(
+            amid=amid,
+            nivel=nivel,
+            tipo_alerta=tipo_alerta,
+            problema=problema,
+            estatus=estatus,
+            mostrar_todos=mostrar_todos,
+            nivel_override="ALTA",
+        ),
+        "advertencia": construir_querystring_filtro(
+            amid=amid,
+            nivel=nivel,
+            tipo_alerta=tipo_alerta,
+            problema=problema,
+            estatus=estatus,
+            mostrar_todos=mostrar_todos,
+            nivel_override="ADVERTENCIA",
+        ),
+        "ok": construir_querystring_filtro(
+            amid=amid,
+            nivel=nivel,
+            tipo_alerta=tipo_alerta,
+            problema=problema,
+            estatus=estatus,
+            mostrar_todos=True,
+            nivel_override="OK",
+        ),
+    }
 
     return {
         "alertas": alertas,
@@ -399,8 +559,10 @@ def obtener_contexto_alertas(request):
         "filtro_nivel": nivel,
         "filtro_tipo_alerta": tipo_alerta,
         "filtro_problema": problema,
+        "filtro_estatus": estatus,
         "mostrar_todos": mostrar_todos,
         "page_obj": page_obj,
         "querystring_sin_page": querystring_sin_page,
+        "cards_filtros": cards_filtros,
         "alertas_por_pagina": ALERTAS_POR_PAGINA,
     }
