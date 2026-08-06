@@ -47,6 +47,7 @@ archivos_temporales/
 !*.example.csv
 datos_query_prueba.csv
 VERSION ZONA PAGA.xlsx
+estructura_proyecto.txt
 
 # OS files
 .DS_Store
@@ -79,3 +80,4 @@ medir_oracle.py
 
 # Instructivo
 como activar.txt
+
