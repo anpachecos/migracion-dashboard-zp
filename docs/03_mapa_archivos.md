@@ -1,0 +1,441 @@
+# 03 - Mapa de archivos del proyecto
+
+## Objetivo
+
+Este documento describe la estructura principal del proyecto Django y explica para qué sirve cada carpeta o archivo importante.
+
+El objetivo es facilitar la mantención del código, entender dónde vive cada parte del sistema y poder explicar el funcionamiento general del dashboard sin tener que revisar todos los archivos desde cero.
+
+---
+
+## Estructura general
+
+```txt
+migracion-dashboard-web/
+|
+├── manage.py
+├── requirements.txt
+├── .env.example
+├── config/
+├── apps/
+│   └── dashboard/
+├── docs/
+└── temp_uploads/
+```
+
+El proyecto está organizado como una aplicación Django. La carpeta principal de trabajo es `apps/dashboard/`, donde se encuentran las vistas, servicios, templates, archivos estáticos y comandos personalizados del dashboard.
+
+---
+
+## Archivos raíz
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `manage.py` | Archivo principal para ejecutar comandos Django, levantar el servidor, aplicar migraciones y ejecutar tareas administrativas. | Vigente |
+| `requirements.txt` | Lista de librerías necesarias para instalar el proyecto. | Vigente |
+| `.env.example` | Ejemplo de variables de entorno necesarias para configurar el sistema. No debe contener credenciales reales. | Vigente |
+| `.env` | Archivo local con variables reales de configuración, incluyendo credenciales. No debe subirse al repositorio. | No subir |
+| `.gitignore` | Define qué archivos o carpetas no deben ser versionados por Git. | Vigente |
+| `db.sqlite3` | Base de datos local usada por Django para usuarios, sesiones, logs u otros modelos internos. | No subir / revisar |
+| `estructura_proyecto.txt` | Archivo temporal generado para revisar la estructura del proyecto. | No subir |
+| `medir_oracle.py` | Script de prueba o medición relacionado con Oracle. Puede contener datos sensibles o de conexión. | No subir / revisar |
+| `probar_oracle.py` | Script de prueba de conexión a Oracle ubicado en la raíz. Puede duplicar el comando Django del mismo nombre. | No subir / revisar |
+
+---
+
+## Carpeta `config/`
+
+La carpeta `config/` contiene la configuración global del proyecto Django.
+
+```txt
+config/
+├── settings.py
+├── urls.py
+├── asgi.py
+├── wsgi.py
+└── __init__.py
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `settings.py` | Configuración general del proyecto: apps instaladas, conexión a base de datos, archivos estáticos, login, variables de entorno, zona horaria y configuración de Oracle. | Vigente |
+| `urls.py` | Define las rutas principales del proyecto y conecta con las rutas de la app `dashboard`. | Vigente |
+| `wsgi.py` | Punto de entrada para despliegue en servidores WSGI. | Vigente |
+| `asgi.py` | Punto de entrada para despliegue ASGI. Actualmente no es el foco principal del proyecto. | Vigente |
+| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+
+---
+
+## Carpeta `apps/dashboard/`
+
+Esta es la aplicación principal del sistema. Contiene la lógica del dashboard, las rutas internas, las vistas, los servicios, los templates, los archivos estáticos y los comandos de administración.
+
+```txt
+apps/dashboard/
+├── admin.py
+├── apps.py
+├── context_processors.py
+├── models.py
+├── tests.py
+├── urls.py
+├── views.py
+├── management/
+├── migrations/
+├── services/
+├── static/
+└── templates/
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `views.py` | Contiene las vistas principales del dashboard. Recibe las solicitudes web, llama a los servicios y renderiza los templates. | Vigente / revisar orden |
+| `urls.py` | Define las rutas internas del dashboard: baterías, GPS, alertas, perfil y exportaciones. | Vigente |
+| `models.py` | Contiene modelos Django usados principalmente para la base local SQLite, como logs u otras estructuras internas. | Vigente / revisar |
+| `context_processors.py` | Agrega información común a los templates, como datos visibles en el layout general o última actualización. | Vigente |
+| `admin.py` | Configuración del panel administrador de Django para modelos locales. | Vigente |
+| `apps.py` | Configuración de la app `dashboard`. Puede iniciar procesos como scheduler si está configurado. | Vigente / revisar |
+| `tests.py` | Archivo para pruebas automáticas. Actualmente puede estar vacío o pendiente de uso. | Pendiente |
+| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+
+---
+
+## Carpeta `services/`
+
+La carpeta `services/` contiene la lógica de negocio del dashboard. Es una de las carpetas más importantes del proyecto porque aquí se consulta Oracle, se preparan datos para los paneles y se centralizan cálculos.
+
+```txt
+apps/dashboard/services/
+├── alertas_bateria_utils.py
+├── alertas_service.py
+├── baterias_service.py
+├── gps_service.py
+├── logs_service.py
+├── oracle_connection.py
+├── reglas_alertas_service.py
+├── scheduler.py
+└── __init__.py
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `oracle_connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza la creación del pool y la obtención de conexiones. | Vigente |
+| `baterias_service.py` | Prepara los datos del Panel Baterías: tarjetas, tabla por media hora, gráficos y alertas del período. | Vigente / revisar lógica de alertas |
+| `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, ubicación esperada y validación contra radio. | Vigente |
+| `alertas_service.py` | Consulta desde Oracle la tabla resumen de alertas y prepara cards, filtros, paginación y tabla del Panel Alertas. | Vigente |
+| `alertas_bateria_utils.py` | Funciones auxiliares para detectar caídas de batería en Python. Debe revisarse porque puede duplicar lógica que también existe o debería existir en Oracle. | Revisar |
+| `reglas_alertas_service.py` | Consulta y actualiza reglas configurables de alertas desde el Panel Perfil/Admin. | Vigente |
+| `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
+| `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
+| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+
+### Observación importante sobre alertas de batería
+
+Actualmente el Panel Baterías y el Panel Alertas pueden no usar exactamente la misma lógica para detectar caídas de batería.
+
+- El Panel Baterías puede calcular alertas desde Python.
+- El Panel Alertas lee alertas ya resumidas desde Oracle.
+
+Esto debe revisarse para evitar diferencias entre ambos paneles. La recomendación futura es tener una única lógica oficial para eventos de batería y que ambos paneles la consulten.
+
+---
+
+## Carpeta `templates/dashboard/`
+
+Contiene los archivos HTML de las pantallas del dashboard.
+
+```txt
+apps/dashboard/templates/dashboard/
+├── base_dashboard.html
+├── panel_alertas.html
+├── panel_alertas_mantencion.html
+├── panel_baterias.html
+├── panel_gps.html
+├── panel_perfil.html
+└── registration/
+    └── login.html
+```
+
+| Template | Descripción | Estado |
+|---|---|---|
+| `base_dashboard.html` | Estructura base del sitio: layout general, sidebar, bloques comunes y carga de estilos/scripts. | Vigente |
+| `panel_baterias.html` | Pantalla del Panel Baterías. Muestra buscador, tarjetas, alertas, tabla por media hora y gráficos. | Vigente |
+| `panel_gps.html` | Pantalla del Panel GPS. Muestra mapa, última ubicación, ubicación esperada y datos asociados. | Vigente |
+| `panel_alertas.html` | Pantalla del Panel Alertas. Muestra cards, filtros, tabla de alertas y paginación. | Vigente |
+| `panel_alertas_mantencion.html` | Versión alternativa o antigua del panel de alertas en mantención. | Revisar |
+| `panel_perfil.html` | Pantalla administrativa para usuarios, logs, carga de archivos y reglas de alertas. | Vigente |
+| `registration/login.html` | Pantalla de inicio de sesión. | Vigente |
+
+---
+
+## Carpeta `static/dashboard/`
+
+Contiene archivos estáticos usados por el frontend: CSS, JavaScript e imágenes.
+
+```txt
+apps/dashboard/static/dashboard/
+├── css/
+├── js/
+└── img/
+```
+
+---
+
+## Carpeta `static/dashboard/css/`
+
+Contiene los estilos visuales de la aplicación.
+
+```txt
+apps/dashboard/static/dashboard/css/
+├── base_dashboard.css
+├── login.css
+├── panel_alertas.css
+├── panel_baterias.css
+├── panel_gps.css
+└── panel_perfil.css
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `base_dashboard.css` | Estilos generales compartidos por todo el dashboard. | Vigente |
+| `login.css` | Estilos de la pantalla de login. | Vigente |
+| `panel_baterias.css` | Estilos propios del Panel Baterías. | Vigente |
+| `panel_gps.css` | Estilos propios del Panel GPS. | Vigente |
+| `panel_alertas.css` | Estilos propios del Panel Alertas. | Vigente |
+| `panel_perfil.css` | Estilos propios del Panel Perfil. | Vigente |
+
+---
+
+## Carpeta `static/dashboard/js/`
+
+Contiene scripts JavaScript usados por los paneles.
+
+```txt
+apps/dashboard/static/dashboard/js/
+├── panel_alertas.js
+├── panel_baterias.js
+└── panel_gps.js
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `panel_baterias.js` | Maneja gráficos y comportamiento dinámico del Panel Baterías. | Vigente |
+| `panel_gps.js` | Maneja mapa, puntos GPS y comportamiento dinámico del Panel GPS. | Vigente |
+| `panel_alertas.js` | JS asociado al Panel Alertas. Revisar si se sigue usando o si quedó de una versión anterior. | Revisar |
+
+---
+
+## Carpeta `static/dashboard/img/`
+
+Contiene logos e imágenes usadas por el dashboard.
+
+```txt
+apps/dashboard/static/dashboard/img/
+├── logo.png
+├── logo2.png
+├── zp.png
+├── zp1.png
+├── zp2.png
+├── zp3.png
+└── zp4.png
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `logo.png` | Imagen o logo usado en la interfaz. | Vigente / revisar uso |
+| `logo2.png` | Imagen o logo alternativo. | Vigente / revisar uso |
+| `zp.png` a `zp4.png` | Imágenes asociadas al dashboard o a Zonas Pagas. | Vigente / revisar uso |
+
+---
+
+## Carpeta `management/commands/`
+
+Contiene comandos personalizados que se ejecutan con `python manage.py`.
+
+```txt
+apps/dashboard/management/commands/
+├── actualizar_validadores.py
+├── cargar_validadores_limpios.py
+├── importar_ubicaciones_esperadas.py
+├── importar_validadores_csv.py
+├── importar_validadores_oracle.py
+├── limpiar_historial_ubicacion_oracle.py
+├── limpiar_registros_antiguos.py
+├── limpiar_tablas_sqlite_antiguas.py
+├── probar_oracle.py
+└── registrar_estado_oracle.py
+```
+
+| Comando | Descripción | Estado |
+|---|---|---|
+| `probar_oracle.py` | Prueba la conexión a Oracle desde Django. | Vigente |
+| `importar_ubicaciones_esperadas.py` | Importa ubicaciones esperadas desde archivo Excel hacia Oracle. | Vigente |
+| `registrar_estado_oracle.py` | Registra estado o disponibilidad de Oracle en logs. | Vigente |
+| `limpiar_historial_ubicacion_oracle.py` | Limpia historial antiguo de ubicaciones esperadas en Oracle. | Vigente |
+| `limpiar_tablas_sqlite_antiguas.py` | Limpieza puntual de tablas antiguas en SQLite. | Uso puntual |
+| `actualizar_validadores.py` | Flujo antiguo o pendiente de revisión. | Revisar |
+| `cargar_validadores_limpios.py` | Flujo antiguo o pendiente de revisión. | Revisar |
+| `importar_validadores_csv.py` | Flujo antiguo o pendiente de revisión. | Revisar |
+| `importar_validadores_oracle.py` | Confirmar si sigue vigente o pertenece al flujo anterior. | Revisar |
+| `limpiar_registros_antiguos.py` | Confirmar si sigue vigente o pertenece al flujo anterior. | Revisar |
+
+---
+
+## Carpeta `migrations/`
+
+Contiene migraciones de Django para la base local SQLite.
+
+```txt
+apps/dashboard/migrations/
+├── 0001_initial.py
+├── 0002_logimportacion.py
+├── 0003_estadovalidadorlimpio_estadovalidadorraw.py
+├── 0004_alter_logimportacion_origen.py
+├── 0005_remove_estadovalidadorlimpio_dashboard_e_estado__20839b_idx_and_more.py
+├── 0006_ubicacionesperadavalidador.py
+├── 0007_historialubicacionesperadavalidador.py
+├── 0008_estadovalidadorlimpio_dashboard_e_amid_e28d3f_idx_and_more.py
+├── 0009_estatuszp_alter_logimportacion_options_and_more.py
+├── 0010_retira_modelos_sqlite_antiguos_solo_estado.py
+└── __init__.py
+```
+
+Estas migraciones representan el historial de estructura de la base local Django. No se deben borrar sin revisar, porque permiten reconstruir o mantener la base local.
+
+| Elemento | Descripción | Estado |
+|---|---|---|
+| Migraciones `0001` a `0010` | Cambios históricos en modelos Django. Algunas pertenecen al flujo anterior con SQLite. | Vigente / histórico |
+| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+
+---
+
+## Carpetas y archivos generados que no se deben versionar
+
+Estas carpetas o archivos son generados automáticamente, corresponden al ambiente local o pueden contener información sensible.
+
+```txt
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+temp_uploads/
+estructura_proyecto.txt
+db.sqlite3
+.env
+medir_oracle.py
+probar_oracle.py
+```
+
+Deben estar incluidos en `.gitignore`.
+
+---
+
+## Archivos que requieren revisión
+
+| Archivo | Motivo |
+|---|---|
+| `alertas_bateria_utils.py` | Puede duplicar lógica de alertas de batería con Oracle. |
+| `panel_alertas_mantencion.html` | Puede ser una versión antigua o temporal. Confirmar si se usa. |
+| `actualizar_validadores.py` | Posible flujo antiguo SQLite. |
+| `cargar_validadores_limpios.py` | Posible flujo antiguo SQLite. |
+| `importar_validadores_csv.py` | Posible flujo antiguo. |
+| `importar_validadores_oracle.py` | Confirmar si sigue vigente o si pertenece al flujo anterior. |
+| `limpiar_registros_antiguos.py` | Confirmar si sigue vigente. |
+| `panel_alertas.js` | Confirmar si todavía se usa en la versión actual del Panel Alertas. |
+| `views.py` | Archivo funcional, pero podría ordenarse por secciones o separarse más adelante. |
+
+---
+
+## Relación entre capas del sistema
+
+El flujo general del código se puede entender así:
+
+```txt
+URL → View → Service → Oracle → Contexto → Template → HTML/CSS/JS
+```
+
+Ejemplo Panel Baterías:
+
+```txt
+/baterias/
+→ panel_baterias()
+→ obtener_contexto_baterias()
+→ Oracle: BATERIA_BLOQUE_30MIN + VW_ESTATUS_ZP_DJANGO
+→ panel_baterias.html
+→ panel_baterias.css + panel_baterias.js
+```
+
+Ejemplo Panel Alertas:
+
+```txt
+/alertas/
+→ panel_alertas()
+→ obtener_contexto_alertas()
+→ Oracle: ALERTA_VALIDADOR_RESUMEN
+→ panel_alertas.html
+→ panel_alertas.css
+```
+
+Ejemplo Panel GPS:
+
+```txt
+/gps/
+→ panel_gps()
+→ obtener_contexto_gps()
+→ Oracle: datos GPS + ubicación esperada
+→ panel_gps.html
+→ panel_gps.css + panel_gps.js
+```
+
+---
+
+## Resumen de archivos más importantes
+
+Para entender y mantener el proyecto, los archivos principales son:
+
+```txt
+apps/dashboard/views.py
+apps/dashboard/urls.py
+apps/dashboard/context_processors.py
+apps/dashboard/models.py
+apps/dashboard/services/oracle_connection.py
+apps/dashboard/services/baterias_service.py
+apps/dashboard/services/gps_service.py
+apps/dashboard/services/alertas_service.py
+apps/dashboard/services/reglas_alertas_service.py
+apps/dashboard/templates/dashboard/base_dashboard.html
+apps/dashboard/templates/dashboard/panel_baterias.html
+apps/dashboard/templates/dashboard/panel_gps.html
+apps/dashboard/templates/dashboard/panel_alertas.html
+apps/dashboard/templates/dashboard/panel_perfil.html
+apps/dashboard/static/dashboard/css/
+apps/dashboard/static/dashboard/js/
+```
+
+---
+
+## Pendientes sugeridos
+
+- Separar código vigente de código antiguo.
+- Revisar comandos que pertenecen al flujo antiguo SQLite.
+- Documentar tablas, vistas, procedures y jobs de Oracle.
+- Unificar la lógica de alertas de batería entre Panel Baterías y Panel Alertas.
+- Revisar si `panel_alertas_mantencion.html` sigue siendo necesario.
+- Revisar si `panel_alertas.js` todavía se usa.
+- Ordenar `views.py` por secciones o evaluar separación futura.
+- Confirmar que `.env`, `db.sqlite3`, `venv/`, `__pycache__/` y archivos temporales estén ignorados por Git.
+
+---
+
+## Nota final
+
+Este documento no busca modificar el proyecto, sino servir como mapa inicial para entenderlo. Antes de refactorizar o eliminar archivos, se recomienda marcar cada elemento como:
+
+```txt
+VIGENTE
+ANTIGUO
+REVISAR
+NO TOCAR
+```
+
+De esta forma se puede ordenar el sistema sin romper funcionalidades que todavía estén en uso.
