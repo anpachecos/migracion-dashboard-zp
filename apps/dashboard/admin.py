@@ -1,3 +1,4 @@
 from django.contrib import admin
 
-# Register your models here.
+# Actualmente no hay modelos registrados en el administrador de Django.
+# Los usuarios, grupos y permisos se administran con los modelos internos de Django.

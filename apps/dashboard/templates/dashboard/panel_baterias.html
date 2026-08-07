@@ -152,9 +152,17 @@
                 <ul class="lista-alertas">
                     {% for alerta in alertas_periodo %}
                         <li>
-                            Entre {{ alerta.fecha_anterior|date:"d-m-Y H:i" }} y {{ alerta.fecha_hora|date:"d-m-Y H:i" }}:
-                            batería bajó de {{ alerta.bateria_anterior }}% a {{ alerta.bateria_actual }}%
-                            (caída de {{ alerta.caida }} puntos en {{ alerta.tiempo_transcurrido }}).
+                            {% if alerta.fecha_anterior|date:"d-m-Y H:i" == alerta.fecha_hora|date:"d-m-Y H:i" %}
+                                {{ alerta.fecha_anterior|date:"d-m" }}: {{ alerta.fecha_anterior|date:"H:i" }}
+                            {% elif alerta.fecha_anterior|date:"d-m-Y" == alerta.fecha_hora|date:"d-m-Y" %}
+                                {{ alerta.fecha_anterior|date:"d-m" }}: {{ alerta.fecha_anterior|date:"H:i" }} a {{ alerta.fecha_hora|date:"H:i" }}
+                            {% else %}
+                                Entre {{ alerta.fecha_anterior|date:"d-m-Y H:i" }} y {{ alerta.fecha_hora|date:"d-m-Y H:i" }}
+                            {% endif %}
+                            , batería {{ alerta.bateria_anterior }}% → {{ alerta.bateria_actual }}%
+                            {% if alerta.motivo %}
+                                ({{ alerta.motivo }})
+                            {% endif %}
                         </li>
                     {% endfor %}
                 </ul>

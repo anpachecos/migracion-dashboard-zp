@@ -2,6 +2,18 @@ from django.db import models
 
 
 class LogImportacion(models.Model):
+    """
+    Modelo local usado para registrar procesos internos del dashboard.
+
+    Esta tabla vive en SQLite y se usa para guardar eventos como:
+    - pruebas de conexión Oracle;
+    - importación de ubicaciones esperadas;
+    - exportaciones Excel;
+    - ejecución del scheduler;
+    - estado general de Oracle;
+    - errores o advertencias del sistema.
+    """
+
     ORIGEN_CHOICES = [
         ("PROBAR_ORACLE", "Probar conexión Oracle"),
         ("UBICACIONES_ORACLE", "Ubicaciones esperadas Oracle"),
@@ -11,7 +23,8 @@ class LogImportacion(models.Model):
         ("SCHEDULER", "Scheduler"),
         ("SISTEMA", "Sistema"),
 
-        # Orígenes antiguos, se mantienen para no romper logs históricos.
+        # Orígenes antiguos.
+        # Se mantienen para no romper logs históricos ya guardados en SQLite.
         ("CSV", "CSV"),
         ("ORACLE", "Oracle antiguo"),
         ("LIMPIEZA", "Limpieza antigua"),
@@ -62,10 +75,16 @@ class LogImportacion(models.Model):
 
 class EstatusZP(models.Model):
     """
-    Modelo de solo lectura sobre la vista Oracle USR_LAB.VW_ESTATUS_ZP_DJANGO.
+    Modelo de referencia sobre la vista Oracle USR_LAB.VW_ESTATUS_ZP_DJANGO.
 
-    No es una tabla SQLite.
-    No se administra con migraciones Django porque managed = False.
+    Importante:
+    - No representa una tabla SQLite.
+    - No se administra con migraciones Django porque managed = False.
+    - Actualmente no se usa en el flujo principal del dashboard.
+    - Las consultas operativas a Oracle se realizan desde los servicios usando
+      python-oracledb y apps.dashboard.services.oracle_connection.
+    - Se mantiene solo como referencia del esquema o para uso futuro si se
+      configura lectura ORM contra Oracle.
     """
 
     id = models.CharField(db_column="ID", max_length=50, primary_key=True)

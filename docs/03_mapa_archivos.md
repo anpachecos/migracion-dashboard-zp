@@ -73,7 +73,7 @@ Por lo tanto, no es necesario mantener un archivo `probar_oracle.py` suelto en l
 
 ## Carpeta `config/`
 
-La carpeta `config/` contiene la configuración global del proyecto Django.
+La carpeta `config/` contiene la configuración global del proyecto Django. Aquí se definen las rutas principales del sistema, la configuración general del proyecto y los puntos de entrada para despliegue.
 
 ```txt
 config/
@@ -86,13 +86,21 @@ config/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `settings.py` | Configuración general del proyecto: apps instaladas, conexión a base de datos, archivos estáticos, login, variables de entorno, zona horaria y configuración de Oracle. | Vigente |
+| `settings.py` | Configuración principal del proyecto: variables de entorno, apps instaladas, middleware, base SQLite local, archivos estáticos, login, sesiones, zona horaria, Oracle y scheduler. | Vigente / revisar antes de despliegue |
 | `urls.py` | Define las rutas principales del proyecto y conecta con las rutas de la app `dashboard`. | Vigente |
-| `wsgi.py` | Punto de entrada para despliegue en servidores WSGI. | Vigente |
+| `wsgi.py` | Punto de entrada para despliegue en servidores WSGI, como Waitress u otros servidores compatibles. | Vigente |
 | `asgi.py` | Punto de entrada para despliegue ASGI. Actualmente no es el foco principal del proyecto. | Vigente |
-| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+| `__init__.py` | Indica que la carpeta es un paquete Python. No requiere cambios. | Vigente |
 
----
+### Observaciones
+
+- Las credenciales reales y datos del entorno deben mantenerse en `.env`, no directamente en `settings.py`.
+- `.env` no debe subirse al repositorio.
+- `.env.example` debe quedar solo como plantilla, sin contraseñas reales.
+- `ALLOWED_HOSTS` se configura desde `.env` para permitir acceso desde localhost, IPs internas o nombre del servidor.
+- SQLite se usa para datos internos de Django, como usuarios, sesiones, permisos, logs y migraciones.
+- Los datos operativos del dashboard se consultan desde Oracle.
+- Antes de activar o mantener activo `DASHBOARD_SCHEDULER_ENABLED`, se debe revisar `apps/dashboard/services/scheduler.py`.
 
 ## Carpeta `apps/dashboard/`
 
@@ -116,15 +124,24 @@ apps/dashboard/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `views.py` | Contiene las vistas principales del dashboard. Recibe las solicitudes web, llama a los servicios y renderiza los templates. | Vigente / revisar orden |
-| `urls.py` | Define las rutas internas del dashboard: baterías, GPS, alertas, perfil y exportaciones. | Vigente |
-| `models.py` | Contiene modelos Django usados principalmente para la base local SQLite, como logs u otras estructuras internas. | Vigente / revisar |
-| `context_processors.py` | Agrega información común a los templates, como datos visibles en el layout general o última actualización. | Vigente |
-| `admin.py` | Configuración del panel administrador de Django para modelos locales. | Vigente |
-| `apps.py` | Configuración de la app `dashboard`. Puede iniciar procesos como scheduler si está configurado. | Vigente / revisar |
-| `tests.py` | Archivo para pruebas automáticas. Actualmente puede estar vacío o pendiente de uso. | Pendiente |
-| `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+| `views.py` | Contiene las vistas principales del dashboard. Recibe solicitudes web, valida permisos, llama a servicios, renderiza templates y gestiona acciones como exportaciones o comandos administrativos. Actualmente también contiene lógica auxiliar de exportación Excel que podría moverse a un servicio dedicado. | Vigente / refactorizar |
+| `urls.py` | Define las rutas internas de la app `dashboard`, incluyendo paneles principales, acciones administrativas y exportaciones Excel. | Vigente |
+| `models.py` | Define modelos Django. Actualmente contiene `LogImportacion`, usado en SQLite para logs internos, y `EstatusZP`, modelo no administrado que referencia la vista Oracle `VW_ESTATUS_ZP_DJANGO`. | Vigente / revisar `EstatusZP` |
+| `context_processors.py` | Agrega datos comunes al layout general del dashboard, como la hora de renderizado, último dato recibido desde Oracle y última actualización de versión ZP. Usa caché para evitar consultas Oracle en cada petición. | Vigente / revisar simplificación |
+| `admin.py` | Configura qué modelos locales se muestran en el administrador de Django. Actualmente no registra modelos propios de la app. | Vigente / opcional |
+| `apps.py` | Configura la app `dashboard`. Si `DASHBOARD_SCHEDULER_ENABLED=True`, puede iniciar el scheduler interno al levantar Django. | Vigente / revisar en despliegue |
+| `tests.py` | Contiene pruebas unitarias básicas para funciones del dashboard, como context processor, filtros de alertas y permisos de edición de reglas. | Vigente / ampliar |
+| `__init__.py` | Indica que la carpeta es un paquete Python. No requiere cambios. | Vigente |
 
+### Observaciones
+
+- `views.py` funciona correctamente, pero concentra varias responsabilidades. Más adelante se recomienda mover la lógica de exportación Excel a un servicio dedicado, por ejemplo `services/exportaciones_excel_service.py`.
+- `EstatusZP` aparece como modelo de referencia sobre Oracle, pero actualmente las consultas operativas se realizan principalmente desde los servicios usando `python-oracledb`.
+- `context_processors.py` usa caché para no consultar Oracle en cada petición. Se puede simplificar si se elimina la lógica de precarga en segundo plano.
+- `admin.py` está vacío porque no hay modelos propios registrados en el administrador de Django. Si más adelante se quiere revisar `LogImportacion` desde `/admin`, se puede registrar ahí.
+- `apps.py` puede iniciar el scheduler interno. Antes de usarlo en despliegue, se debe revisar que no active tareas antiguas o innecesarias.
+- La carga de ubicaciones esperadas actualmente se realiza desde el panel Perfil mediante subida manual de Excel, no desde un archivo fijo programado en el scheduler.
+- `tests.py` ya contiene pruebas básicas, pero todavía no cubre todo el sistema. Se recomienda ampliarlas progresivamente.
 ---
 
 ## Carpeta `services/`
@@ -167,32 +184,38 @@ Esto debe revisarse para evitar diferencias entre ambos paneles. La recomendaci�
 
 ---
 
-## Carpeta `templates/dashboard/`
+## Carpeta `templates/`
 
-Contiene los archivos HTML de las pantallas del dashboard.
+La carpeta `templates/` contiene las plantillas HTML usadas por Django para mostrar las páginas del dashboard.
 
 ```txt
 apps/dashboard/templates/dashboard/
 ├── base_dashboard.html
-├── panel_alertas.html
-├── panel_alertas_mantencion.html
+├── login.html
 ├── panel_baterias.html
 ├── panel_gps.html
-├── panel_perfil.html
-└── registration/
-    └── login.html
+├── panel_alertas.html
+├── panel_alertas_mantencion.html
+└── panel_perfil.html
 ```
 
-| Template | Descripción | Estado |
+| Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.html` | Estructura base del sitio: layout general, sidebar, bloques comunes y carga de estilos/scripts. | Vigente |
-| `panel_baterias.html` | Pantalla del Panel Baterías. Muestra buscador, tarjetas, alertas, tabla por media hora y gráficos. | Vigente |
-| `panel_gps.html` | Pantalla del Panel GPS. Muestra mapa, última ubicación, ubicación esperada y datos asociados. | Vigente |
-| `panel_alertas.html` | Pantalla del Panel Alertas. Muestra cards, filtros, tabla de alertas y paginación. | Vigente |
-| `panel_alertas_mantencion.html` | Versión alternativa o antigua del panel de alertas en mantención. | Revisar |
-| `panel_perfil.html` | Pantalla administrativa para usuarios, logs, carga de archivos y reglas de alertas. | Vigente |
-| `registration/login.html` | Pantalla de inicio de sesión. | Vigente |
+| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. | Vigente |
+| `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
+| `panel_baterias.html` | Template del panel de baterías. Muestra búsqueda por AMID, tarjetas resumen, alertas del período, tabla por bloques de 30 minutos y gráficos. | Vigente |
+| `panel_gps.html` | Template del panel GPS. Muestra filtros por AMID, fechas, horarios, métricas del período, mapa Leaflet y resumen de ubicación esperada. | Vigente |
+| `panel_alertas.html` | Template activo del panel de alertas. Muestra resumen de prioridades, filtros, tabla de alertas, accesos a revisión GPS/Batería y paginación. | Vigente |
+| `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
+| `panel_perfil.html` | Template del perfil de usuario y administración. Muestra datos del usuario conectado, métricas de usuarios, logs, carga de ubicaciones y configuración de reglas de alertas para administradores. | Vigente / extenso |
 
+### Observaciones
+
+- Los templates principales funcionan como capa de presentación. La lógica pesada debe mantenerse en `views.py` o, idealmente, en los servicios.
+- `base_dashboard.html` centraliza la navegación y el estado del sistema, por lo que evita repetir estructura en cada panel.
+- `panel_alertas_mantencion.html` parece ser una plantilla antigua. Se debe revisar si todavía existe alguna vista o ruta que la use.
+- `panel_perfil.html` es el template más extenso, porque mezcla datos de usuario, administración, logs, carga de ubicaciones y reglas de alertas. Más adelante podría dividirse en fragmentos reutilizables.
+- Si se busca mejorar mantenibilidad, se podrían crear templates parciales en una carpeta como `templates/dashboard/partials/`.
 ---
 
 ## Carpeta `static/dashboard/`

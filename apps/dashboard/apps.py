@@ -1,6 +1,7 @@
+import os
+
 from django.apps import AppConfig
 from django.conf import settings
-import os
 
 
 class DashboardConfig(AppConfig):
@@ -9,13 +10,18 @@ class DashboardConfig(AppConfig):
 
     def ready(self):
         """
-        Antes el scheduler se iniciaba automáticamente al levantar Django.
+        Inicializa procesos internos de la app dashboard.
 
-        Ahora queda desactivado por defecto, porque:
-        - Baterías consulta Oracle directo.
-        - GPS consulta Oracle directo.
-        - Ubicaciones esperadas se cargan manualmente desde Perfil.
-        - SQLite queda principalmente para usuarios, sesiones y logs internos.
+        El scheduler se inicia solo si DASHBOARD_SCHEDULER_ENABLED=True.
+        Actualmente debe usarse solo para tareas automáticas internas, como:
+        - registrar estado de Oracle;
+        - limpiar historial de ubicaciones Oracle.
+
+        La carga de ubicaciones esperadas se realiza manualmente desde el panel
+        Perfil, mediante la subida de un archivo Excel por parte de un usuario admin.
+
+        La validación con RUN_MAIN evita duplicar el scheduler cuando Django
+        se ejecuta con runserver en modo desarrollo.
         """
 
         if os.environ.get("RUN_MAIN") != "true":

@@ -1,4 +1,4 @@
-import threading
+import logging
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -6,14 +6,14 @@ from django.utils import timezone
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 
+logger = logging.getLogger(__name__)
+
 CACHE_KEY_ULTIMA_CARGA_DATOS = "dashboard_ultima_carga_datos_oracle"
 CACHE_KEY_ULTIMA_VERSION_ZP = "dashboard_ultima_version_zp_oracle"
 CACHE_MISS = object()
 
+# 5 minutos
 CACHE_TIMEOUT_SEGUNDOS = 300
-
-_warmup_thread_running = False
-_warmup_thread_lock = threading.Lock()
 
 
 def normalizar_fecha_oracle(fecha):
@@ -37,7 +37,7 @@ def obtener_ultima_carga_datos_oracle():
     """
     Obtiene el último bloque horario con datos desde Oracle.
 
-    Se cachea por 60 segundos para evitar abrir conexión Oracle en cada cambio
+    Se cachea por 5 minutos para evitar abrir conexión Oracle en cada cambio
     de página.
     """
 
@@ -63,7 +63,11 @@ def obtener_ultima_carga_datos_oracle():
         if resultado and resultado[0]:
             ultima_carga = normalizar_fecha_oracle(resultado[0])
 
-    except Exception:
+    except Exception as error:
+        logger.exception(
+            "Error obteniendo última carga de datos Oracle para sidebar: %s",
+            error,
+        )
         ultima_carga = None
 
     cache.set(
@@ -78,6 +82,9 @@ def obtener_ultima_carga_datos_oracle():
 def obtener_ultima_version_zp_oracle():
     """
     Obtiene la última fecha de carga de la versión ZP desde Oracle.
+
+    Se cachea por 5 minutos para evitar abrir conexión Oracle en cada cambio
+    de página.
     """
 
     valor_cache = cache.get(CACHE_KEY_ULTIMA_VERSION_ZP, CACHE_MISS)
@@ -101,7 +108,11 @@ def obtener_ultima_version_zp_oracle():
         if resultado and resultado[0]:
             ultima_version = normalizar_fecha_oracle(resultado[0])
 
-    except Exception:
+    except Exception as error:
+        logger.exception(
+            "Error obteniendo última versión ZP Oracle para sidebar: %s",
+            error,
+        )
         ultima_version = None
 
     cache.set(
@@ -113,56 +124,11 @@ def obtener_ultima_version_zp_oracle():
     return ultima_version
 
 
-def _iniciar_precarga_datos_actualizacion():
-    """
-    Precalienta los valores de Oracle en segundo plano para que el dashboard
-    no espere a la conexión en la petición inicial.
-    """
-
-    global _warmup_thread_running
-
-    if _warmup_thread_running:
-        return
-
-    with _warmup_thread_lock:
-        if _warmup_thread_running:
-            return
-        _warmup_thread_running = True
-
-    def _ejecutar_precarga():
-        try:
-            obtener_ultima_carga_datos_oracle()
-            obtener_ultima_version_zp_oracle()
-        finally:
-            global _warmup_thread_running
-            with _warmup_thread_lock:
-                _warmup_thread_running = False
-
-    threading.Thread(target=_ejecutar_precarga, daemon=True).start()
-
-
-def _asegurar_datos_actualizacion_disponibles():
-    """
-    Asegura que los valores de Oracle estén cargados en caché para la petición actual.
-    Si estaban vacíos, los obtiene de forma síncrona para que el sidebar no quede en blanco.
-    """
-
-    datos_carga = cache.get(CACHE_KEY_ULTIMA_CARGA_DATOS, CACHE_MISS)
-    datos_version = cache.get(CACHE_KEY_ULTIMA_VERSION_ZP, CACHE_MISS)
-
-    if datos_carga is CACHE_MISS:
-        obtener_ultima_carga_datos_oracle()
-
-    if datos_version is CACHE_MISS:
-        obtener_ultima_version_zp_oracle()
-
-
 def datos_actualizacion_dashboard(request):
     """
     Variables globales disponibles en el sidebar del dashboard.
 
-    Importante:
-    Si el usuario no está autenticado, no consultamos Oracle.
+    Si el usuario no está autenticado, no se consulta Oracle.
     Esto evita lentitud innecesaria en login/logout.
     """
 
@@ -171,16 +137,8 @@ def datos_actualizacion_dashboard(request):
 
     ultima_actualizacion = timezone.localtime(timezone.now())
 
-    _asegurar_datos_actualizacion_disponibles()
-
-    datos_carga = cache.get(CACHE_KEY_ULTIMA_CARGA_DATOS, CACHE_MISS)
-    datos_version = cache.get(CACHE_KEY_ULTIMA_VERSION_ZP, CACHE_MISS)
-
-    if datos_carga is CACHE_MISS or datos_version is CACHE_MISS:
-        _iniciar_precarga_datos_actualizacion()
-
     return {
         "ultima_actualizacion_dashboard": ultima_actualizacion,
-        "ultima_carga_datos": datos_carga if datos_carga is not CACHE_MISS else None,
-        "ultima_actualizacion_version_zp": datos_version if datos_version is not CACHE_MISS else None,
+        "ultima_carga_datos": obtener_ultima_carga_datos_oracle(),
+        "ultima_actualizacion_version_zp": obtener_ultima_version_zp_oracle(),
     }

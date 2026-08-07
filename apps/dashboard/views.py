@@ -16,12 +16,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
-
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-
 from apps.dashboard.services.alertas_service import obtener_contexto_alertas
+from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 from apps.dashboard.services.reglas_alertas_service import (
     actualizar_reglas_alertas,
     iniciar_recalculo_en_segundo_plano,
@@ -31,7 +27,6 @@ from apps.dashboard.services.reglas_alertas_service import (
 )
 
 from .models import LogImportacion
-
 from .services.baterias_service import (
     construir_tabla_bateria,
     obtener_ahora_referencia,
@@ -40,7 +35,6 @@ from .services.baterias_service import (
     obtener_rango_fechas_panel,
 )
 from .services.gps_service import obtener_contexto_gps
-
 
 def usuario_es_admin(user):
     return user.is_superuser or user.groups.filter(name="Admin").exists()
