@@ -12,10 +12,11 @@ El objetivo es facilitar la mantención del código, entender dónde vive cada p
 
 ```txt
 migracion-dashboard-web/
-|
+│
 ├── manage.py
 ├── requirements.txt
 ├── .env.example
+├── .gitignore
 ├── config/
 ├── apps/
 │   └── dashboard/
@@ -24,6 +25,8 @@ migracion-dashboard-web/
 ```
 
 El proyecto está organizado como una aplicación Django. La carpeta principal de trabajo es `apps/dashboard/`, donde se encuentran las vistas, servicios, templates, archivos estáticos y comandos personalizados del dashboard.
+
+Los archivos de configuración general se encuentran en `config/`. La documentación técnica del proyecto se mantiene en `docs/`.
 
 ---
 
@@ -36,11 +39,36 @@ El proyecto está organizado como una aplicación Django. La carpeta principal d
 | `.env.example` | Ejemplo de variables de entorno necesarias para configurar el sistema. No debe contener credenciales reales. | Vigente |
 | `.env` | Archivo local con variables reales de configuración, incluyendo credenciales. No debe subirse al repositorio. | No subir |
 | `.gitignore` | Define qué archivos o carpetas no deben ser versionados por Git. | Vigente |
-| `db.sqlite3` | Base de datos local usada por Django para usuarios, sesiones, logs u otros modelos internos. | No subir / revisar |
-| `estructura_proyecto.txt` | Archivo temporal generado para revisar la estructura del proyecto. | No subir |
-| `medir_oracle.py` | Script de prueba o medición relacionado con Oracle. Puede contener datos sensibles o de conexión. | No subir / revisar |
-| `probar_oracle.py` | Script de prueba de conexión a Oracle ubicado en la raíz. Puede duplicar el comando Django del mismo nombre. | No subir / revisar |
+| `db.sqlite3` | Base de datos local usada por Django para usuarios, sesiones, permisos, grupos, logs y migraciones internas. No se versiona porque contiene información local del entorno. | No subir |
+| `estructura_proyecto.txt` | Archivo temporal generado para revisar la estructura del proyecto. No forma parte del funcionamiento del dashboard. | No subir |
 
+---
+
+## Archivos locales fuera del proyecto
+
+Durante el desarrollo pueden existir scripts auxiliares usados solo para pruebas o diagnóstico. Estos archivos no forman parte del flujo normal del dashboard y no deben subirse al repositorio.
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `medir_oracle.py` | Script local usado para medir tiempos de conexión, pool y consultas Oracle. No es llamado por la web ni por el scheduler. Se mantiene fuera del proyecto como respaldo o herramienta de diagnóstico local. | Fuera del proyecto / No subir |
+
+---
+
+## Nota sobre scripts de Oracle
+
+La prueba oficial de conexión a Oracle dentro del proyecto se realiza mediante el comando Django:
+
+```powershell
+python manage.py probar_oracle
+```
+
+Este comando se encuentra en:
+
+```txt
+apps/dashboard/management/commands/probar_oracle.py
+```
+
+Por lo tanto, no es necesario mantener un archivo `probar_oracle.py` suelto en la raíz del proyecto.
 ---
 
 ## Carpeta `config/`
@@ -267,7 +295,7 @@ apps/dashboard/management/commands/
 
 | Comando | Descripción | Estado |
 |---|---|---|
-| `probar_oracle.py` | Prueba la conexión a Oracle desde Django. | Vigente |
+| `probar_oracle.py` | Comando Django vigente para probar la conexión Oracle desde consola o desde acciones administrativas. Ejecuta `SELECT SYSDATE FROM dual` y registra el resultado en logs. | Vigente |
 | `importar_ubicaciones_esperadas.py` | Importa ubicaciones esperadas desde archivo Excel hacia Oracle. | Vigente |
 | `registrar_estado_oracle.py` | Registra estado o disponibilidad de Oracle en logs. | Vigente |
 | `limpiar_historial_ubicacion_oracle.py` | Limpia historial antiguo de ubicaciones esperadas en Oracle. | Vigente |
