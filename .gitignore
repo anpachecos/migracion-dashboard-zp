@@ -1,83 +1,132 @@
-# Python
+# ============================================================
+# Python: bytecode y cachés generados automáticamente
+# ============================================================
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.pyc
+*$py.class
 
-# Virtual environments
+# Cachés de herramientas de análisis, tipos y pruebas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+
+# ============================================================
+# Entornos virtuales: dependencias instaladas localmente
+# ============================================================
 venv/
-env/
 venv_pc/
+env/
 .venv/
 
-# Django
+# ============================================================
+# Django y ejecución local
+# ============================================================
+# Logs producidos por Django, comandos y servicios
 *.log
+
+# Configuración local alternativa
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
 
-# Environment variables
+# Base SQLite local y archivos auxiliares WAL/SHM/journal
+*.sqlite3
+*.sqlite3-*
+
+# Las migraciones Django NO se ignoran: forman parte del código.
+
+# ============================================================
+# Variables de entorno y secretos
+# ============================================================
+# Ignora .env y todas sus variantes (.env.local, .env.production, etc.)
 .env
-.env.local
-.env.production
+.env.*
 
-# Static and media generated files
-media/*
-!media/.gitkeep
+# Conserva únicamente la plantilla sin credenciales
+!.env.example
 
+# Llaves y contenedores de certificados privados
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# ============================================================
+# Archivos estáticos, medios y cargas generadas
+# ============================================================
+# Resultado de python manage.py collectstatic
 staticfiles/
 static_collected/
 
-# Uploaded/generated files
+# Contenido cargado por usuarios; permite conservar el marcador
+media/*
+!media/.gitkeep
+
+# Temporales de carga y logs de procesos en segundo plano
+temp_uploads/*
+!temp_uploads/.gitkeep
 uploads/
+
+# Exportaciones y otros resultados generados
 outputs/
 exports/
 reportes_generados/
 archivos_temporales/
 
-# Excel / data files
+# ============================================================
+# Datos operativos y planillas
+# ============================================================
+# Evita publicar exportaciones o fuentes con datos reales
 *.xlsx
 *.xls
-*.csv
 *.xlsm
+*.csv
 
-# Except example files if needed
+# Permite plantillas o muestras sanitizadas con nombre explícito
 !*.example.xlsx
 !*.example.csv
+
+# Nombres históricos conocidos del proyecto
 datos_query_prueba.csv
 VERSION ZONA PAGA.xlsx
 estructura_proyecto.txt
 
-# OS files
+# ============================================================
+# Cobertura, empaquetado y archivos temporales
+# ============================================================
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.tmp
+*.bak
+*.swp
+*~
+
+# ============================================================
+# Editores, notebooks y sistema operativo
+# ============================================================
+.vscode/
+.idea/
+.ipynb_checkpoints/
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# IDEs
-.vscode/
-.idea/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Tests / coverage
-.coverage
-htmlcov/
-.pytest_cache/
-
-# Build files
-dist/
-build/
-*.egg-info/
-
-# Scripts locales / pruebas
+# ============================================================
+# Scripts e instructivos exclusivamente locales
+# ============================================================
+scripts_locales/
+respaldo_scripts_locales/
+*.local.py
 probar_oracle.py
 probar_conexion_oracle_server.py
-scripts_locales/
-*.local.py
 medir_oracle.py
-
-# Instructivo
 como activar.txt
-

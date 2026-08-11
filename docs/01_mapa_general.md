@@ -1,5 +1,7 @@
 # Mapa general del Dashboard ZP
 
+> Ver también: [arquitectura](02_arquitectura.md), [operación](04_instalacion_operacion.md) y [datos](05_datos_integraciones.md).
+
 ## Objetivo
 
 El Dashboard ZP permite revisar información operativa de validadores MK 2.0 mediante paneles de batería, GPS y alertas.
