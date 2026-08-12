@@ -15,6 +15,9 @@ ORDEN_PRIORIDAD = {
 ALERTAS_POR_PAGINA = 10
 CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
 CACHE_TIMEOUT_RESUMEN_ALERTAS = 60
+CACHE_KEY_UBICACIONES_ALERTAS = "dashboard:ubicaciones-alertas:v1"
+CACHE_TIMEOUT_UBICACIONES_ALERTAS = 300
+UBICACION_SIN_ASIGNAR = "Sin ubicaci\u00f3n asignada"
 
 
 def normalizar_numero(valor, default=0):
@@ -117,6 +120,8 @@ def _armar_filtros_alertas(
     problema=None,
     estatus=None,
     solo_con_alerta=True,
+    amids_excluidos=None,
+    ubicaciones_excluidas=None,
 ):
     filtros = []
     params = {}
@@ -125,7 +130,7 @@ def _armar_filtros_alertas(
         filtros.append("TIENE_ALERTA = 1")
 
     if amid:
-        filtros.append("AMID = :amid")
+        filtros.append("r.AMID = :amid")
         params["amid"] = int(amid)
 
     if nivel:
@@ -145,6 +150,28 @@ def _armar_filtros_alertas(
     if condicion_estatus:
         filtros.append(f"({condicion_estatus})")
 
+    binds_amids = []
+    for indice, amid_excluido in enumerate(amids_excluidos or []):
+        nombre_bind = f"amid_excluido_{indice}"
+        binds_amids.append(f":{nombre_bind}")
+        params[nombre_bind] = int(amid_excluido)
+
+    if binds_amids:
+        filtros.append(f"r.AMID NOT IN ({', '.join(binds_amids)})")
+
+    binds_ubicaciones = []
+    for indice, ubicacion in enumerate(ubicaciones_excluidas or []):
+        nombre_bind = f"ubicacion_excluida_{indice}"
+        binds_ubicaciones.append(f":{nombre_bind}")
+        params[nombre_bind] = str(ubicacion)
+
+    if binds_ubicaciones:
+        params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
+        filtros.append(
+            "NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) "
+            f"NOT IN ({', '.join(binds_ubicaciones)})"
+        )
+
     return filtros, params
 
 
@@ -155,6 +182,8 @@ def contar_alertas_validadores(
     problema=None,
     estatus=None,
     solo_con_alerta=True,
+    amids_excluidos=None,
+    ubicaciones_excluidas=None,
 ):
     filtros, params = _armar_filtros_alertas(
         amid=amid,
@@ -163,6 +192,8 @@ def contar_alertas_validadores(
         problema=problema,
         estatus=estatus,
         solo_con_alerta=solo_con_alerta,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
     )
 
     where_sql = ""
@@ -171,7 +202,9 @@ def contar_alertas_validadores(
 
     query = f"""
         SELECT COUNT(*)
-        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
+        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
+        LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
+          ON u.AMID = r.AMID
         {where_sql}
     """
 
@@ -193,6 +226,8 @@ def obtener_alertas_validadores(
     limite=500,
     offset=0,
     ordenar=True,
+    amids_excluidos=None,
+    ubicaciones_excluidas=None,
 ):
     """
     Lee alertas desde USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA.
@@ -206,6 +241,8 @@ def obtener_alertas_validadores(
         problema=problema,
         estatus=estatus,
         solo_con_alerta=solo_con_alerta,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
     )
 
     where_sql = ""
@@ -266,7 +303,8 @@ def obtener_alertas_validadores(
                 ROW_NUMBER() OVER ({order_sql}) AS rn
             FROM (
                 SELECT
-                    AMID,
+                    r.AMID,
+                    NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) AS UBICACION_ACTUAL,
                     FECHA_HOY,
                     FECHA_INI_HIST,
                     FECHA_FIN_HIST,
@@ -308,7 +346,9 @@ def obtener_alertas_validadores(
                     ACCION_SUGERIDA,
                     TIENE_ALERTA,
                     FECHA_ACTUALIZACION
-                FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
+                FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
+                LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
+                  ON u.AMID = r.AMID
                 {where_sql}
             ) q
         )
@@ -317,6 +357,7 @@ def obtener_alertas_validadores(
 
     params["offset"] = int(offset)
     params["limite"] = int(limite)
+    params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
 
     alertas = []
 
@@ -330,6 +371,10 @@ def obtener_alertas_validadores(
             item = dict(zip(columnas, row))
 
             item["amid"] = normalizar_numero(item.get("amid"))
+            item["ubicacion_actual"] = normalizar_texto(
+                item.get("ubicacion_actual"),
+                UBICACION_SIN_ASIGNAR,
+            )
             item["nivel_alerta_global"] = normalizar_texto(item.get("nivel_alerta_global"), "OK")
             item["nivel_alerta_gps"] = normalizar_texto(item.get("nivel_alerta_gps"), "OK")
             item["nivel_alerta_bateria"] = normalizar_texto(item.get("nivel_alerta_bateria"), "OK")
@@ -366,20 +411,60 @@ def obtener_alertas_validadores(
     return alertas
 
 
-def obtener_resumen_alertas():
+def obtener_ubicaciones_alertas_disponibles():
+    """Ubicaciones asignadas a los AMID activos que pueden excluirse."""
+
+    ubicaciones_cache = cache.get(CACHE_KEY_UBICACIONES_ALERTAS)
+    if ubicaciones_cache is not None:
+        return ubicaciones_cache
+
+    query = """
+        SELECT ubicacion_actual
+        FROM (
+            SELECT DISTINCT
+                NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) AS ubicacion_actual
+            FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
+            LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
+              ON u.AMID = r.AMID
+        )
+        ORDER BY ubicacion_actual
+    """
+
+    with obtener_conexion_oracle() as connection:
+        cursor = connection.cursor()
+        cursor.execute(query, {"ubicacion_sin_asignar": UBICACION_SIN_ASIGNAR})
+        ubicaciones = [str(row[0]) for row in cursor.fetchall() if row and row[0]]
+
+    cache.set(
+        CACHE_KEY_UBICACIONES_ALERTAS,
+        ubicaciones,
+        CACHE_TIMEOUT_UBICACIONES_ALERTAS,
+    )
+    return ubicaciones
+
+
+def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
     """
     Totales de AMID activos para las tarjetas superiores.
 
-    Son iguales para todos los usuarios y el job Oracle se ejecuta cada
-    30 minutos, por lo que una caché local de 60 segundos evita repetir la
-    misma consulta en cada navegación sin ocultar cambios por mucho tiempo.
+    Sin preferencias usa cache compartida. Un resumen personalizado se
+    consulta directamente para no mezclar los datos de usuarios distintos.
     """
 
-    resumen_cache = cache.get(CACHE_KEY_RESUMEN_ALERTAS)
-    if resumen_cache is not None:
-        return resumen_cache
+    usar_cache = not amids_excluidos and not ubicaciones_excluidas
+    if usar_cache:
+        resumen_cache = cache.get(CACHE_KEY_RESUMEN_ALERTAS)
+        if resumen_cache is not None:
+            return resumen_cache
 
-    query = """
+    filtros, params = _armar_filtros_alertas(
+        solo_con_alerta=False,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
+    )
+    where_sql = "WHERE " + " AND ".join(filtros) if filtros else ""
+
+    query = f"""
         SELECT
             COUNT(*) AS total_validadores,
             SUM(CASE WHEN TIENE_ALERTA = 1 THEN 1 ELSE 0 END) AS total_alertas,
@@ -390,12 +475,15 @@ def obtener_resumen_alertas():
             SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
             SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
             MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
-        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
+        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
+        LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
+          ON u.AMID = r.AMID
+        {where_sql}
     """
 
     with obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
-        cursor.execute(query)
+        cursor.execute(query, params)
         row = cursor.fetchone()
 
     if not row:
@@ -423,11 +511,12 @@ def obtener_resumen_alertas():
             "ultima_actualizacion": row[8],
         }
 
-    cache.set(
-        CACHE_KEY_RESUMEN_ALERTAS,
-        resumen,
-        CACHE_TIMEOUT_RESUMEN_ALERTAS,
-    )
+    if usar_cache:
+        cache.set(
+            CACHE_KEY_RESUMEN_ALERTAS,
+            resumen,
+            CACHE_TIMEOUT_RESUMEN_ALERTAS,
+        )
     return resumen
 
 def construir_querystring_filtro(
@@ -463,7 +552,10 @@ def construir_querystring_filtro(
     return urlencode(params)
 
 
-def obtener_contexto_alertas(request):
+def obtener_contexto_alertas(request, preferencias=None):
+    preferencias = preferencias or {}
+    amids_excluidos = preferencias.get("amids_excluidos", [])
+    ubicaciones_excluidas = preferencias.get("ubicaciones_excluidas", [])
     amid = request.GET.get("amid", "").strip()
     nivel = request.GET.get("nivel", "").strip().upper()
     tipo_alerta = request.GET.get("tipo_alerta", "").strip().upper()
@@ -488,6 +580,8 @@ def obtener_contexto_alertas(request):
         problema=problema if problema else None,
         estatus=estatus if estatus else None,
         solo_con_alerta=solo_con_alerta,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
     )
 
     total_paginas = max(1, (total_alertas + ALERTAS_POR_PAGINA - 1) // ALERTAS_POR_PAGINA)
@@ -507,6 +601,8 @@ def obtener_contexto_alertas(request):
         limite=ALERTAS_POR_PAGINA,
         offset=offset,
         ordenar=True,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
     )
 
     page_obj = {
@@ -520,7 +616,10 @@ def obtener_contexto_alertas(request):
         "end_index": min(offset + len(alertas), total_alertas),
     }
 
-    resumen = obtener_resumen_alertas()
+    resumen = obtener_resumen_alertas(
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
+    )
 
     querystring_sin_page = construir_querystring_filtro(
         amid=amid,

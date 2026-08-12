@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -71,6 +72,57 @@ class LogImportacion(models.Model):
 
     def __str__(self):
         return f"{self.origen} - {self.estado} - {self.fecha_inicio}"
+
+class AlertaAmidExcluido(models.Model):
+    """AMID que un usuario decidi\u00f3 ocultar del panel de alertas."""
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="alertas_amids_excluidos",
+    )
+    amid = models.BigIntegerField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["amid"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "amid"],
+                name="uq_alerta_usuario_amid",
+            ),
+        ]
+        verbose_name = "AMID excluido del panel de alertas"
+        verbose_name_plural = "AMID excluidos del panel de alertas"
+
+    def __str__(self):
+        return f"{self.usuario} - AMID {self.amid}"
+
+
+class AlertaUbicacionExcluida(models.Model):
+    """Ubicaci\u00f3n cuyos AMID un usuario decidi\u00f3 ocultar del panel."""
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="alertas_ubicaciones_excluidas",
+    )
+    nombre = models.CharField(max_length=255)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "nombre"],
+                name="uq_alerta_usuario_ubicacion",
+            ),
+        ]
+        verbose_name = "Ubicaci\u00f3n excluida del panel de alertas"
+        verbose_name_plural = "Ubicaciones excluidas del panel de alertas"
+
+    def __str__(self):
+        return f"{self.usuario} - {self.nombre}"
 
 
 class EstatusZP(models.Model):

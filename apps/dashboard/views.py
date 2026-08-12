@@ -16,8 +16,15 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from apps.dashboard.services.alertas_service import obtener_contexto_alertas
+from apps.dashboard.services.alertas_service import (
+    obtener_contexto_alertas,
+    obtener_ubicaciones_alertas_disponibles,
+)
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services.preferencias_alertas_service import (
+    guardar_preferencias_alertas_usuario,
+    obtener_preferencias_alertas_usuario,
+)
 from apps.dashboard.services.reglas_alertas_service import (
     actualizar_reglas_alertas,
     iniciar_recalculo_en_segundo_plano,
@@ -116,7 +123,61 @@ def ejecutar_comando_admin(request):
 
 @login_required
 def panel_alertas(request):
-    contexto = obtener_contexto_alertas(request)
+    ubicaciones_disponibles = obtener_ubicaciones_alertas_disponibles()
+
+    if request.method == "POST":
+        limpiar_preferencias = request.POST.get("limpiar_preferencias") == "1"
+        texto_amids = "" if limpiar_preferencias else request.POST.get("amids_excluidos", "")
+        ubicaciones = (
+            []
+            if limpiar_preferencias
+            else request.POST.getlist("ubicaciones_excluidas")
+        )
+
+        try:
+            preferencias = guardar_preferencias_alertas_usuario(
+                usuario=request.user,
+                texto_amids=texto_amids,
+                ubicaciones=ubicaciones,
+                ubicaciones_disponibles=ubicaciones_disponibles,
+            )
+            if limpiar_preferencias:
+                messages.success(request, "Preferencias de alertas restablecidas.")
+            else:
+                messages.success(
+                    request,
+                    "Preferencias guardadas: "
+                    f"{len(preferencias['amids_excluidos'])} AMID y "
+                    f"{len(preferencias['ubicaciones_excluidas'])} ubicaciones excluidas.",
+                )
+        except ValueError as error:
+            messages.error(request, str(error))
+
+        return redirect("dashboard:panel_alertas")
+
+    preferencias = obtener_preferencias_alertas_usuario(request.user)
+    ubicaciones_seleccionadas = set(preferencias["ubicaciones_excluidas"])
+
+    contexto = obtener_contexto_alertas(request, preferencias=preferencias)
+    contexto.update(
+        {
+            "preferencias_alertas": preferencias,
+            "amids_excluidos_texto": "\n".join(
+                str(amid) for amid in preferencias["amids_excluidos"]
+            ),
+            "ubicaciones_disponibles": [
+                {
+                    "nombre": nombre,
+                    "seleccionada": nombre in ubicaciones_seleccionadas,
+                }
+                for nombre in ubicaciones_disponibles
+            ],
+            "total_preferencias_alertas": (
+                len(preferencias["amids_excluidos"])
+                + len(preferencias["ubicaciones_excluidas"])
+            ),
+        }
+    )
     return render(request, "dashboard/panel_alertas.html", contexto)
 
 

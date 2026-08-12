@@ -22,6 +22,108 @@
     font-size: 0.9rem;
 }
 
+.preferencias-alertas {
+    margin-bottom: 1.2rem;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+.preferencias-alertas summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    color: #1e3a8a;
+    font-weight: 700;
+    cursor: pointer;
+    background: #eff6ff;
+}
+
+.preferencias-resumen {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.preferencias-contenido {
+    padding: 1rem;
+}
+
+.preferencias-contenido > p {
+    margin: 0 0 1rem;
+    color: #64748b;
+    font-size: 0.86rem;
+}
+
+.preferencias-formulario {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1fr);
+    gap: 1rem;
+}
+
+.preferencia-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.preferencia-campo label {
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.preferencia-campo textarea,
+.preferencia-campo select {
+    width: 100%;
+    min-height: 9rem;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 0.6rem 0.7rem;
+    color: #0f172a;
+    background: #ffffff;
+    font: inherit;
+}
+
+.preferencia-campo small,
+.preferencias-acciones small {
+    color: #64748b;
+    font-size: 0.76rem;
+}
+
+.preferencias-acciones {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.preferencias-acciones button {
+    border: 0;
+    border-radius: 10px;
+    padding: 0.65rem 0.95rem;
+    color: #ffffff;
+    background: #2563eb;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.preferencias-acciones .boton-secundario {
+    color: #334155;
+    background: #e2e8f0;
+}
+
+.celda-ubicacion {
+    min-width: 170px;
+    max-width: 260px;
+}
 .alertas-cards {
     display: grid;
     grid-template-columns: repeat(7, minmax(120px, 1fr));
@@ -366,6 +468,15 @@
 
     .alertas-filtros {
         align-items: stretch;
+    }
+
+    .preferencias-alertas summary {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .preferencias-formulario {
+        grid-template-columns: 1fr;
     }
 
     .campo-filtro,
