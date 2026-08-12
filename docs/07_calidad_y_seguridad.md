@@ -1,4 +1,4 @@
-# 06 — Calidad y seguridad
+# 07 — Calidad y seguridad
 
 ## Validación mínima
 

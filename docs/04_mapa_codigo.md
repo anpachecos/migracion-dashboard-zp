@@ -1,4 +1,4 @@
-# 03 - Mapa de archivos del proyecto
+# 04 — Mapa del código
 
 ## Objetivo
 
@@ -56,19 +56,20 @@ Durante el desarrollo pueden existir scripts auxiliares usados solo para pruebas
 
 ## Nota sobre scripts de Oracle
 
-La prueba oficial de conexión a Oracle dentro del proyecto se realiza mediante el comando Django:
+Los objetos Oracle mantenidos por este proyecto se organizan en:
+
+- `oracle/current/`: baseline consolidado vigente;
+- `oracle/history/`: scripts ya ejecutados;
+- `oracle/diagnostics/`: auditorías de solo lectura.
+
+La prueba oficial de conexión se realiza con:
 
 ```powershell
 python manage.py probar_oracle
 ```
 
-Este comando se encuentra en:
-
-```txt
-apps/dashboard/management/commands/probar_oracle.py
-```
-
-Por lo tanto, no es necesario mantener un archivo `probar_oracle.py` suelto en la raíz del proyecto.
+El comando vive en `apps/dashboard/management/commands/probar_oracle.py`; no se
+debe conservar otro `probar_oracle.py` suelto en la raíz.
 ---
 
 ## Carpeta `config/`
@@ -422,7 +423,7 @@ Ejemplo Panel Alertas:
 /alertas/
 → panel_alertas()
 → obtener_contexto_alertas()
-→ Oracle: ALERTA_VALIDADOR_RESUMEN
+→ Oracle: VW_ALERTA_VALIDADOR_ACTIVA
 → panel_alertas.html
 → panel_alertas.css
 ```

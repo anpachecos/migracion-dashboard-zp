@@ -1,6 +1,6 @@
-# Mapa general del Dashboard ZP
+# 01 — Visión general del Dashboard ZP
 
-> Ver también: [arquitectura](02_arquitectura.md), [operación](04_instalacion_operacion.md) y [datos](05_datos_integraciones.md).
+> Ver también: [arquitectura](02_arquitectura_sistema.md), [flujo Oracle–Django](03_flujo_completo_oracle_django.md), [operación](05_instalacion_operacion.md) y [datos](06_datos_e_integraciones.md).
 
 ## Objetivo
 
@@ -30,10 +30,13 @@ Usuario → URL Django → View → Service Python → Oracle → Contexto → T
 | CSS/JS | Controlan diseño y comportamiento visual. |
 | SQLite | Mantiene usuarios, sesiones y logs propios de Django. |
 
-## Pendientes de orden
+## Estado de organización
 
-- Separar código vigente de código antiguo.
-- Documentar tablas y vistas Oracle.
-- Unificar lógica de alertas de batería.
-- Revisar comandos antiguos de importación SQLite.
-- Limpiar archivos generados como `__pycache__` y revisar que `venv/` no se suba a Git.
+- El flujo Oracle y sus objetos vigentes están documentados.
+- La lógica de clasificación de alertas está centralizada en Oracle.
+- Los SQL actuales, históricos y de diagnóstico están separados.
+- Los archivos generados, resultados Oracle y secretos están excluidos de Git.
+
+Como mantenimiento futuro queda revisar los comandos históricos de importación
+SQLite antes de eliminarlos y separar secciones de `views.py` si continúa
+creciendo.

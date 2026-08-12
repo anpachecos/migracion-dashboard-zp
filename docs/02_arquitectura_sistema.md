@@ -1,4 +1,4 @@
-# 02 — Arquitectura y flujos
+# 02 — Arquitectura del sistema
 
 ## Resumen
 
@@ -40,7 +40,7 @@ Los paneles y exportaciones requieren login. Las acciones administrativas compru
 
 ### Alertas
 
-`alertas_service.py` consulta `ALERTA_VALIDADOR_RESUMEN`, filtra y pagina en Oracle. Las prioridades son `CRITICA`, `ALTA`, `ADVERTENCIA` y `OK`. `PRC_UPD_ALERTAS_VAL` fuerza el recálculo.
+`alertas_service.py` consulta `VW_ALERTA_VALIDADOR_ACTIVA`, filtra y pagina en Oracle. Las prioridades son `CRITICA`, `ALTA`, `ADVERTENCIA` y `OK`. Los cambios de clasificación usan el wrapper rápido y los cambios de detección usan el cálculo completo.
 
 ### Perfil
 

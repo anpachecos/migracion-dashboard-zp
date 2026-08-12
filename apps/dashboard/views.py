@@ -23,6 +23,7 @@ from apps.dashboard.services.reglas_alertas_service import (
     iniciar_recalculo_en_segundo_plano,
     leer_log_recalculo,
     obtener_reglas_alertas,
+    recalculo_en_curso,
     usuario_puede_editar_reglas,
 )
 
@@ -630,12 +631,38 @@ def panel_perfil(request):
 
         if accion in {"guardar_reglas_alertas", "guardar_y_recalcular_alertas"}:
             try:
-                actualizar_reglas_alertas(request.POST)
-                if accion == "guardar_y_recalcular_alertas":
-                    iniciar_recalculo_en_segundo_plano()
-                    messages.success(request, "Reglas guardadas y el recálculo se inició en segundo plano.")
+                resultado = actualizar_reglas_alertas(request.POST)
+                cantidad = resultado["cantidad"]
+                modo_recalculo = resultado["modo_recalculo"]
+
+                if cantidad == 0:
+                    messages.info(request, "No se detectaron cambios en las reglas.")
+                elif accion == "guardar_y_recalcular_alertas":
+                    hilo = iniciar_recalculo_en_segundo_plano(
+                        modo_recalculo=modo_recalculo
+                    )
+                    if hilo is None:
+                        messages.warning(
+                            request,
+                            f"Se guardaron {cantidad} regla(s), pero ya hay un "
+                            "recálculo manual en curso. No se inició otro proceso.",
+                        )
+                    else:
+                        descripcion_modo = (
+                            "completo, porque cambió una regla de detección"
+                            if modo_recalculo == "completo"
+                            else "rápido, porque solo cambiaron reglas de clasificación"
+                        )
+                        messages.success(
+                            request,
+                            f"Se guardaron {cantidad} regla(s). Se inició el recálculo "
+                            f"{descripcion_modo} en segundo plano.",
+                        )
                 else:
-                    messages.success(request, "Reglas de alertas actualizadas correctamente.")
+                    messages.success(
+                        request,
+                        f"Se guardaron {cantidad} regla(s) y se validaron en Oracle.",
+                    )
             except ValueError as error:
                 messages.error(request, str(error))
             except Exception as error:
@@ -702,6 +729,7 @@ def panel_perfil(request):
             "reglas_alertas": reglas_alertas,
             "puede_editar_reglas": usuario_puede_editar_reglas(usuario_actual),
             "log_recalculo": log_recalculo,
+            "recalculo_en_curso": recalculo_en_curso(),
         })
 
     return render(request, "dashboard/panel_perfil.html", context)

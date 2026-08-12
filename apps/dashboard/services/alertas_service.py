@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+from django.core.cache import cache
+
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 ORDEN_PRIORIDAD = {
@@ -11,6 +13,8 @@ ORDEN_PRIORIDAD = {
 }
 
 ALERTAS_POR_PAGINA = 10
+CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
+CACHE_TIMEOUT_RESUMEN_ALERTAS = 60
 
 
 def normalizar_numero(valor, default=0):
@@ -167,7 +171,7 @@ def contar_alertas_validadores(
 
     query = f"""
         SELECT COUNT(*)
-        FROM USR_LAB.ALERTA_VALIDADOR_RESUMEN
+        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
         {where_sql}
     """
 
@@ -191,7 +195,7 @@ def obtener_alertas_validadores(
     ordenar=True,
 ):
     """
-    Lee alertas desde USR_LAB.ALERTA_VALIDADOR_RESUMEN.
+    Lee alertas desde USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA.
     No calcula reglas. Solo consulta la tabla resumen ya calculada por Oracle.
     """
 
@@ -304,7 +308,7 @@ def obtener_alertas_validadores(
                     ACCION_SUGERIDA,
                     TIENE_ALERTA,
                     FECHA_ACTUALIZACION
-                FROM USR_LAB.ALERTA_VALIDADOR_RESUMEN
+                FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
                 {where_sql}
             ) q
         )
@@ -364,8 +368,16 @@ def obtener_alertas_validadores(
 
 def obtener_resumen_alertas():
     """
-    Totales para tarjetas superiores del panel.
+    Totales de AMID activos para las tarjetas superiores.
+
+    Son iguales para todos los usuarios y el job Oracle se ejecuta cada
+    30 minutos, por lo que una caché local de 60 segundos evita repetir la
+    misma consulta en cada navegación sin ocultar cambios por mucho tiempo.
     """
+
+    resumen_cache = cache.get(CACHE_KEY_RESUMEN_ALERTAS)
+    if resumen_cache is not None:
+        return resumen_cache
 
     query = """
         SELECT
@@ -378,7 +390,7 @@ def obtener_resumen_alertas():
             SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
             SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
             MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
-        FROM USR_LAB.ALERTA_VALIDADOR_RESUMEN
+        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA
     """
 
     with obtener_conexion_oracle() as connection:
@@ -387,7 +399,7 @@ def obtener_resumen_alertas():
         row = cursor.fetchone()
 
     if not row:
-        return {
+        resumen = {
             "total_validadores": 0,
             "total_alertas": 0,
             "total_criticas": 0,
@@ -398,19 +410,25 @@ def obtener_resumen_alertas():
             "total_bateria": 0,
             "ultima_actualizacion": None,
         }
+    else:
+        resumen = {
+            "total_validadores": normalizar_numero(row[0]),
+            "total_alertas": normalizar_numero(row[1]),
+            "total_criticas": normalizar_numero(row[2]),
+            "total_altas": normalizar_numero(row[3]),
+            "total_advertencias": normalizar_numero(row[4]),
+            "total_ok": normalizar_numero(row[5]),
+            "total_gps": normalizar_numero(row[6]),
+            "total_bateria": normalizar_numero(row[7]),
+            "ultima_actualizacion": row[8],
+        }
 
-    return {
-        "total_validadores": normalizar_numero(row[0]),
-        "total_alertas": normalizar_numero(row[1]),
-        "total_criticas": normalizar_numero(row[2]),
-        "total_altas": normalizar_numero(row[3]),
-        "total_advertencias": normalizar_numero(row[4]),
-        "total_ok": normalizar_numero(row[5]),
-        "total_gps": normalizar_numero(row[6]),
-        "total_bateria": normalizar_numero(row[7]),
-        "ultima_actualizacion": row[8],
-    }
-
+    cache.set(
+        CACHE_KEY_RESUMEN_ALERTAS,
+        resumen,
+        CACHE_TIMEOUT_RESUMEN_ALERTAS,
+    )
+    return resumen
 
 def construir_querystring_filtro(
     amid="",

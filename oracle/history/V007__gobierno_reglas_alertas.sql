@@ -1,0 +1,238 @@
+-- Etapa 2: gobierno, validacion y auditoria de reglas.
+-- Requiere haber ejecutado V006__alertas_fase1_sin_perdida.sql.
+--
+-- Este script no elimina datos ni modifica ESTATUS_ZP/JOBS_STATUS_ZP.
+-- Agrega metadatos a las reglas, una bitacora y wrappers seguros.
+
+ALTER TABLE USR_LAB.ALERTA_REGLA_PARAM
+ADD TIPO_REGLA VARCHAR2(20) DEFAULT 'CLASIFICACION' NOT NULL;
+
+UPDATE USR_LAB.ALERTA_REGLA_PARAM
+SET TIPO_REGLA = 'DETECCION'
+WHERE CLAVE IN (
+    'BAT_CAIDA_MIN_DETECTAR',
+    'BAT_CAIDA_MAX_HORAS'
+);
+
+ALTER TABLE USR_LAB.ALERTA_REGLA_PARAM
+ADD CONSTRAINT CK_ALERTA_REGLA_TIPO
+CHECK (TIPO_REGLA IN ('DETECCION', 'CLASIFICACION'));
+
+ALTER TABLE USR_LAB.ALERTA_REGLA_PARAM
+ADD CONSTRAINT CK_ALERTA_REGLA_ACTIVO
+CHECK (ACTIVO IN (0, 1));
+
+CREATE TABLE USR_LAB.ALERTA_REGLA_HISTORIAL (
+    ID NUMBER PRIMARY KEY,
+    CLAVE VARCHAR2(100) NOT NULL,
+    VALOR_ANTERIOR NUMBER,
+    VALOR_NUEVO NUMBER,
+    ACTIVO_ANTERIOR NUMBER(1),
+    ACTIVO_NUEVO NUMBER(1),
+    TIPO_REGLA VARCHAR2(20),
+    USUARIO_CAMBIO VARCHAR2(150) NOT NULL,
+    FECHA_CAMBIO DATE DEFAULT SYSDATE NOT NULL
+);
+
+CREATE SEQUENCE USR_LAB.SEQ_ALERTA_REGLA_HIST
+START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
+
+CREATE OR REPLACE TRIGGER USR_LAB.TRG_ALERTA_REGLA_HIST
+BEFORE UPDATE OF VALOR_NUMERO, ACTIVO ON USR_LAB.ALERTA_REGLA_PARAM
+FOR EACH ROW
+WHEN (
+    NVL(OLD.VALOR_NUMERO, -999999999) <> NVL(NEW.VALOR_NUMERO, -999999999)
+    OR OLD.ACTIVO <> NEW.ACTIVO
+)
+BEGIN
+    INSERT INTO USR_LAB.ALERTA_REGLA_HISTORIAL (
+        ID,
+        CLAVE,
+        VALOR_ANTERIOR,
+        VALOR_NUEVO,
+        ACTIVO_ANTERIOR,
+        ACTIVO_NUEVO,
+        TIPO_REGLA,
+        USUARIO_CAMBIO,
+        FECHA_CAMBIO
+    ) VALUES (
+        USR_LAB.SEQ_ALERTA_REGLA_HIST.NEXTVAL,
+        :NEW.CLAVE,
+        :OLD.VALOR_NUMERO,
+        :NEW.VALOR_NUMERO,
+        :OLD.ACTIVO,
+        :NEW.ACTIVO,
+        :NEW.TIPO_REGLA,
+        NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'),
+            SYS_CONTEXT('USERENV', 'SESSION_USER')),
+        SYSDATE
+    );
+END;
+/
+
+CREATE INDEX USR_LAB.IDX_ALERTA_REGLA_HIST_CLAVE
+ON USR_LAB.ALERTA_REGLA_HISTORIAL (CLAVE, FECHA_CAMBIO);
+
+CREATE OR REPLACE PROCEDURE USR_LAB.PRC_VALIDAR_REGLAS_ALERTA
+AS
+    v_total NUMBER;
+    v_valor NUMBER;
+
+    FUNCTION regla(p_clave VARCHAR2) RETURN NUMBER
+    AS
+        v_resultado NUMBER;
+    BEGIN
+        SELECT VALOR_NUMERO
+        INTO v_resultado
+        FROM USR_LAB.ALERTA_REGLA_PARAM
+        WHERE CLAVE = p_clave
+          AND ACTIVO = 1
+          AND VALOR_NUMERO IS NOT NULL;
+
+        RETURN v_resultado;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(
+                -20001,
+                'Falta una regla activa con valor: ' || p_clave
+            );
+    END;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_total
+    FROM USR_LAB.ALERTA_REGLA_PARAM
+    WHERE CLAVE IN (
+        'GPS_CERO_HOY_CRITICA', 'GPS_PORC_HOY_CRITICA',
+        'GPS_TOTAL_HOY_CRITICA', 'GPS_RACHA_CRITICA',
+        'GPS_CERO_HOY_ALTA', 'GPS_CERO_HOY_ALTA_MAX',
+        'GPS_PORC_HOY_ALTA', 'GPS_TOTAL_HOY_ALTA',
+        'GPS_RACHA_ALTA', 'GPS_CERO_HOY_ADV',
+        'GPS_CERO_HOY_ADV_MAX', 'GPS_CERO_HIST_ADV',
+        'GPS_PORC_HIST_ADV', 'BAT_CAIDA_MIN_DETECTAR',
+        'BAT_CAIDA_MAX_HORAS', 'BAT_CAIDA_HOY_CRITICA',
+        'BAT_CAIDA_HOY_CRITICA_CON_HIST',
+        'BAT_CAIDAS_HOY_CRITICA', 'BAT_CERO_HOY_CRITICA',
+        'BAT_CAIDA_HOY_ALTA', 'BAT_CAIDAS_HIST_ALTA',
+        'BAT_CAIDA_MAX_HIST_ALTA', 'BAT_CERO_HOY_ALTA_MIN',
+        'BAT_CERO_HOY_ALTA_MAX', 'BAT_CERO_HOY_ADV_MIN',
+        'BAT_CERO_HOY_ADV_MAX', 'BAT_CERO_HIST_ADV'
+    )
+      AND ACTIVO = 1
+      AND VALOR_NUMERO IS NOT NULL;
+
+    IF v_total <> 27 THEN
+        RAISE_APPLICATION_ERROR(
+            -20002,
+            'Deben existir 27 reglas activas y con valor. Encontradas: ' || v_total
+        );
+    END IF;
+
+    -- Ningun umbral puede ser negativo.
+    SELECT COUNT(*)
+    INTO v_total
+    FROM USR_LAB.ALERTA_REGLA_PARAM
+    WHERE ACTIVO = 1
+      AND VALOR_NUMERO < 0;
+
+    IF v_total > 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Los umbrales no pueden ser negativos.');
+    END IF;
+
+    -- Los porcentajes deben estar entre 0 y 100.
+    SELECT COUNT(*)
+    INTO v_total
+    FROM USR_LAB.ALERTA_REGLA_PARAM
+    WHERE ACTIVO = 1
+      AND CLAVE LIKE 'GPS_PORC_%'
+      AND (VALOR_NUMERO < 0 OR VALOR_NUMERO > 100);
+
+    IF v_total > 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'Los porcentajes deben estar entre 0 y 100.');
+    END IF;
+
+    IF regla('GPS_CERO_HOY_ADV') > regla('GPS_CERO_HOY_ADV_MAX')
+       OR regla('GPS_CERO_HOY_ADV_MAX') >= regla('GPS_CERO_HOY_ALTA')
+       OR regla('GPS_CERO_HOY_ALTA') > regla('GPS_CERO_HOY_ALTA_MAX')
+       OR regla('GPS_CERO_HOY_ALTA_MAX') >= regla('GPS_CERO_HOY_CRITICA') THEN
+        RAISE_APPLICATION_ERROR(-20005, 'Rangos GPS por cantidad incoherentes.');
+    END IF;
+
+    IF regla('GPS_PORC_HOY_ALTA') > regla('GPS_PORC_HOY_CRITICA')
+       OR regla('GPS_TOTAL_HOY_ALTA') > regla('GPS_TOTAL_HOY_CRITICA')
+       OR regla('GPS_RACHA_ALTA') > regla('GPS_RACHA_CRITICA') THEN
+        RAISE_APPLICATION_ERROR(-20006, 'Umbrales GPS ALTA/CRITICA incoherentes.');
+    END IF;
+
+    IF regla('BAT_CERO_HOY_ADV_MIN') > regla('BAT_CERO_HOY_ADV_MAX')
+       OR regla('BAT_CERO_HOY_ADV_MAX') >= regla('BAT_CERO_HOY_ALTA_MIN')
+       OR regla('BAT_CERO_HOY_ALTA_MIN') > regla('BAT_CERO_HOY_ALTA_MAX')
+       OR regla('BAT_CERO_HOY_ALTA_MAX') >= regla('BAT_CERO_HOY_CRITICA') THEN
+        RAISE_APPLICATION_ERROR(-20007, 'Rangos de bateria en cero incoherentes.');
+    END IF;
+
+    IF regla('BAT_CAIDA_MIN_DETECTAR') <= 0
+       OR regla('BAT_CAIDA_MAX_HORAS') <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20008, 'Las reglas de deteccion deben ser mayores que cero.');
+    END IF;
+
+    IF regla('BAT_CAIDA_HOY_ALTA') > regla('BAT_CAIDA_HOY_CRITICA_CON_HIST')
+       OR regla('BAT_CAIDA_HOY_CRITICA_CON_HIST') > regla('BAT_CAIDA_HOY_CRITICA') THEN
+        RAISE_APPLICATION_ERROR(-20009, 'Umbrales de caida ALTA/CRITICA incoherentes.');
+    END IF;
+
+    -- Fuerza la lectura de todas las claves restantes y falla si alguna falta.
+    v_valor := regla('GPS_CERO_HIST_ADV');
+    v_valor := regla('GPS_PORC_HIST_ADV');
+    v_valor := regla('BAT_CAIDAS_HOY_CRITICA');
+    v_valor := regla('BAT_CAIDAS_HIST_ALTA');
+    v_valor := regla('BAT_CAIDA_MAX_HIST_ALTA');
+    v_valor := regla('BAT_CERO_HIST_ADV');
+END;
+/
+
+-- Wrapper rapido: valida que la tabla sea la fuente completa de reglas y
+-- luego reclasifica las metricas existentes.
+CREATE OR REPLACE PROCEDURE USR_LAB.PRC_RECLASIFICAR_ALERTAS
+AS
+BEGIN
+    USR_LAB.PRC_VALIDAR_REGLAS_ALERTA;
+    USR_LAB.PRC_APLICAR_REGLAS_ALERTA;
+END;
+/
+
+-- Wrapper completo: usar solo si cambia una regla de DETECCION o cuando el
+-- job necesita releer los 14 dias de datos.
+CREATE OR REPLACE PROCEDURE USR_LAB.PRC_RECALCULAR_ALERTAS_SEGURO
+AS
+BEGIN
+    USR_LAB.PRC_VALIDAR_REGLAS_ALERTA;
+    USR_LAB.PRC_UPD_ALERTAS_VAL;
+END;
+/
+
+BEGIN
+    USR_LAB.PRC_VALIDAR_REGLAS_ALERTA;
+END;
+/
+
+SELECT OBJECT_NAME, OBJECT_TYPE, STATUS
+FROM USER_OBJECTS
+WHERE OBJECT_NAME IN (
+    'ALERTA_REGLA_HISTORIAL',
+    'TRG_ALERTA_REGLA_HIST',
+    'PRC_VALIDAR_REGLAS_ALERTA',
+    'PRC_RECLASIFICAR_ALERTAS',
+    'PRC_RECALCULAR_ALERTAS_SEGURO'
+)
+ORDER BY OBJECT_NAME;
+
+SELECT NAME, TYPE, LINE, POSITION, TEXT
+FROM USER_ERRORS
+WHERE NAME IN (
+    'TRG_ALERTA_REGLA_HIST',
+    'PRC_VALIDAR_REGLAS_ALERTA',
+    'PRC_RECLASIFICAR_ALERTAS',
+    'PRC_RECALCULAR_ALERTAS_SEGURO'
+)
+ORDER BY NAME, SEQUENCE;
+

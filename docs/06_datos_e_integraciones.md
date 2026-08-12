@@ -1,4 +1,4 @@
-# 05 — Datos e integraciones
+# 06 — Datos e integraciones
 
 ## Persistencia
 
@@ -15,14 +15,18 @@ No deben copiarse datos operativos a SQLite en el flujo vigente.
 |---|---|
 | `VW_ESTATUS_ZP_DJANGO` | Estado/telemetría por AMID y fecha. |
 | `BATERIA_BLOQUE_30MIN` | Batería agregada cada 30 minutos. |
-| `ALERTA_VALIDADOR_RESUMEN` | Prioridad, motivos, métricas y actualización. |
-| `ALERTA_REGLA_PARAM` | Reglas numéricas configurables. |
+| ALERTA_VALIDADOR_RESUMEN | Resultado calculado: prioridad, motivos y métricas por AMID. |
+| VW_ALERTA_VALIDADOR_ACTIVA | Resúmenes limitados a los AMID activos. |
+| ALERTA_REGLA_PARAM | Reglas configurables y tipo de aplicación. |
+| ALERTA_REGLA_HISTORIAL | Auditoría de valores anteriores y nuevos. |
 | `UBICACION_ESPERADA_VALIDADOR` | Referencia vigente por AMID. |
 | `HISTORIAL_UBICACION_ESPERADA` | Vigencias históricas. |
-| `PRC_UPD_ALERTAS_VAL` | Recalcula alertas. |
+| PRC_UPD_ALERTAS_VAL | Recalcula métricas y clasificación histórica. |
+| PRC_RECLASIFICAR_ALERTAS | Valida y reaplica solo clasificación. |
+| PRC_RECALCULAR_ALERTAS_SEGURO | Valida y ejecuta el cálculo completo. |
 | `PRC_LIMPIAR_HIST_UBICACION` | Limpia historial según retención. |
 
-El DDL no está versionado aquí y debe gestionarse en el proceso propietario de Oracle.
+El baseline vigente se versiona en `oracle/current/`; las migraciones ejecutadas se conservan en `oracle/history/` y los resultados de auditoría no se publican.
 
 ## Contratos de aplicación
 

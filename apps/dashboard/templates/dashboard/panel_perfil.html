@@ -111,7 +111,7 @@
 {% if es_admin %}
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
-        <h2>Administración del sistema</h2>
+        <h2>Administración del sistema</h2> <!-- acá hay una consola o se supone que esto está relacionado con mostrar una consola, quiero que se mantenga ese formato pleas y tambien que la configuración de reglas de alertas sea despglegable porque me ocupa mucho espacio, aparte tengo dos botones de guardar reglas y guiardar y ejecutar rteglas, hay que sacarlos? dejar uno?-->
         <p>
             Acciones administrativas disponibles. Los datos operativos del dashboard
             se consultan directamente desde Oracle; SQLite se mantiene para usuarios,
@@ -144,9 +144,9 @@
     <div class="perfil-bloque-header">
         <h2>Configuración de reglas de alertas</h2>
         <p>
-            Estos valores alimentan el procedure Oracle PRC_UPD_ALERTAS_VAL. Si solo guardas,
-            se aplicarán en la próxima ejecución del job. Si guardas y recalculas,
-            se aplican inmediatamente.
+            Oracle valida todos los umbrales antes de guardarlos. Al aplicar los cambios,
+            las reglas de clasificación reutilizan las métricas existentes; las reglas de
+            detección requieren releer los datos y ejecutan un cálculo completo.
         </p>
     </div>
 
@@ -172,6 +172,14 @@
                                 <span>
                                     <strong>{{ regla.clave }}</strong>
                                     <small>{{ regla.descripcion }}</small>
+                                    <small>
+                                        Tipo:
+                                        {% if regla.tipo_regla == "DETECCION" %}
+                                            Detección (cálculo completo)
+                                        {% else %}
+                                            Clasificación (aplicación rápida)
+                                        {% endif %}
+                                    </small>
                                     {% if regla.fecha_actualizacion %}
                                         <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
                                     {% endif %}
@@ -194,6 +202,14 @@
                                 <span>
                                     <strong>{{ regla.clave }}</strong>
                                     <small>{{ regla.descripcion }}</small>
+                                    <small>
+                                        Tipo:
+                                        {% if regla.tipo_regla == "DETECCION" %}
+                                            Detección (cálculo completo)
+                                        {% else %}
+                                            Clasificación (aplicación rápida)
+                                        {% endif %}
+                                    </small>
                                     {% if regla.fecha_actualizacion %}
                                         <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
                                     {% endif %}
@@ -207,12 +223,19 @@
 
             <div class="reglas-alertas-acciones">
                 <button type="submit" class="btn-reglas-guardar">Guardar reglas</button>
-                <button type="submit" name="action" value="guardar_y_recalcular_alertas" class="btn-reglas-recalcular">Guardar y recalcular ahora</button>
+                <button type="submit" name="action" value="guardar_y_recalcular_alertas" class="btn-reglas-recalcular" {% if recalculo_en_curso %}disabled{% endif %}>
+                    {% if recalculo_en_curso %}
+                        Recálculo manual en curso
+                    {% else %}
+                        Guardar y aplicar ahora
+                    {% endif %}
+                </button>
             </div>
 
             {% if log_recalculo %}
                 <div class="reglas-alertas-log">
-                    <h4>Log de recálculo</h4>
+                    <h4>Últimas ejecuciones de recálculo</h4>
+                    <small>Se muestran como máximo las últimas 100 líneas.</small>
                     <pre>{{ log_recalculo }}</pre>
                 </div>
             {% endif %}
