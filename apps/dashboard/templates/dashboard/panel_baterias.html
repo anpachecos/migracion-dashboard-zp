@@ -148,6 +148,12 @@
         {% if total_caidas_drasticas > 0 %}
             <section class="seccion bloque-alertas">
                 <h2>Alertas del período</h2>
+                {% if not detalle_alertas_completo %}
+                    <p class="texto-ayuda">
+                        No fue posible reconstruir el detalle completo; se muestra la última caída informada por Oracle.
+                    </p>
+                {% endif %}
+
 
                 <ul class="lista-alertas">
                     {% for alerta in alertas_periodo %}

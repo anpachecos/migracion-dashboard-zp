@@ -1,3 +1,5 @@
+import unicodedata
+
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -13,11 +15,14 @@ ORDEN_PRIORIDAD = {
 }
 
 ALERTAS_POR_PAGINA = 10
-CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
+CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v2"
 CACHE_TIMEOUT_RESUMEN_ALERTAS = 60
 CACHE_KEY_UBICACIONES_ALERTAS = "dashboard:ubicaciones-alertas:v1"
 CACHE_TIMEOUT_UBICACIONES_ALERTAS = 300
 UBICACION_SIN_ASIGNAR = "Sin ubicaci\u00f3n asignada"
+MIN_CARACTERES_BUSQUEDA_ALERTAS = 2
+LIMITE_SUGERENCIAS_ALERTAS = 15
+MAX_LIMITE_SUGERENCIAS_ALERTAS = 20
 
 
 def normalizar_numero(valor, default=0):
@@ -394,6 +399,9 @@ def obtener_alertas_validadores(
             item["bateria_actual"] = item.get("bateria_actual")
             item["caidas_hoy"] = normalizar_numero(item.get("caidas_hoy"))
             item["caidas_hist"] = normalizar_numero(item.get("caidas_hist"))
+            item["total_caidas"] = (
+                item["caidas_hoy"] + item["caidas_hist"]
+            )
             item["bateria_cero_hoy"] = normalizar_numero(item.get("bateria_cero_hoy"))
             item["bateria_cero_hist"] = normalizar_numero(item.get("bateria_cero_hist"))
 
@@ -443,6 +451,67 @@ def obtener_ubicaciones_alertas_disponibles():
     return ubicaciones
 
 
+def buscar_amids_alertas(termino, limite=LIMITE_SUGERENCIAS_ALERTAS):
+    """Busca AMID activos por prefijo sin cargar el catalogo completo."""
+
+    termino = str(termino or "").strip()
+    if len(termino) < MIN_CARACTERES_BUSQUEDA_ALERTAS or not termino.isdigit():
+        return []
+
+    limite = max(1, min(int(limite), MAX_LIMITE_SUGERENCIAS_ALERTAS))
+    query = """
+        SELECT amid
+        FROM (
+            SELECT r.AMID AS amid
+            FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
+            WHERE TO_CHAR(r.AMID) LIKE :patron
+            ORDER BY r.AMID
+        )
+        WHERE ROWNUM <= :limite
+    """
+
+    with obtener_conexion_oracle() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            query,
+            {
+                "patron": f"{termino}%",
+                "limite": limite,
+            },
+        )
+        return [
+            str(row[0])
+            for row in cursor.fetchall()
+            if row and row[0] is not None
+        ]
+
+
+def _normalizar_termino_busqueda(valor):
+    texto = unicodedata.normalize("NFD", str(valor or "").casefold())
+    return "".join(
+        caracter for caracter in texto if not unicodedata.combining(caracter)
+    )
+
+
+def buscar_ubicaciones_alertas(termino, limite=LIMITE_SUGERENCIAS_ALERTAS):
+    """Filtra el catalogo cacheado de ubicaciones sin enviarlo completo al HTML."""
+
+    termino_normalizado = _normalizar_termino_busqueda(termino).strip()
+    if len(termino_normalizado) < MIN_CARACTERES_BUSQUEDA_ALERTAS:
+        return []
+
+    limite = max(1, min(int(limite), MAX_LIMITE_SUGERENCIAS_ALERTAS))
+    resultados = []
+
+    for ubicacion in obtener_ubicaciones_alertas_disponibles():
+        if termino_normalizado in _normalizar_termino_busqueda(ubicacion):
+            resultados.append(ubicacion)
+            if len(resultados) >= limite:
+                break
+
+    return resultados
+
+
 def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
     """
     Totales de AMID activos para las tarjetas superiores.
@@ -474,6 +543,7 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
             SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'OK' THEN 1 ELSE 0 END) AS total_ok,
             SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
             SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
+            SUM(NVL(CAIDAS_HOY, 0) + NVL(CAIDAS_HIST, 0)) AS total_caidas_bateria,
             MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
         FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
         LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
@@ -496,6 +566,7 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
             "total_ok": 0,
             "total_gps": 0,
             "total_bateria": 0,
+            "total_caidas_bateria": 0,
             "ultima_actualizacion": None,
         }
     else:
@@ -508,7 +579,8 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
             "total_ok": normalizar_numero(row[5]),
             "total_gps": normalizar_numero(row[6]),
             "total_bateria": normalizar_numero(row[7]),
-            "ultima_actualizacion": row[8],
+            "total_caidas_bateria": normalizar_numero(row[8]),
+            "ultima_actualizacion": row[9],
         }
 
     if usar_cache:

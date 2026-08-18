@@ -1,9 +1,18 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+
+
+CACHE_KEY_REGLAS_CAIDAS_BATERIA = "dashboard:reglas-caidas-bateria:v1"
+CACHE_TIMEOUT_REGLAS_CAIDAS_BATERIA = 300
+CLAVES_REGLAS_CAIDAS_BATERIA = (
+    "BAT_CAIDA_MIN_DETECTAR",
+    "BAT_CAIDA_MAX_HORAS",
+)
 
 
 """
@@ -24,8 +33,9 @@ Python:
 - No vuelve a calcular el registro más cercano.
 - Arma la estructura para HTML y gráficos.
 - El último registro / tarjetas salen desde VW_ESTATUS_ZP_DJANGO.
-- Las alertas de batería se leen desde USR_LAB.ALERTA_VALIDADOR_RESUMEN,
-  para mantener consistencia con el Panel Alertas.
+- El nivel de alerta se lee desde USR_LAB.ALERTA_VALIDADOR_RESUMEN.
+- El detalle de cada caída se reconstruye desde los bloques usando los umbrales
+  activos de USR_LAB.ALERTA_REGLA_PARAM.
 """
 
 
@@ -316,6 +326,138 @@ def obtener_bloques_bateria_oracle(amid, fecha_inicio, fecha_fin):
     return bloques
 
 
+def obtener_reglas_caidas_bateria_oracle():
+    """Obtiene desde Oracle las reglas activas necesarias para detectar caídas."""
+    reglas_cache = cache.get(CACHE_KEY_REGLAS_CAIDAS_BATERIA)
+    if reglas_cache is not None:
+        return reglas_cache
+
+    query = """
+        SELECT CLAVE, VALOR_NUMERO
+        FROM USR_LAB.ALERTA_REGLA_PARAM
+        WHERE ACTIVO = 1
+          AND CLAVE IN (:clave_minima, :clave_horas)
+    """
+
+    with obtener_conexion_oracle() as conexion:
+        with conexion.cursor() as cursor:
+            cursor.execute(
+                query,
+                {
+                    "clave_minima": CLAVES_REGLAS_CAIDAS_BATERIA[0],
+                    "clave_horas": CLAVES_REGLAS_CAIDAS_BATERIA[1],
+                },
+            )
+            reglas = {
+                str(clave).strip().upper(): convertir_numero(valor)
+                for clave, valor in cursor.fetchall()
+            }
+
+    faltantes = [
+        clave
+        for clave in CLAVES_REGLAS_CAIDAS_BATERIA
+        if reglas.get(clave) is None
+    ]
+    if faltantes:
+        raise RuntimeError(
+            "Faltan reglas activas para detectar caídas de batería: "
+            + ", ".join(faltantes)
+        )
+
+    reglas_normalizadas = {
+        "caida_minima": reglas["BAT_CAIDA_MIN_DETECTAR"],
+        "max_horas": reglas["BAT_CAIDA_MAX_HORAS"],
+    }
+    cache.set(
+        CACHE_KEY_REGLAS_CAIDAS_BATERIA,
+        reglas_normalizadas,
+        CACHE_TIMEOUT_REGLAS_CAIDAS_BATERIA,
+    )
+    return reglas_normalizadas
+
+
+def formatear_duracion_caida(diferencia):
+    """Convierte un timedelta a un texto breve para el detalle visual."""
+    minutos = max(0, int(round(diferencia.total_seconds() / 60)))
+    horas, minutos_restantes = divmod(minutos, 60)
+
+    if horas and minutos_restantes:
+        return f"{horas} h {minutos_restantes} min"
+    if horas:
+        return f"{horas} h"
+    return f"{minutos_restantes} min"
+
+
+def detectar_caidas_bateria_en_bloques(bloques, caida_minima, max_horas):
+    """
+    Reconstruye cada caída comparando bloques consecutivos con dato real.
+
+    Los umbrales no están definidos en Django: se reciben desde
+    ``ALERTA_REGLA_PARAM`` para conservar una sola fuente de reglas.
+    """
+    bloques_validos = sorted(
+        (
+            bloque
+            for bloque in bloques
+            if bloque.tiene_dato
+            and bloque.fecha_hora is not None
+            and convertir_numero(bloque.porcentaje_bateria) is not None
+        ),
+        key=lambda bloque: bloque.fecha_hora,
+    )
+    alertas = []
+
+    for anterior, actual in zip(bloques_validos, bloques_validos[1:]):
+        diferencia_tiempo = actual.fecha_hora - anterior.fecha_hora
+        diferencia_horas = diferencia_tiempo.total_seconds() / 3600
+        bateria_anterior = convertir_numero(anterior.porcentaje_bateria)
+        bateria_actual = convertir_numero(actual.porcentaje_bateria)
+        caida = bateria_anterior - bateria_actual
+
+        if not (0 < diferencia_horas <= max_horas and caida >= caida_minima):
+            continue
+
+        duracion = formatear_duracion_caida(diferencia_tiempo)
+        caida_formateada = formatear_bateria_entera(caida)
+        alertas.append(
+            {
+                "fecha_anterior": anterior.fecha_hora,
+                "fecha_hora": actual.fecha_hora,
+                "bateria_anterior": formatear_bateria_entera(bateria_anterior),
+                "bateria_actual": formatear_bateria_entera(bateria_actual),
+                "caida": caida_formateada,
+                "tiempo_transcurrido": duracion,
+                "motivo": f"Caída de {caida_formateada} puntos en {duracion}",
+            }
+        )
+
+    return list(reversed(alertas))
+
+
+def obtener_detalle_caidas_bateria_oracle(amid, dias=14):
+    """Obtiene bajo demanda todas las caídas de un AMID en los últimos días."""
+    fecha_inicio, fecha_fin = obtener_rango_fechas_panel(dias)
+    bloques = obtener_bloques_bateria_oracle(
+        amid=amid,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+    )
+    reglas = obtener_reglas_caidas_bateria_oracle()
+    alertas = detectar_caidas_bateria_en_bloques(
+        bloques,
+        caida_minima=reglas["caida_minima"],
+        max_horas=reglas["max_horas"],
+    )
+    return {
+        "amid": int(amid),
+        "dias": int(dias),
+        "caida_minima": reglas["caida_minima"],
+        "max_horas": reglas["max_horas"],
+        "total": len(alertas),
+        "alertas": alertas,
+    }
+
+
 def obtener_resumen_alerta_bateria_oracle(amid):
     """
     Obtiene el resumen oficial de alertas de batería desde Oracle.
@@ -586,6 +728,7 @@ def obtener_contexto_baterias(request):
     total_caidas_drasticas = 0
     clase_alertas_periodo = "tarjeta-neutra"
     alertas_periodo = []
+    detalle_alertas_completo = False
 
     if amid:
         try:
@@ -656,13 +799,25 @@ def obtener_contexto_baterias(request):
             )
 
             if resumen_alerta_bateria:
-                total_caidas_drasticas = resumen_alerta_bateria.total_caidas
                 clase_alertas_periodo = obtener_clase_alertas_bateria(
                     resumen_alerta_bateria
                 )
-                alertas_periodo = construir_alertas_periodo_desde_resumen(
-                    resumen_alerta_bateria
-                )
+                try:
+                    reglas_caidas = obtener_reglas_caidas_bateria_oracle()
+                    alertas_periodo = detectar_caidas_bateria_en_bloques(
+                        bloques,
+                        caida_minima=reglas_caidas["caida_minima"],
+                        max_horas=reglas_caidas["max_horas"],
+                    )
+                    total_caidas_drasticas = len(alertas_periodo)
+                    detalle_alertas_completo = True
+                except Exception:
+                    # Si no están disponibles las reglas, se conserva el
+                    # resumen oficial para que el panel siga funcionando.
+                    total_caidas_drasticas = resumen_alerta_bateria.total_caidas
+                    alertas_periodo = construir_alertas_periodo_desde_resumen(
+                        resumen_alerta_bateria
+                    )
             else:
                 total_caidas_drasticas = 0
                 clase_alertas_periodo = "tarjeta-neutra"
@@ -701,6 +856,7 @@ def obtener_contexto_baterias(request):
         "total_caidas_drasticas": total_caidas_drasticas,
         "clase_alertas_periodo": clase_alertas_periodo,
         "alertas_periodo": alertas_periodo,
+        "detalle_alertas_completo": detalle_alertas_completo,
     }
 
 

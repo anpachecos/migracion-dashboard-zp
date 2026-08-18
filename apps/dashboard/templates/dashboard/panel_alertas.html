@@ -5,12 +5,15 @@
 {% block title %}Panel de Alertas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=6">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=9">
 {% endblock %}
 
 {% block content %}
 
-<div class="alertas-page">
+<div
+    class="alertas-page"
+    data-caidas-url="{% url 'dashboard:detalle_caidas_bateria' %}"
+>
 
     <div class="alertas-header">
         <div>
@@ -27,11 +30,19 @@
         </div>
     </div>
 
-    <details class="preferencias-alertas" {% if total_preferencias_alertas %}open{% endif %}>
+    <details class="preferencias-alertas">
         <summary>
-            <span>Configurar alertas que no quiero ver</span>
-            <span class="preferencias-resumen">
-                {{ total_preferencias_alertas }} exclusi&oacute;n{{ total_preferencias_alertas|pluralize:"es" }} activa{{ total_preferencias_alertas|pluralize:"s" }}
+            <span class="preferencias-summary-principal">
+                <span class="preferencias-summary-titulo">Configurar alertas que no quiero ver</span>
+                <span class="preferencias-summary-ayuda">Haz clic para abrir la configuraci&oacute;n</span>
+            </span>
+            <span class="preferencias-summary-lateral">
+                <span class="preferencias-resumen" id="preferencias-resumen">
+                    {{ total_preferencias_alertas }} exclusi&oacute;n{{ total_preferencias_alertas|pluralize:"es" }} activa{{ total_preferencias_alertas|pluralize:"s" }} ·
+                    {{ total_amids_excluidos }} AMID ·
+                    {{ total_ubicaciones_excluidas }} ubicaci&oacute;n{{ total_ubicaciones_excluidas|pluralize:"es" }}
+                </span>
+                <span class="preferencias-chevron" aria-hidden="true"></span>
             </span>
         </summary>
 
@@ -41,37 +52,126 @@
                 No modifican las alertas ni los datos de Oracle.
             </p>
 
-            <form method="post" class="preferencias-formulario">
+            <form
+                method="post"
+                class="preferencias-formulario"
+                id="preferencias-alertas-form"
+                data-sugerencias-url="{% url 'dashboard:buscar_exclusiones_alertas' %}"
+                data-minimo-caracteres="2"
+            >
                 {% csrf_token %}
 
-                <div class="preferencia-campo">
-                    <label for="amids_excluidos">AMID que no quiero ver</label>
-                    <textarea
+                <section class="preferencia-campo" aria-labelledby="titulo-amid-excluidos">
+                    <h3 id="titulo-amid-excluidos">AMID que no quiero ver</h3>
+
+                    <div class="preferencia-autocomplete" data-autocomplete="amid">
+                        <label for="buscador-amid-exclusion">Buscar AMID</label>
+                        <input
+                            type="search"
+                            id="buscador-amid-exclusion"
+                            class="preferencia-buscador"
+                            placeholder="Ejemplo: 75006"
+                            inputmode="numeric"
+                            autocomplete="off"
+                            aria-autocomplete="list"
+                            aria-controls="sugerencias-amid"
+                            data-buscador-exclusion
+                        >
+                        <div
+                            id="sugerencias-amid"
+                            class="preferencia-sugerencias"
+                            role="listbox"
+                            data-sugerencias-exclusion
+                            hidden
+                        ></div>
+                        <small class="preferencia-estado" data-estado-exclusion aria-live="polite">
+                            Escribe al menos 2 dígitos para buscar.
+                        </small>
+                    </div>
+
+                    <div class="preferencia-seleccionados">
+                        <span class="preferencia-subtitulo">AMID excluidos</span>
+                        <div class="preferencia-chips" data-lista-exclusiones="amid">
+                            {% for amid in preferencias_alertas.amids_excluidos %}
+                                <span class="preferencia-chip" data-valor="{{ amid }}">
+                                    <span>{{ amid }}</span>
+                                    <button
+                                        type="button"
+                                        data-quitar-exclusion
+                                        aria-label="Quitar AMID {{ amid }}"
+                                    >&times;</button>
+                                </span>
+                            {% endfor %}
+                            <span
+                                class="preferencia-vacio"
+                                data-lista-vacia="amid"
+                                {% if preferencias_alertas.amids_excluidos %}hidden{% endif %}
+                            >Ningún AMID excluido.</span>
+                        </div>
+                    </div>
+
+                    <input
+                        type="hidden"
                         id="amids_excluidos"
                         name="amids_excluidos"
-                        rows="7"
-                        placeholder="Ejemplo: 7500679, 7500680"
-                    >{{ amids_excluidos_texto }}</textarea>
-                    <small>Escribe uno por l&iacute;nea o sep&aacute;ralos con comas.</small>
-                </div>
-
-                <div class="preferencia-campo">
-                    <label for="ubicaciones_excluidas">Ubicaciones que no quiero ver</label>
-                    <select
-                        id="ubicaciones_excluidas"
-                        name="ubicaciones_excluidas"
-                        multiple
-                        size="7"
+                        value="{{ amids_excluidos_texto }}"
+                        data-campo-amids
                     >
-                        {% for ubicacion in ubicaciones_disponibles %}
-                            <option
-                                value="{{ ubicacion.nombre }}"
-                                {% if ubicacion.seleccionada %}selected{% endif %}
-                            >{{ ubicacion.nombre }}</option>
-                        {% endfor %}
-                    </select>
-                    <small>Usa Ctrl (o Cmd) para seleccionar o quitar varias ubicaciones.</small>
-                </div>
+                </section>
+
+                <section class="preferencia-campo" aria-labelledby="titulo-ubicaciones-excluidas">
+                    <h3 id="titulo-ubicaciones-excluidas">Ubicaciones que no quiero ver</h3>
+
+                    <div class="preferencia-autocomplete" data-autocomplete="ubicacion">
+                        <label for="buscador-ubicacion-exclusion">Buscar ubicación</label>
+                        <input
+                            type="search"
+                            id="buscador-ubicacion-exclusion"
+                            class="preferencia-buscador"
+                            placeholder="Ejemplo: Américo Vespucio"
+                            autocomplete="off"
+                            aria-autocomplete="list"
+                            aria-controls="sugerencias-ubicacion"
+                            data-buscador-exclusion
+                        >
+                        <div
+                            id="sugerencias-ubicacion"
+                            class="preferencia-sugerencias"
+                            role="listbox"
+                            data-sugerencias-exclusion
+                            hidden
+                        ></div>
+                        <small class="preferencia-estado" data-estado-exclusion aria-live="polite">
+                            Escribe al menos 2 caracteres para buscar.
+                        </small>
+                    </div>
+
+                    <div class="preferencia-seleccionados">
+                        <span class="preferencia-subtitulo">Ubicaciones excluidas</span>
+                        <div class="preferencia-chips" data-lista-exclusiones="ubicacion">
+                            {% for ubicacion in preferencias_alertas.ubicaciones_excluidas %}
+                                <span class="preferencia-chip preferencia-chip-ubicacion" data-valor="{{ ubicacion }}">
+                                    <span>{{ ubicacion }}</span>
+                                    <button
+                                        type="button"
+                                        data-quitar-exclusion
+                                        aria-label="Quitar ubicación {{ ubicacion }}"
+                                    >&times;</button>
+                                    <input
+                                        type="hidden"
+                                        name="ubicaciones_excluidas"
+                                        value="{{ ubicacion }}"
+                                    >
+                                </span>
+                            {% endfor %}
+                            <span
+                                class="preferencia-vacio"
+                                data-lista-vacia="ubicacion"
+                                {% if preferencias_alertas.ubicaciones_excluidas %}hidden{% endif %}
+                            >Ninguna ubicación excluida.</span>
+                        </div>
+                    </div>
+                </section>
 
                 <div class="preferencias-acciones">
                     <button type="submit">Guardar preferencias</button>
@@ -82,9 +182,15 @@
                         class="boton-secundario"
                     >Restablecer preferencias</button>
                     <small>
-                        Para volver a mostrar todo, vac&iacute;a los AMID, desmarca las ubicaciones y guarda.
+                        Los cambios se aplican al guardar y solo afectan lo que ve tu usuario.
                     </small>
                 </div>
+
+                <noscript>
+                    <p class="preferencias-sin-js">
+                        Este selector necesita JavaScript para agregar o quitar exclusiones.
+                    </p>
+                </noscript>
             </form>
         </div>
     </details>
@@ -125,8 +231,9 @@
         </div>
 
         <div class="alerta-card">
-            <span>Alertas batería</span>
-            <strong>{{ resumen_alertas.total_bateria }}</strong>
+            <span>Caídas batería</span>
+            <strong>{{ resumen_alertas.total_caidas_bateria }}</strong>
+            <small class="alerta-card-detalle">{{ resumen_alertas.total_bateria }} AMID con alerta</small>
         </div>
     </div>
 
@@ -289,6 +396,29 @@
                                 {% endif %}
                             </div>
 
+                            {% if alerta.total_caidas > 0 %}
+                                <div class="caidas-resumen">
+                                    <strong>{{ alerta.total_caidas }}</strong>
+                                    caída{{ alerta.total_caidas|pluralize:"s" }} detectada{{ alerta.total_caidas|pluralize:"s" }}
+                                    <span>
+                                        ({{ alerta.caidas_hoy }} hoy · {{ alerta.caidas_hist }} históricas)
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="boton-detalle-caidas"
+                                    data-ver-caidas
+                                    data-amid="{{ alerta.amid }}"
+                                    aria-expanded="false"
+                                >Ver todas las caídas</button>
+                                <div
+                                    class="detalle-caidas"
+                                    data-detalle-caidas="{{ alerta.amid }}"
+                                    aria-live="polite"
+                                    hidden
+                                ></div>
+                            {% endif %}
+
                             <div class="acciones-revision acciones-en-celda">
                                 <a href="{% url 'dashboard:panel_baterias' %}?amid={{ alerta.amid }}">
                                     Revisar batería
@@ -328,4 +458,8 @@
 
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=3"></script>
 {% endblock %}

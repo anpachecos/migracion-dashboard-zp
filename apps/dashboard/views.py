@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -17,6 +17,10 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from apps.dashboard.services.alertas_service import (
+    LIMITE_SUGERENCIAS_ALERTAS,
+    MIN_CARACTERES_BUSQUEDA_ALERTAS,
+    buscar_amids_alertas,
+    buscar_ubicaciones_alertas,
     obtener_contexto_alertas,
     obtener_ubicaciones_alertas_disponibles,
 )
@@ -40,6 +44,7 @@ from .services.baterias_service import (
     obtener_ahora_referencia,
     obtener_bloques_bateria_oracle,
     obtener_contexto_baterias,
+    obtener_detalle_caidas_bateria_oracle,
     obtener_rango_fechas_panel,
 )
 from .services.gps_service import obtener_contexto_gps
@@ -122,12 +127,86 @@ def ejecutar_comando_admin(request):
 
 
 @login_required
-def panel_alertas(request):
-    ubicaciones_disponibles = obtener_ubicaciones_alertas_disponibles()
+def buscar_exclusiones_alertas(request):
+    """Endpoint liviano para los autocompletados del panel de alertas."""
 
+    if request.method != "GET":
+        return JsonResponse({"detalle": "Metodo no permitido."}, status=405)
+
+    tipo = request.GET.get("tipo", "").strip().lower()
+    termino = request.GET.get("q", "").strip()[:120]
+
+    if len(termino) < MIN_CARACTERES_BUSQUEDA_ALERTAS:
+        return JsonResponse(
+            {
+                "resultados": [],
+                "minimo_caracteres": MIN_CARACTERES_BUSQUEDA_ALERTAS,
+            }
+        )
+
+    if tipo == "amid":
+        valores = buscar_amids_alertas(termino, LIMITE_SUGERENCIAS_ALERTAS)
+    elif tipo == "ubicacion":
+        valores = buscar_ubicaciones_alertas(termino, LIMITE_SUGERENCIAS_ALERTAS)
+    else:
+        return JsonResponse({"detalle": "Tipo de busqueda no valido."}, status=400)
+
+    return JsonResponse(
+        {
+            "resultados": [
+                {
+                    "valor": valor,
+                    "etiqueta": valor,
+                }
+                for valor in valores
+            ],
+            "minimo_caracteres": MIN_CARACTERES_BUSQUEDA_ALERTAS,
+            "limite": LIMITE_SUGERENCIAS_ALERTAS,
+        }
+    )
+
+
+@login_required
+def detalle_caidas_bateria(request):
+    """Devuelve las caídas de un AMID solo cuando el usuario abre el detalle."""
+    if request.method != "GET":
+        return JsonResponse({"detalle": "Metodo no permitido."}, status=405)
+
+    amid = request.GET.get("amid", "").strip()
+    if not amid or not amid.isdigit():
+        return JsonResponse(
+            {"detalle": "Debes indicar un AMID valido."},
+            status=400,
+        )
+
+    try:
+        resultado = obtener_detalle_caidas_bateria_oracle(amid=amid, dias=14)
+    except RuntimeError:
+        return JsonResponse(
+            {"detalle": "No fue posible leer las reglas de caidas en Oracle."},
+            status=503,
+        )
+    except Exception:
+        return JsonResponse(
+            {"detalle": "No fue posible consultar el detalle de caidas."},
+            status=500,
+        )
+
+    return JsonResponse(resultado)
+
+
+@login_required
+def panel_alertas(request):
     if request.method == "POST":
+        # Se obtiene el catalogo completo solo al guardar para conservar la
+        # validacion existente. En los GET ya no se envia al HTML.
+        ubicaciones_disponibles = obtener_ubicaciones_alertas_disponibles()
         limpiar_preferencias = request.POST.get("limpiar_preferencias") == "1"
-        texto_amids = "" if limpiar_preferencias else request.POST.get("amids_excluidos", "")
+        texto_amids = (
+            ""
+            if limpiar_preferencias
+            else request.POST.get("amids_excluidos", "")
+        )
         ubicaciones = (
             []
             if limpiar_preferencias
@@ -156,22 +235,18 @@ def panel_alertas(request):
         return redirect("dashboard:panel_alertas")
 
     preferencias = obtener_preferencias_alertas_usuario(request.user)
-    ubicaciones_seleccionadas = set(preferencias["ubicaciones_excluidas"])
 
     contexto = obtener_contexto_alertas(request, preferencias=preferencias)
     contexto.update(
         {
             "preferencias_alertas": preferencias,
-            "amids_excluidos_texto": "\n".join(
+            "amids_excluidos_texto": ",".join(
                 str(amid) for amid in preferencias["amids_excluidos"]
             ),
-            "ubicaciones_disponibles": [
-                {
-                    "nombre": nombre,
-                    "seleccionada": nombre in ubicaciones_seleccionadas,
-                }
-                for nombre in ubicaciones_disponibles
-            ],
+            "total_amids_excluidos": len(preferencias["amids_excluidos"]),
+            "total_ubicaciones_excluidas": len(
+                preferencias["ubicaciones_excluidas"]
+            ),
             "total_preferencias_alertas": (
                 len(preferencias["amids_excluidos"])
                 + len(preferencias["ubicaciones_excluidas"])

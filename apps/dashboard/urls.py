@@ -13,6 +13,16 @@ urlpatterns = [
     path("baterias/", views.panel_baterias, name="panel_baterias"),
     path("gps/", views.panel_gps, name="panel_gps"),
     path("alertas/", views.panel_alertas, name="panel_alertas"),
+    path(
+        "alertas/buscar-exclusiones/",
+        views.buscar_exclusiones_alertas,
+        name="buscar_exclusiones_alertas",
+    ),
+    path(
+        "alertas/caidas-bateria/",
+        views.detalle_caidas_bateria,
+        name="detalle_caidas_bateria",
+    ),
     path("perfil/", views.panel_perfil, name="panel_perfil"),
 
     # Acciones administrativas
