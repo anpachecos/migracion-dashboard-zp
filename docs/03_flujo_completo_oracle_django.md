@@ -27,15 +27,20 @@ flowchart TD
     E --> F["BATERIA_BLOQUE_30MIN"]
     C --> G["PRC_UPD_AMID_ALERTAS"]
     G --> H["AMID_MAESTRO_ALERTAS"]
+    F --> P["PRC_REFRESCAR_CAIDAS_BAT"]
+    J["ALERTA_REGLA_PARAM: 27 umbrales"] --> P
+    P --> Q["ALERTA_BATERIA_CAIDA_EVENTO: caídas confirmadas de 14 días"]
     F --> I["PRC_UPD_ALERTAS_VAL: cálculo completo"]
     H --> I
-    J["ALERTA_REGLA_PARAM: 27 umbrales"] --> K["PRC_VALIDAR_REGLAS_ALERTA"]
+    Q --> I
+    J --> K["PRC_VALIDAR_REGLAS_ALERTA"]
     K --> I
     K --> L["PRC_RECLASIFICAR_ALERTAS: aplicación rápida"]
     I --> M["ALERTA_VALIDADOR_RESUMEN: una fila por AMID"]
     L --> M
     M --> N["VW_ALERTA_VALIDADOR_ACTIVA"]
     N --> O["Django: panel, filtros, paginación y caché"]
+    Q --> O
 ```
 
 Hay dos caminos al cambiar una regla:
@@ -68,10 +73,11 @@ Los jobs programados ejecutan la preparación de bloques y el cálculo completo
 cada 30 minutos. Django nunca recorre todo el histórico para construir el Panel
 Alertas: consulta la vista activa, que expone una sola fila por AMID.
 
-Las tres estructuras de lectura son:
+Las cuatro estructuras de lectura son:
 
 - `VW_ESTATUS_ZP_DJANGO`, para detalle GPS y último estado normalizado;
 - `BATERIA_BLOQUE_30MIN`, para tablas y gráficos de batería;
+- `ALERTA_BATERIA_CAIDA_EVENTO`, para el detalle oficial de cada caída;
 - `VW_ALERTA_VALIDADOR_ACTIVA`, para el panel y los totales de alertas.
 
 Los totales del panel se mantienen 60 segundos en la caché local de Django. La
@@ -130,6 +136,31 @@ El procedimiento `PRC_ACTUALIZAR_BATERIA_BLOQUES`:
 
 Procesa dos días por defecto, aunque ambos parámetros pueden modificarse al ejecutar el procedimiento.
 
+### `ALERTA_BATERIA_CAIDA_EVENTO`
+
+Almacena el detalle materializado de las caídas confirmadas por Oracle. Cada fila
+identifica el AMID, el bloque anterior, el bloque donde se produjo la caída, los
+porcentajes desde/hasta, la diferencia y la fecha del cálculo.
+
+La tabla no tiene un job independiente. Su mantenimiento forma parte del flujo
+normal de alertas:
+
+1. `JOB_UPD_ALERTAS_VAL` ejecuta `PRC_UPD_ALERTAS_VAL` cada 30 minutos.
+2. `PRC_UPD_ALERTAS_VAL` llama primero a `PRC_REFRESCAR_CAIDAS_BAT`.
+3. El procedimiento elimina el detalle derivado anterior e inserta nuevamente
+   solo las caídas comprendidas entre `TRUNC(SYSDATE) - 13` y `SYSDATE`.
+4. El resumen de alertas se calcula desde esa misma versión de eventos.
+5. El `COMMIT` ocurre al finalizar el cálculo completo. Si este falla, el
+   `ROLLBACK` restaura también la versión anterior del detalle.
+
+Por lo tanto, no hace falta un job adicional para borrar caídas antiguas: los
+eventos que salen de la ventana de 14 días desaparecen automáticamente en el
+siguiente recálculo. La tabla no es un historial permanente.
+
+La migración `V009__detalle_caidas_bateria_fuente_unica.sql` se ejecuta una sola
+vez para crear la tabla y los procedimientos. Después de eso, el job existente
+mantiene su contenido.
+
 ### `AMID_MAESTRO_ALERTAS`
 
 Es el catálogo de AMID que participan en el cálculo de alertas.
@@ -171,6 +202,9 @@ Mantiene una sola fila por AMID gracias a la restricción única sobre esa colum
 - Fecha de actualización del cálculo.
 
 `PRC_UPD_ALERTAS_VAL` calcula una ventana de 14 días: hoy más los 13 días anteriores.
+En este resumen, `CAIDAS_HIST` representa el total de esa ventana e incluye las
+caídas de hoy. `CAIDAS_HOY` es el subconjunto ocurrido desde el inicio del día;
+no deben sumarse ambas columnas.
 
 ### Ubicaciones esperadas
 
@@ -235,7 +269,11 @@ Si ninguna condición se cumple, el nivel GPS queda en `OK`.
 
 ## Cálculo de alertas de batería
 
-Las caídas se detectan comparando bloques consecutivos de batería que contienen datos reales.
+`PRC_REFRESCAR_CAIDAS_BAT` detecta las caídas comparando bloques consecutivos de
+batería que contienen datos reales y guarda el resultado en
+`ALERTA_BATERIA_CAIDA_EVENTO`. `PRC_UPD_ALERTAS_VAL` usa esos mismos eventos para
+calcular cantidades, máximos y clasificación. Django solo los consulta; no
+vuelve a aplicar las reglas.
 
 Una caída candidata debe respetar estos valores:
 
@@ -299,7 +337,9 @@ El procedimiento también genera un motivo principal y una acción sugerida: rev
 
 Consulta `VW_ALERTA_VALIDADOR_ACTIVA` para las tarjetas, filtros, paginación,
 motivo y acción sugerida. Los totales globales se cachean durante 60 segundos.
-Las solicitudes web no vuelven a ejecutar las reglas.
+El detalle desplegable consulta `ALERTA_BATERIA_CAIDA_EVENTO` únicamente cuando
+el usuario lo abre. Las solicitudes web no vuelven a ejecutar las reglas ni
+reconstruyen caídas desde los bloques.
 
 ### Panel Baterías
 
@@ -307,9 +347,11 @@ Consulta:
 
 - `VW_ESTATUS_ZP_DJANGO` para el último estado;
 - `BATERIA_BLOQUE_30MIN` para tabla y gráficos;
+- `ALERTA_BATERIA_CAIDA_EVENTO` para el detalle oficial de caídas;
 - el resumen Oracle para los indicadores oficiales del AMID.
 
-Python no vuelve a buscar el registro más cercano de cada bloque.
+Python no vuelve a buscar el registro más cercano de cada bloque ni detecta
+caídas por su cuenta. Ambos paneles utilizan la misma fuente Oracle.
 
 ### Panel GPS
 
@@ -338,7 +380,7 @@ El historial de valores vive en Oracle; el archivo local registra la ejecución.
 | Job | Función | Frecuencia | Duración observada |
 |---|---|---|---:|
 | `JOB_ACTUALIZAR_BATERIA_BLOQUES` | Prepara bloques de batería | cada 30 minutos | ~1:06 |
-| `JOB_UPD_ALERTAS_VAL` | Cálculo completo de alertas | cada 30 minutos | ~3:10 |
+| `JOB_UPD_ALERTAS_VAL` | Refresca eventos de caída y calcula el resumen completo | cada 30 minutos | ~3:10 antes de V009; volver a medir |
 | `JOB_UPD_AMID_ALERTAS` | Sincroniza maestro de AMID | diario | ~0:04 |
 
 Durante la auditoría no presentaban fallos.

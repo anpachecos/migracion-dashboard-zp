@@ -15,18 +15,36 @@ No deben copiarse datos operativos a SQLite en el flujo vigente.
 |---|---|
 | `VW_ESTATUS_ZP_DJANGO` | Estado/telemetría por AMID y fecha. |
 | `BATERIA_BLOQUE_30MIN` | Batería agregada cada 30 minutos. |
+| `ALERTA_BATERIA_CAIDA_EVENTO` | Detalle derivado de caídas confirmadas en la ventana móvil de 14 días. |
 | ALERTA_VALIDADOR_RESUMEN | Resultado calculado: prioridad, motivos y métricas por AMID. |
 | VW_ALERTA_VALIDADOR_ACTIVA | Resúmenes limitados a los AMID activos. |
 | ALERTA_REGLA_PARAM | Reglas configurables y tipo de aplicación. |
 | ALERTA_REGLA_HISTORIAL | Auditoría de valores anteriores y nuevos. |
 | `UBICACION_ESPERADA_VALIDADOR` | Referencia vigente por AMID. |
 | `HISTORIAL_UBICACION_ESPERADA` | Vigencias históricas. |
+| `PRC_REFRESCAR_CAIDAS_BAT` | Reemplaza transaccionalmente los eventos de caída usando las reglas de detección. |
 | PRC_UPD_ALERTAS_VAL | Recalcula métricas y clasificación histórica. |
 | PRC_RECLASIFICAR_ALERTAS | Valida y reaplica solo clasificación. |
 | PRC_RECALCULAR_ALERTAS_SEGURO | Valida y ejecuta el cálculo completo. |
 | `PRC_LIMPIAR_HIST_UBICACION` | Limpia historial según retención. |
 
 El baseline vigente se versiona en `oracle/current/`; las migraciones ejecutadas se conservan en `oracle/history/` y los resultados de auditoría no se publican.
+
+### Ciclo de vida de los eventos de caída
+
+`ALERTA_BATERIA_CAIDA_EVENTO` es una tabla derivada y acotada, no un histórico
+indefinido. No necesita un job de limpieza separado.
+
+`JOB_UPD_ALERTAS_VAL` se ejecuta cada 30 minutos y llama indirectamente a
+`PRC_REFRESCAR_CAIDAS_BAT` a través de `PRC_UPD_ALERTAS_VAL`. En la misma
+transacción se eliminan los eventos derivados anteriores, se insertan los de la
+ventana vigente de 14 días y se recalcula `ALERTA_VALIDADOR_RESUMEN`. Si ocurre
+un error antes del `COMMIT`, Oracle recupera la versión anterior mediante
+`ROLLBACK`.
+
+`CAIDAS_HIST` es el total de los 14 días e incluye `CAIDAS_HOY`. Django no debe
+sumarlas ni aplicar nuevamente `BAT_CAIDA_MIN_DETECTAR` o
+`BAT_CAIDA_MAX_HORAS`.
 
 ## Contratos de aplicación
 

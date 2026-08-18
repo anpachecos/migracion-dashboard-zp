@@ -151,7 +151,6 @@ La carpeta `services/` contiene la lógica de negocio del dashboard. Es una de l
 
 ```txt
 apps/dashboard/services/
-├── alertas_bateria_utils.py
 ├── alertas_service.py
 ├── baterias_service.py
 ├── gps_service.py
@@ -165,10 +164,10 @@ apps/dashboard/services/
 | Archivo | Descripción | Estado |
 |---|---|---|
 | `oracle_connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza la creación del pool y la obtención de conexiones. | Vigente |
-| `baterias_service.py` | Prepara los datos del Panel Baterías: tarjetas, tabla por media hora, gráficos y alertas del período. | Vigente / revisar lógica de alertas |
+| `baterias_service.py` | Prepara tarjetas, tabla y gráficos del Panel Baterías. Lee el resumen y el detalle oficial de caídas desde Oracle. | Vigente |
 | `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, ubicación esperada y validación contra radio. | Vigente |
 | `alertas_service.py` | Consulta desde Oracle la tabla resumen de alertas y prepara cards, filtros, paginación y tabla del Panel Alertas. | Vigente |
-| `alertas_bateria_utils.py` | Funciones auxiliares para detectar caídas de batería en Python. Debe revisarse porque puede duplicar lógica que también existe o debería existir en Oracle. | Revisar |
+
 | `reglas_alertas_service.py` | Consulta y actualiza reglas configurables de alertas desde el Panel Perfil/Admin. | Vigente |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
 | `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
@@ -176,12 +175,17 @@ apps/dashboard/services/
 
 ### Observación importante sobre alertas de batería
 
-Actualmente el Panel Baterías y el Panel Alertas pueden no usar exactamente la misma lógica para detectar caídas de batería.
+La divergencia anterior entre paneles fue resuelta por V009:
 
-- El Panel Baterías puede calcular alertas desde Python.
-- El Panel Alertas lee alertas ya resumidas desde Oracle.
+- `PRC_REFRESCAR_CAIDAS_BAT` aplica en Oracle las reglas de detección.
+- `ALERTA_BATERIA_CAIDA_EVENTO` conserva los eventos derivados de la ventana de
+  14 días.
+- `PRC_UPD_ALERTAS_VAL` calcula el resumen desde esos mismos eventos.
+- `baterias_service.py` y el detalle del Panel Alertas consultan la tabla de
+  eventos; no reconstruyen caídas en Python.
 
-Esto debe revisarse para evitar diferencias entre ambos paneles. La recomendación futura es tener una única lógica oficial para eventos de batería y que ambos paneles la consulten.
+`CAIDAS_HIST` ya incluye `CAIDAS_HOY`. La aplicación usa `CAIDAS_HIST` como total
+y calcula los días anteriores mediante `CAIDAS_HIST - CAIDAS_HOY`.
 
 ---
 

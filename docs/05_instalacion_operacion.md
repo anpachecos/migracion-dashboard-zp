@@ -78,5 +78,8 @@ En producción: `DEBUG=False`, clave única, hosts restrictivos, `migrate`, `che
 - Fallo Oracle: revisar variables/red/service name y ejecutar `probar_oracle`.
 - SQLite bloqueado: revisar concurrencia y jobs duplicados.
 - Sin estilos: ejecutar `collectstatic` y publicar `STATIC_ROOT`.
-- Alertas antiguas: revisar resumen, reglas y `PRC_UPD_ALERTAS_VAL`.
+- Alertas antiguas: revisar `JOB_UPD_ALERTAS_VAL`, `PRC_UPD_ALERTAS_VAL` y la
+  fecha de cálculo de `ALERTA_BATERIA_CAIDA_EVENTO`.
+- Detalle de caídas no disponible: validar los objetos de V009 y ejecutar el
+  diagnóstico `oracle/diagnostics/V009_VALIDAR__detalle_caidas_bateria.sql`.
 

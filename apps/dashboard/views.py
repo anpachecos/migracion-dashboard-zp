@@ -181,15 +181,10 @@ def detalle_caidas_bateria(request):
 
     try:
         resultado = obtener_detalle_caidas_bateria_oracle(amid=amid, dias=14)
-    except RuntimeError:
-        return JsonResponse(
-            {"detalle": "No fue posible leer las reglas de caidas en Oracle."},
-            status=503,
-        )
     except Exception:
         return JsonResponse(
-            {"detalle": "No fue posible consultar el detalle de caidas."},
-            status=500,
+            {"detalle": "El detalle de caidas de Oracle no esta disponible."},
+            status=503,
         )
 
     return JsonResponse(resultado)

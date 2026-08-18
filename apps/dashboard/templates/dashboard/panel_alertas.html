@@ -399,9 +399,9 @@
                             {% if alerta.total_caidas > 0 %}
                                 <div class="caidas-resumen">
                                     <strong>{{ alerta.total_caidas }}</strong>
-                                    caída{{ alerta.total_caidas|pluralize:"s" }} detectada{{ alerta.total_caidas|pluralize:"s" }}
+                                    caída{{ alerta.total_caidas|pluralize:"s" }} en 14 días
                                     <span>
-                                        ({{ alerta.caidas_hoy }} hoy · {{ alerta.caidas_hist }} históricas)
+                                        {{ alerta.caidas_hoy }} hoy · {{ alerta.caidas_anteriores }} en días anteriores
                                     </span>
                                 </div>
                                 <button
@@ -461,5 +461,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=3"></script>
+<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=4"></script>
 {% endblock %}

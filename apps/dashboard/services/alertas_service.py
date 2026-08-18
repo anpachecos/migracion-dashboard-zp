@@ -15,7 +15,7 @@ ORDEN_PRIORIDAD = {
 }
 
 ALERTAS_POR_PAGINA = 10
-CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v2"
+CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v3"
 CACHE_TIMEOUT_RESUMEN_ALERTAS = 60
 CACHE_KEY_UBICACIONES_ALERTAS = "dashboard:ubicaciones-alertas:v1"
 CACHE_TIMEOUT_UBICACIONES_ALERTAS = 300
@@ -399,8 +399,9 @@ def obtener_alertas_validadores(
             item["bateria_actual"] = item.get("bateria_actual")
             item["caidas_hoy"] = normalizar_numero(item.get("caidas_hoy"))
             item["caidas_hist"] = normalizar_numero(item.get("caidas_hist"))
-            item["total_caidas"] = (
-                item["caidas_hoy"] + item["caidas_hist"]
+            item["total_caidas"] = item["caidas_hist"]
+            item["caidas_anteriores"] = max(
+                item["caidas_hist"] - item["caidas_hoy"], 0
             )
             item["bateria_cero_hoy"] = normalizar_numero(item.get("bateria_cero_hoy"))
             item["bateria_cero_hist"] = normalizar_numero(item.get("bateria_cero_hist"))
@@ -543,7 +544,7 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
             SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'OK' THEN 1 ELSE 0 END) AS total_ok,
             SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
             SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
-            SUM(NVL(CAIDAS_HOY, 0) + NVL(CAIDAS_HIST, 0)) AS total_caidas_bateria,
+            SUM(NVL(CAIDAS_HIST, 0)) AS total_caidas_bateria,
             MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
         FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
         LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u

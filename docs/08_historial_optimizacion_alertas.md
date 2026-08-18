@@ -54,6 +54,24 @@ El log manual incorporó modo, duración, error, rotación a 1 MB y presentació
 las últimas 100 líneas. También se evita iniciar dos recálculos manuales dentro
 del mismo proceso Django.
 
+## Etapa 5 — Fuente única para caídas de batería
+
+V009 incorporó:
+
+- `ALERTA_BATERIA_CAIDA_EVENTO`, con los eventos derivados de los últimos 14
+  días;
+- `PRC_REFRESCAR_CAIDAS_BAT`, responsable de aplicar las reglas de detección;
+- la llamada al refresco dentro de `PRC_UPD_ALERTAS_VAL` antes de calcular el
+  resumen;
+- lectura bajo demanda del detalle desde Django, sin reconstrucción en Python;
+- corrección del total para no sumar `CAIDAS_HOY` dos veces, porque ya está
+  incluido en `CAIDAS_HIST`.
+
+No se creó otro job. `JOB_UPD_ALERTAS_VAL` mantiene la tabla cada 30 minutos. El
+refresco reemplaza su contenido por la ventana vigente dentro de la misma
+transacción del resumen, por lo que también cumple la retención sin un proceso
+de borrado independiente.
+
 ## Estado final
 
 - Las reglas viven en Oracle y se editan desde Django.
@@ -62,6 +80,8 @@ del mismo proceso Django.
 - Detección utiliza el cálculo completo.
 - Los valores anteriores quedan auditados.
 - Django consulta resultados preparados.
+- Los dos paneles consumen los mismos eventos de caída calculados por Oracle.
+- Los eventos de caída se mantienen automáticamente en una ventana de 14 días.
 
 Los archivos de `oracle/history/` conservan las sentencias ejecutadas y sus
 reparaciones. No deben volver a ejecutarse sobre el esquema actual.

@@ -369,8 +369,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const meta = document.createElement("p");
         meta.className = "detalle-caidas-meta";
-        meta.textContent = `${alertas.length} caída${alertas.length === 1 ? "" : "s"} · `
-            + `umbral desde ${datos.caida_minima} puntos · máximo ${datos.max_horas} h`;
+        meta.textContent = `${alertas.length} caída${alertas.length === 1 ? "" : "s"} `
+            + `confirmada${alertas.length === 1 ? "" : "s"} por Oracle en 14 días`;
         contenedor.appendChild(meta);
 
         const lista = document.createElement("ol");
