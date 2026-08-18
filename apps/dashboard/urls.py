@@ -24,6 +24,11 @@ urlpatterns = [
         name="detalle_caidas_bateria",
     ),
     path("perfil/", views.panel_perfil, name="panel_perfil"),
+    path(
+        "perfil/reglas-alertas/editor/",
+        views.editor_reglas_alertas,
+        name="editor_reglas_alertas",
+    ),
 
     # Acciones administrativas
     path(

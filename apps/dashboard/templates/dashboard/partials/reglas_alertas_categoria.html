@@ -1,0 +1,106 @@
+<div class="reglas-tab-panel{% if visible %} is-active{% endif %}" data-reglas-panel="{{ categoria }}" {% if not visible %}hidden{% endif %}>
+    {% for seccion in secciones %}
+    <details class="reglas-acordeon" {% if forloop.first %}open{% endif %}>
+        <summary>
+            <span>
+                <strong>{{ seccion.titulo }}</strong>
+                <small>{{ seccion.descripcion }}</small>
+            </span>
+            <span class="reglas-acordeon-conteo">{{ seccion.reglas|length }} reglas</span>
+        </summary>
+
+        <div class="reglas-acordeon-contenido">
+{% if seccion.rangos %}
+            <div class="reglas-rangos-grid">
+                {% for rango in seccion.rangos %}
+                <div class="reglas-rango" data-reglas-rango data-maximo-fijo="{{ rango.maximo_fijo|stringformat:'s' }}">
+                    <div class="reglas-rango-encabezado">
+                        <strong>{{ rango.titulo }}</strong>
+                        <small>{{ rango.nota }}</small>
+                    </div>
+                    <div class="reglas-rango-barra" aria-label="{{ rango.titulo }}">
+                        <span class="reglas-rango-linea"></span>
+                        {% for marcador in rango.marcadores %}
+                        <span
+                            class="reglas-rango-marca reglas-rango-marca--{{ marcador.prioridad }}"
+                            style="left: {{ marcador.posicion|stringformat:'s' }}%;"
+                            data-rango-clave="{{ marcador.clave }}"
+                        ><i></i></span>
+                        {% endfor %}
+                    </div>
+                    <div class="reglas-rango-leyenda">
+                        {% for marcador in rango.marcadores %}
+                        <span class="reglas-rango-item reglas-rango-item--{{ marcador.prioridad }}">
+                            {{ marcador.etiqueta }}:
+                            <strong data-rango-valor="{{ marcador.clave }}">{{ marcador.valor|stringformat:'s' }}</strong>
+                            {{ rango.unidad }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="reglas-cards">
+                {% for regla in seccion.reglas %}
+                <article class="regla-card" data-regla-card data-clave="{{ regla.clave }}" data-original="{{ regla.valor_numero|stringformat:'s' }}">
+                    <div class="regla-card-encabezado">
+                        <div>
+                            <h4>{{ regla.nombre }}</h4>
+                            <code>{{ regla.clave }}</code>
+                        </div>
+                        <span class="regla-prioridad regla-prioridad--{% if regla.prioridad == 'Crítica' %}critica{% elif regla.prioridad == 'Alta' %}alta{% elif regla.prioridad == 'Advertencia' %}advertencia{% else %}deteccion{% endif %}">
+                            {{ regla.prioridad }}
+                        </span>
+                    </div>
+
+                    <p class="regla-explicacion" data-template="{{ regla.explicacion }}" data-regla-explicacion>{{ regla.explicacion_actual }}</p>
+
+                    <div class="regla-control">
+                        <label for="regla_{{ regla.clave }}">Valor del umbral</label>
+                        <div class="regla-numero">
+                            <input
+                                id="regla_{{ regla.clave }}"
+                                type="number"
+                                name="regla_{{ regla.clave }}"
+                                value="{{ regla.valor_numero|stringformat:'s' }}"
+                                min="{{ regla.minimo }}"
+                                {% if regla.maximo is not None %}max="{{ regla.maximo }}"{% endif %}
+                                step="{{ regla.paso }}"
+                                data-regla-input
+                            >
+                            <span>{{ regla.unidad }}</span>
+                        </div>
+                        {% if regla.usar_slider %}
+                        <input
+                            class="regla-slider"
+                            type="range"
+                            min="{{ regla.minimo }}"
+                            max="{{ regla.maximo }}"
+                            step="{{ regla.paso }}"
+                            value="{{ regla.valor_numero|stringformat:'s' }}"
+                            aria-label="Ajustar {{ regla.nombre }}"
+                            data-regla-slider
+                        >
+                        {% endif %}
+                    </div>
+
+                    <details class="regla-tecnica">
+                        <summary>Información técnica</summary>
+                        <dl>
+                            <div><dt>Clave Oracle</dt><dd>{{ regla.clave }}</dd></div>
+                            <div><dt>Tipo</dt><dd>{% if regla.tipo_regla == "DETECCION" %}Detección · cálculo completo{% else %}Clasificación · aplicación rápida{% endif %}</dd></div>
+                            <div><dt>Estado</dt><dd>{% if regla.activo == 1 %}Activa{% else %}Inactiva{% endif %} (solo lectura)</dd></div>
+                            {% if regla.fecha_actualizacion %}<div><dt>Actualizada</dt><dd>{{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</dd></div>{% endif %}
+                            {% if regla.descripcion %}<div><dt>Descripción Oracle</dt><dd>{{ regla.descripcion }}</dd></div>{% endif %}
+                        </dl>
+                    </details>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+    </details>
+    {% empty %}
+    <p class="texto-vacio">No hay reglas disponibles en esta categoría.</p>
+    {% endfor %}
+</div>

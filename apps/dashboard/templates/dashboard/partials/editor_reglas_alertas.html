@@ -1,0 +1,52 @@
+{% if reglas_alertas_error %}
+<div class="reglas-editor-error">
+    <strong>No fue posible cargar el editor.</strong>
+    <p>{{ reglas_alertas_error }}</p>
+    <button type="button" class="btn-reglas-secundario" data-reintentar-reglas>Reintentar</button>
+</div>
+{% else %}
+<form method="post" class="form-reglas-alertas" data-reglas-form>
+    {% csrf_token %}
+
+    <div class="reglas-editor-toolbar">
+        <div>
+            <span class="reglas-total">{{ total_reglas_editor }} reglas configurables</span>
+            <span class="reglas-cambios" data-contador-cambios>Sin cambios pendientes</span>
+        </div>
+        <p>Los valores mostrados son los que Oracle utiliza actualmente.</p>
+    </div>
+
+    <div class="reglas-tabs" role="tablist" aria-label="Tipo de alerta">
+        <button type="button" class="reglas-tab is-active" role="tab" aria-selected="true" data-reglas-tab="BATERIA">
+            Batería
+        </button>
+        <button type="button" class="reglas-tab" role="tab" aria-selected="false" data-reglas-tab="GPS">
+            GPS
+        </button>
+    </div>
+
+    {% include "dashboard/partials/reglas_alertas_categoria.html" with categoria="BATERIA" secciones=editor_reglas.BATERIA visible=True %}
+    {% include "dashboard/partials/reglas_alertas_categoria.html" with categoria="GPS" secciones=editor_reglas.GPS visible=False %}
+
+    <div class="reglas-alertas-acciones">
+        <div class="reglas-acciones-ayuda">
+            <strong>¿Cómo quieres guardar?</strong>
+            <span>Aplicar ahora inicia un recálculo; guardar para el próximo ciclo no lo ejecuta.</span>
+        </div>
+        <button type="submit" name="action" value="guardar_reglas_alertas" class="btn-reglas-secundario">
+            Guardar para el próximo ciclo
+        </button>
+        <button type="submit" name="action" value="guardar_y_recalcular_alertas" class="btn-reglas-primario" {% if recalculo_en_curso %}disabled{% endif %}>
+            {% if recalculo_en_curso %}Recálculo en curso{% else %}Guardar y aplicar ahora{% endif %}
+        </button>
+    </div>
+
+    {% if log_recalculo %}
+    <details class="reglas-log">
+        <summary>Ver últimas ejecuciones de recálculo</summary>
+        <p>Se muestran como máximo las últimas 100 líneas.</p>
+        <pre>{{ log_recalculo }}</pre>
+    </details>
+    {% endif %}
+</form>
+{% endif %}

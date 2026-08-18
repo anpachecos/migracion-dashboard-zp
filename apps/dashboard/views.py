@@ -10,6 +10,7 @@ from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from openpyxl import Workbook
@@ -33,7 +34,7 @@ from apps.dashboard.services.reglas_alertas_service import (
     actualizar_reglas_alertas,
     iniciar_recalculo_en_segundo_plano,
     leer_log_recalculo,
-    obtener_reglas_alertas,
+    obtener_editor_reglas_alertas,
     recalculo_en_curso,
     usuario_puede_editar_reglas,
 )
@@ -755,6 +756,7 @@ def panel_perfil(request):
         "es_admin": es_admin,
         "usuario_actual": usuario_actual,
         "roles_usuario_actual": roles_usuario_actual or "Sin rol asignado",
+        "abrir_editor_reglas": request.GET.get("editor_reglas") == "1",
     }
 
     if request.method == "POST" and es_admin:
@@ -799,7 +801,8 @@ def panel_perfil(request):
             except Exception as error:
                 messages.error(request, f"No fue posible actualizar las reglas: {error}")
 
-            return redirect("dashboard:panel_perfil")
+            url_perfil = reverse("dashboard:panel_perfil")
+            return redirect(f"{url_perfil}?editor_reglas=1")
 
     if es_admin:
         usuarios = User.objects.all().order_by("username")
@@ -840,14 +843,6 @@ def panel_perfil(request):
                 "es_admin": usuario.is_superuser,
             })
 
-        try:
-            reglas_alertas = obtener_reglas_alertas()
-        except Exception as error:
-            reglas_alertas = {"GPS": [], "BATERIA": []}
-            context["reglas_alertas_error"] = str(error)
-
-        log_recalculo = leer_log_recalculo()
-
         context.update({
             "total_usuarios": total_usuarios,
             "usuarios_activos": usuarios_activos,
@@ -857,13 +852,45 @@ def panel_perfil(request):
             "lista_usuarios": lista_usuarios,
             "ultimos_logs": ultimos_logs,
             "resultado_comando_admin": resultado_comando_admin,
-            "reglas_alertas": reglas_alertas,
             "puede_editar_reglas": usuario_puede_editar_reglas(usuario_actual),
-            "log_recalculo": log_recalculo,
-            "recalculo_en_curso": recalculo_en_curso(),
         })
 
     return render(request, "dashboard/panel_perfil.html", context)
+
+
+@login_required
+def editor_reglas_alertas(request):
+    """Renderiza el editor bajo demanda para no consultar Oracle al abrir el perfil."""
+    if request.method != "GET":
+        return HttpResponse("Método no permitido.", status=405)
+
+    if not usuario_puede_editar_reglas(request.user):
+        return HttpResponse("No tienes permisos para editar estas reglas.", status=403)
+
+    contexto = {
+        "editor_reglas": {"BATERIA": [], "GPS": []},
+        "recalculo_en_curso": recalculo_en_curso(),
+        "log_recalculo": leer_log_recalculo(),
+    }
+    estado = 200
+    try:
+        editor = obtener_editor_reglas_alertas()
+        contexto["editor_reglas"] = editor
+        contexto["total_reglas_editor"] = sum(
+            len(seccion["reglas"])
+            for secciones in editor.values()
+            for seccion in secciones
+        )
+    except Exception as error:
+        contexto["reglas_alertas_error"] = str(error)
+        estado = 503
+
+    return render(
+        request,
+        "dashboard/partials/editor_reglas_alertas.html",
+        contexto,
+        status=estado,
+    )
 
 
 @login_required

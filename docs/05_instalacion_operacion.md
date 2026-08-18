@@ -53,6 +53,7 @@ python manage.py runserver
 | `/login/`, `/logout/` | Sesión. |
 | `/`, `/baterias/` | Baterías. |
 | `/gps/`, `/alertas/`, `/perfil/` | Paneles GPS, alertas y perfil. |
+| `/perfil/reglas-alertas/editor/` | Fragmento protegido del editor; se solicita sólo al desplegar la configuración. |
 | `/perfil/ejecutar-comando/` | Acciones administrativas. |
 | `/baterias/exportar/`, `/gps/exportar/`, `/alertas/exportar/` | Exportaciones XLSX. |
 | `/admin/` | Administración Django. |
@@ -71,6 +72,17 @@ python manage.py runserver
 
 Use `python manage.py <comando> --help` antes de operaciones de escritura o eliminación.
 
+## Operación del editor de reglas
+
+1. Al abrir `/perfil/`, la tarjeta **Configuración de alertas** permanece cerrada y no consulta `ALERTA_REGLA_PARAM`.
+2. Al pulsar **Administrar reglas**, el navegador solicita una sola vez el editor a Django. Cerrar y volver a abrir la tarjeta no repite la consulta.
+3. **Guardar para el próximo ciclo** actualiza y valida los valores en Oracle, pero no inicia un recálculo manual.
+4. **Guardar y aplicar ahora** actualiza, valida e inicia en segundo plano `PRC_RECLASIFICAR_ALERTAS` o `PRC_RECALCULAR_ALERTAS_SEGURO`, según el tipo de las reglas modificadas.
+5. Después del POST, Django vuelve al perfil con `?editor_reglas=1` para mostrar el resultado y recargar valores vigentes.
+
+No se requieren migraciones Django ni scripts Oracle para el rediseño. Si se agrega una clave nueva a `CLAVES_PERMITIDAS`, también se debe documentar en `catalogo_reglas_alertas.py`; la validación al importar impide publicar un catálogo incompleto.
+
+La interfaz no calcula una vista previa de AMID afectados. Para incorporar esa función de manera segura se necesita un procedimiento Oracle de simulación de solo lectura que acepte parámetros candidatos. No usar actualizaciones temporales con `ROLLBACK`, porque pueden bloquear la tabla global y el recálculo completo puede ser costoso.
 ## Despliegue y diagnóstico
 
 En producción: `DEBUG=False`, clave única, hosts restrictivos, `migrate`, `check --deploy`, pruebas, `collectstatic` y servidor WSGI para `config.wsgi:application`. Proteja `.env` y SQLite con ACL.

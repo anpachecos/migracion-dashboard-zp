@@ -9,6 +9,10 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.dashboard.services.catalogo_reglas_alertas import (
+    construir_editor_reglas_alertas,
+    validar_catalogo_reglas,
+)
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 CLAVES_PERMITIDAS = {
@@ -46,6 +50,7 @@ CLAVES_PERMITIDAS = {
 }
 
 CLAVES_PERMITIDAS_TODO = set(CLAVES_PERMITIDAS["GPS"]) | set(CLAVES_PERMITIDAS["BATERIA"])
+validar_catalogo_reglas(CLAVES_PERMITIDAS_TODO)
 
 CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
 
@@ -104,6 +109,13 @@ def obtener_reglas_alertas():
             )
 
         mapa_reglas = {regla["clave"]: regla for regla in reglas}
+        claves_faltantes = CLAVES_PERMITIDAS_TODO - set(mapa_reglas)
+        if claves_faltantes:
+            raise RuntimeError(
+                "Faltan reglas configurables en ALERTA_REGLA_PARAM: "
+                + ", ".join(sorted(claves_faltantes))
+            )
+
         resultado = {
             "GPS": [],
             "BATERIA": [],
@@ -120,6 +132,11 @@ def obtener_reglas_alertas():
         return resultado
     except Exception as exc:
         raise RuntimeError(f"No fue posible cargar las reglas de alertas desde Oracle: {exc}") from exc
+
+
+def obtener_editor_reglas_alertas():
+    """Carga una sola vez los valores Oracle y agrega metadatos para la interfaz."""
+    return construir_editor_reglas_alertas(obtener_reglas_alertas())
 
 
 def _normalizar_valor_numero(valor):

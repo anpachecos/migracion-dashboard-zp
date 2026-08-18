@@ -153,6 +153,7 @@ La carpeta `services/` contiene la lógica de negocio del dashboard. Es una de l
 apps/dashboard/services/
 ├── alertas_service.py
 ├── baterias_service.py
+├── catalogo_reglas_alertas.py
 ├── gps_service.py
 ├── logs_service.py
 ├── oracle_connection.py
@@ -168,7 +169,8 @@ apps/dashboard/services/
 | `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, ubicación esperada y validación contra radio. | Vigente |
 | `alertas_service.py` | Consulta desde Oracle la tabla resumen de alertas y prepara cards, filtros, paginación y tabla del Panel Alertas. | Vigente |
 
-| `reglas_alertas_service.py` | Consulta y actualiza reglas configurables de alertas desde el Panel Perfil/Admin. | Vigente |
+| `catalogo_reglas_alertas.py` | Define nombres legibles, agrupación, unidades y ayudas del editor. Valida que sus 27 claves coincidan con la lista permitida, pero no contiene lógica de clasificación. | Vigente |
+| `reglas_alertas_service.py` | Consulta y actualiza reglas configurables desde el Perfil/Admin. Mantiene el guardado, validación Oracle y selección de recálculo rápido o completo. | Vigente |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
 | `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
 | `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
@@ -201,7 +203,10 @@ apps/dashboard/templates/dashboard/
 ├── panel_gps.html
 ├── panel_alertas.html
 ├── panel_alertas_mantencion.html
-└── panel_perfil.html
+├── panel_perfil.html
+└── partials/
+    ├── editor_reglas_alertas.html
+    └── reglas_alertas_categoria.html
 ```
 
 | Archivo | Descripción | Estado |
@@ -212,15 +217,16 @@ apps/dashboard/templates/dashboard/
 | `panel_gps.html` | Template del panel GPS. Muestra filtros por AMID, fechas, horarios, métricas del período, mapa Leaflet y resumen de ubicación esperada. | Vigente |
 | `panel_alertas.html` | Template activo del panel de alertas. Muestra resumen de prioridades, filtros, tabla de alertas, accesos a revisión GPS/Batería y paginación. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
-| `panel_perfil.html` | Template del perfil de usuario y administración. Muestra datos del usuario conectado, métricas de usuarios, logs, carga de ubicaciones y configuración de reglas de alertas para administradores. | Vigente / extenso |
+| `panel_perfil.html` | Perfil y administración. La configuración de alertas se presenta como una tarjeta compacta y no incluye las 27 reglas en el HTML inicial. | Vigente |
+| `partials/editor_reglas_alertas.html` | Formulario del editor que Django devuelve bajo demanda. Conserva las dos formas de guardado. | Vigente |
+| `partials/reglas_alertas_categoria.html` | Presenta pestañas, acordeones, controles y detalle técnico de cada regla. | Vigente |
 
 ### Observaciones
 
 - Los templates principales funcionan como capa de presentación. La lógica pesada debe mantenerse en `views.py` o, idealmente, en los servicios.
 - `base_dashboard.html` centraliza la navegación y el estado del sistema, por lo que evita repetir estructura en cada panel.
 - `panel_alertas_mantencion.html` parece ser una plantilla antigua. Se debe revisar si todavía existe alguna vista o ruta que la use.
-- `panel_perfil.html` es el template más extenso, porque mezcla datos de usuario, administración, logs, carga de ubicaciones y reglas de alertas. Más adelante podría dividirse en fragmentos reutilizables.
-- Si se busca mejorar mantenibilidad, se podrían crear templates parciales en una carpeta como `templates/dashboard/partials/`.
+- El editor de reglas está separado en `templates/dashboard/partials/`; `panel_perfil.html` conserva solamente la tarjeta y el contenedor de carga diferida.
 ---
 
 ## Carpeta `static/dashboard/`
@@ -247,7 +253,8 @@ apps/dashboard/static/dashboard/css/
 ├── panel_alertas.css
 ├── panel_baterias.css
 ├── panel_gps.css
-└── panel_perfil.css
+├── panel_perfil.css
+└── panel_perfil_reglas.css
 ```
 
 | Archivo | Descripción | Estado |
@@ -257,7 +264,8 @@ apps/dashboard/static/dashboard/css/
 | `panel_baterias.css` | Estilos propios del Panel Baterías. | Vigente |
 | `panel_gps.css` | Estilos propios del Panel GPS. | Vigente |
 | `panel_alertas.css` | Estilos propios del Panel Alertas. | Vigente |
-| `panel_perfil.css` | Estilos propios del Panel Perfil. | Vigente |
+| `panel_perfil.css` | Estilos generales del Panel Perfil. | Vigente |
+| `panel_perfil_reglas.css` | Estilos aislados del editor de reglas, sus pestañas, acordeones y controles. | Vigente |
 
 ---
 
@@ -269,14 +277,16 @@ Contiene scripts JavaScript usados por los paneles.
 apps/dashboard/static/dashboard/js/
 ├── panel_alertas.js
 ├── panel_baterias.js
-└── panel_gps.js
+├── panel_gps.js
+└── panel_perfil.js
 ```
 
 | Archivo | Descripción | Estado |
 |---|---|---|
 | `panel_baterias.js` | Maneja gráficos y comportamiento dinámico del Panel Baterías. | Vigente |
 | `panel_gps.js` | Maneja mapa, puntos GPS y comportamiento dinámico del Panel GPS. | Vigente |
-| `panel_alertas.js` | JS asociado al Panel Alertas. Revisar si se sigue usando o si quedó de una versión anterior. | Revisar |
+| `panel_alertas.js` | Comportamiento dinámico del Panel Alertas. | Vigente |
+| `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
 
 ---
 
@@ -445,6 +455,26 @@ Ejemplo Panel GPS:
 
 ---
 
+## Flujo del editor de reglas
+
+```txt
+GET /perfil/
+→ panel_perfil.html (tarjeta cerrada; sin consulta de reglas a Oracle)
+→ clic en “Administrar reglas”
+→ GET /perfil/reglas-alertas/editor/
+→ reglas_alertas_service.py (una lectura de ALERTA_REGLA_PARAM)
+→ catálogo visual + templates parciales
+→ edición local en el navegador
+→ POST /perfil/ (guardado y validación existentes)
+```
+
+- El endpoint diferido exige sesión y permisos de administrador.
+- El formulario conserva las claves `regla_<CLAVE_ORACLE>` y la lista permitida; el frontend no puede inventar claves válidas.
+- “Guardar para el próximo ciclo” valida y persiste sin iniciar un recálculo manual.
+- “Guardar y aplicar ahora” inicia el modo rápido si sólo cambió clasificación y el modo completo si cambió detección.
+- La columna `ACTIVO` se muestra sólo como información porque el flujo actual no la modifica.
+- Los rangos visuales se construyen sólo entre umbrales con la misma unidad (por ejemplo, bloques en 0%, porcentaje GPS o rachas); se actualizan en el navegador y no consultan Oracle.
+- No existe vista previa real del impacto. Una futura simulación requiere un procedimiento Oracle de solo cálculo que reciba valores candidatos sin actualizar la tabla global; no se debe simular mediante `UPDATE` seguido de `ROLLBACK`.
 ## Resumen de archivos más importantes
 
 Para entender y mantener el proyecto, los archivos principales son:

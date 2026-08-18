@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_perfil_reglas.css' %}?v=1">
 {% endblock %}
 
 {% block content %}
@@ -111,7 +112,7 @@
 {% if es_admin %}
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
-        <h2>Administración del sistema</h2> <!-- acá hay una consola o se supone que esto está relacionado con mostrar una consola, quiero que se mantenga ese formato pleas y tambien que la configuración de reglas de alertas sea despglegable porque me ocupa mucho espacio, aparte tengo dos botones de guardar reglas y guiardar y ejecutar rteglas, hay que sacarlos? dejar uno?-->
+        <h2>Administración del sistema</h2>
         <p>
             Acciones administrativas disponibles. Los datos operativos del dashboard
             se consultan directamente desde Oracle; SQLite se mantiene para usuarios,
@@ -140,111 +141,35 @@
     </div>
 </section>
 
-<section class="perfil-bloque">
-    <div class="perfil-bloque-header">
-        <h2>Configuración de reglas de alertas</h2>
-        <p>
-            Oracle valida todos los umbrales antes de guardarlos. Al aplicar los cambios,
-            las reglas de clasificación reutilizan las métricas existentes; las reglas de
-            detección requieren releer los datos y ejecutan un cálculo completo.
-        </p>
+<section
+    class="perfil-bloque reglas-config-shell{% if abrir_editor_reglas %} is-open{% endif %}"
+    data-reglas-shell
+    data-editor-url="{% url 'dashboard:editor_reglas_alertas' %}"
+    data-auto-open="{% if abrir_editor_reglas %}1{% else %}0{% endif %}"
+>
+    <div class="reglas-config-resumen">
+        <div>
+            <span class="reglas-config-etiqueta">Administración de Oracle</span>
+            <h2>Configuración de alertas</h2>
+            <p>
+                Ajusta los umbrales de batería y GPS sin cambiar las claves ni la lógica
+                que ya utiliza Oracle. El editor se carga solamente cuando lo necesitas.
+            </p>
+        </div>
+        {% if puede_editar_reglas %}
+        <button type="button" class="btn-administrar-reglas" data-toggle-reglas aria-expanded="false">
+            <span data-toggle-reglas-texto>Administrar reglas</span>
+            <span class="btn-administrar-flecha" aria-hidden="true">⌄</span>
+        </button>
+        {% endif %}
     </div>
 
-    {% if reglas_alertas_error %}
-        <div class="admin-mensaje error">{{ reglas_alertas_error }}</div>
-    {% endif %}
-
     {% if puede_editar_reglas %}
-        <form method="post" class="form-reglas-alertas">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="guardar_reglas_alertas">
-
-            <div class="reglas-alertas-grid">
-                <div class="reglas-alertas-grupo">
-                    <h3>GPS</h3>
-                    <div class="reglas-alertas-tabla">
-                        <div class="regla-alerta-header">
-                            <span>Regla</span>
-                            <span>Valor</span>
-                        </div>
-                        {% for regla in reglas_alertas.GPS %}
-                            <label class="regla-alerta-row">
-                                <span>
-                                    <strong>{{ regla.clave }}</strong>
-                                    <small>{{ regla.descripcion }}</small>
-                                    <small>
-                                        Tipo:
-                                        {% if regla.tipo_regla == "DETECCION" %}
-                                            Detección (cálculo completo)
-                                        {% else %}
-                                            Clasificación (aplicación rápida)
-                                        {% endif %}
-                                    </small>
-                                    {% if regla.fecha_actualizacion %}
-                                        <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
-                                    {% endif %}
-                                </span>
-                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero|default_if_none:'' }}">
-                            </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="reglas-alertas-grupo">
-                    <h3>Batería</h3>
-                    <div class="reglas-alertas-tabla">
-                        <div class="regla-alerta-header">
-                            <span>Regla</span>
-                            <span>Valor</span>
-                        </div>
-                        {% for regla in reglas_alertas.BATERIA %}
-                            <label class="regla-alerta-row">
-                                <span>
-                                    <strong>{{ regla.clave }}</strong>
-                                    <small>{{ regla.descripcion }}</small>
-                                    <small>
-                                        Tipo:
-                                        {% if regla.tipo_regla == "DETECCION" %}
-                                            Detección (cálculo completo)
-                                        {% else %}
-                                            Clasificación (aplicación rápida)
-                                        {% endif %}
-                                    </small>
-                                    {% if regla.fecha_actualizacion %}
-                                        <small>Actualizado: {{ regla.fecha_actualizacion|date:"d-m-Y H:i" }}</small>
-                                    {% endif %}
-                                </span>
-                                <input type="number" step="0.01" name="regla_{{ regla.clave }}" value="{{ regla.valor_numero|default_if_none:'' }}">
-                            </label>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="reglas-alertas-acciones">
-                <button type="submit" class="btn-reglas-guardar">Guardar reglas</button>
-                <button type="submit" name="action" value="guardar_y_recalcular_alertas" class="btn-reglas-recalcular" {% if recalculo_en_curso %}disabled{% endif %}>
-                    {% if recalculo_en_curso %}
-                        Recálculo manual en curso
-                    {% else %}
-                        Guardar y aplicar ahora
-                    {% endif %}
-                </button>
-            </div>
-
-            {% if log_recalculo %}
-                <div class="reglas-alertas-log">
-                    <h4>Últimas ejecuciones de recálculo</h4>
-                    <small>Se muestran como máximo las últimas 100 líneas.</small>
-                    <pre>{{ log_recalculo }}</pre>
-                </div>
-            {% endif %}
-        </form>
+    <div class="reglas-editor-contenedor" data-editor-reglas hidden aria-live="polite"></div>
     {% else %}
-        <p class="texto-vacio">No tienes permisos para editar estas reglas.</p>
+    <p class="texto-vacio">No tienes permisos para editar estas reglas.</p>
     {% endif %}
 </section>
-
 <section class="perfil-bloque">
     <div class="perfil-bloque-header">
         <h2>Cargar ubicaciones esperadas</h2>
@@ -417,4 +342,8 @@
     </div>
 </section>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'dashboard/js/panel_perfil.js' %}?v=1" defer></script>
 {% endblock %}
