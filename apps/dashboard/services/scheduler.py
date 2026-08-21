@@ -327,6 +327,8 @@ def iniciar_scheduler():
         id="registrar_estado_oracle_cada_30_min",
         replace_existing=True,
         max_instances=1,
+        misfire_grace_time=60,
+        coalesce=True,
     )
 
     scheduler.add_job(

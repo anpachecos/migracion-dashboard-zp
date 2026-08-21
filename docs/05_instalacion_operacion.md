@@ -90,6 +90,7 @@ En producción: `DEBUG=False`, clave única, hosts restrictivos, `migrate`, `che
 - Fallo Oracle: revisar variables/red/service name y ejecutar `probar_oracle`.
 - SQLite bloqueado: revisar concurrencia y jobs duplicados.
 - Sin estilos: ejecutar `collectstatic` y publicar `STATIC_ROOT`.
+- Mensaje APScheduler `run time ... was missed` para `registrar_estado_oracle_job`: el job tolera hasta 60 segundos de retraso y combina ejecuciones pendientes mediante `misfire_grace_time=60` y `coalesce=True`.
 - Alertas antiguas: revisar `JOB_UPD_ALERTAS_VAL`, `PRC_UPD_ALERTAS_VAL` y la
   fecha de cálculo de `ALERTA_BATERIA_CAIDA_EVENTO`.
 - Detalle de caídas no disponible: validar los objetos de V009 y ejecutar el
