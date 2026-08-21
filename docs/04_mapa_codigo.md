@@ -166,7 +166,7 @@ apps/dashboard/services/
 |---|---|---|
 | `oracle_connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza la creación del pool y la obtención de conexiones. | Vigente |
 | `baterias_service.py` | Prepara tarjetas, tabla y gráficos del Panel Baterías. Lee el resumen y el detalle oficial de caídas desde Oracle. | Vigente |
-| `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, ubicación esperada y validación contra radio. | Vigente |
+| `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, referencia esperada histórica por fecha, versión ZP y validación contra radio. | Vigente |
 | `alertas_service.py` | Consulta desde Oracle la tabla resumen de alertas y prepara cards, filtros, paginación y tabla del Panel Alertas. | Vigente |
 
 | `catalogo_reglas_alertas.py` | Define nombres legibles, agrupación, unidades y ayudas del editor. Valida que sus 27 claves coincidan con la lista permitida, pero no contiene lógica de clasificación. | Vigente |
@@ -214,7 +214,7 @@ apps/dashboard/templates/dashboard/
 | `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
 | `panel_baterias.html` | Template del panel de baterías. Muestra búsqueda por AMID, tarjetas resumen, alertas del período, tabla por bloques de 30 minutos y gráficos. | Vigente |
-| `panel_gps.html` | Template del panel GPS. Muestra filtros por AMID, fechas, horarios, métricas del período, mapa Leaflet y resumen de ubicación esperada. | Vigente |
+| `panel_gps.html` | Template del panel GPS. Muestra filtros, métricas, mapa Leaflet y un historial plegable del período que reutiliza los mismos puntos del mapa. | Vigente |
 | `panel_alertas.html` | Template activo del panel de alertas. Muestra resumen de prioridades, filtros, tabla de alertas, accesos a revisión GPS/Batería y paginación. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
 | `panel_perfil.html` | Perfil y administración. La configuración de alertas se presenta como una tarjeta compacta y no incluye las 27 reglas en el HTML inicial. | Vigente |
@@ -284,7 +284,7 @@ apps/dashboard/static/dashboard/js/
 | Archivo | Descripción | Estado |
 |---|---|---|
 | `panel_baterias.js` | Maneja gráficos y comportamiento dinámico del Panel Baterías. | Vigente |
-| `panel_gps.js` | Maneja mapa, puntos GPS y comportamiento dinámico del Panel GPS. | Vigente |
+| `panel_gps.js` | Maneja mapa y puntos GPS; construye bajo demanda la tabla histórica, sus filtros y paginación, y permite volver desde una fila al marcador. | Vigente |
 | `panel_alertas.js` | Comportamiento dinámico del Panel Alertas. | Vigente |
 | `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
 
@@ -451,6 +451,7 @@ Ejemplo Panel GPS:
 → Oracle: datos GPS + ubicación esperada
 → panel_gps.html
 → panel_gps.css + panel_gps.js
+→ historial plegable: mismas ubicaciones GPS, 25 filas por página, sin nueva consulta Oracle
 ```
 
 ---

@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=11">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=12">
 {% endblock %}
 
 {% block content %}
@@ -288,6 +288,58 @@
 
         </section>
 
+        {% if ubicaciones_gps %}
+        <section class="gps-historial" data-gps-historial>
+            <button type="button" class="gps-historial-toggle" data-gps-historial-toggle aria-expanded="false" aria-controls="gps-historial-contenido">
+                <span class="gps-historial-toggle-texto">
+                    <strong>Historial GPS del período</strong>
+                    <small>{{ ubicaciones_gps|length }} registros · mapa y tabla usan la misma información</small>
+                </span>
+                <span class="gps-historial-toggle-accion" data-gps-historial-toggle-label>Mostrar historial</span>
+                <span class="gps-historial-flecha" aria-hidden="true">⌄</span>
+            </button>
+
+            <div id="gps-historial-contenido" class="gps-historial-contenido" data-gps-historial-contenido hidden>
+                <div class="gps-historial-filtros" role="group" aria-label="Filtrar historial GPS">
+                    <button type="button" class="is-active" data-gps-historial-filtro="todos" aria-pressed="true">Todos</button>
+                    <button type="button" data-gps-historial-filtro="dentro" aria-pressed="false">Dentro del radio</button>
+                    <button type="button" data-gps-historial-filtro="fuera" aria-pressed="false">Fuera del radio</button>
+                    <button type="button" data-gps-historial-filtro="cero" aria-pressed="false">GPS 0,0</button>
+                    <button type="button" data-gps-historial-filtro="cambios" aria-pressed="false">Cambios detectados</button>
+                </div>
+
+                <div class="gps-historial-tabla-wrap">
+                    <table class="gps-historial-tabla">
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Coordenadas</th>
+                                <th>Ubicación esperada</th>
+                                <th>Distancia</th>
+                                <th>Batería</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody data-gps-historial-body></tbody>
+                    </table>
+                </div>
+
+                <div class="gps-historial-vacio" data-gps-historial-vacio hidden>
+                    No hay registros para el filtro seleccionado.
+                </div>
+
+                <div class="gps-historial-paginacion">
+                    <span data-gps-historial-resumen></span>
+                    <div>
+                        <button type="button" data-gps-historial-anterior>Anterior</button>
+                        <span data-gps-historial-pagina></span>
+                        <button type="button" data-gps-historial-siguiente>Siguiente</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
     </div>
 
 </section>
@@ -303,5 +355,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=19"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=20"></script>
 {% endblock %}

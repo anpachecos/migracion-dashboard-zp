@@ -141,6 +141,7 @@ function inicializarMapaGps() {
     }
 
     const puntosRuta = [];
+    const marcadoresGps = [];
 
     if (ubicaciones && ubicaciones.length > 0) {
         ubicaciones.forEach(function (ubicacion, index) {
@@ -173,6 +174,8 @@ function inicializarMapaGps() {
                 fillOpacity: esUltima ? 0.9 : 0.55,
                 weight: esUltima ? 3 : 2,
             }).addTo(mapa);
+
+            marcadoresGps[index] = marcador;
 
             const titulo = esUltima ? "Última ubicación" : "Ubicación anterior";
 
@@ -299,4 +302,236 @@ function inicializarMapaGps() {
             moverMapaAUbicacion(ubicacionEsperada, 17);
         });
     }
+    inicializarHistorialGps({
+        ubicaciones: ubicaciones,
+        mapa: mapa,
+        marcadoresGps: marcadoresGps,
+        mapaElemento: mapaElemento,
+    });
+}
+
+const GPS_HISTORIAL_TAMANIO_PAGINA = 25;
+
+function obtenerFirmaUbicacionEsperada(ubicacion) {
+    return [
+        ubicacion.ubicacion_esperada_nombre || "",
+        ubicacion.ubicacion_esperada_latitud ?? "",
+        ubicacion.ubicacion_esperada_longitud ?? "",
+        ubicacion.ubicacion_esperada_radio_metros ?? "",
+    ].join("|");
+}
+
+function prepararRegistrosHistorialGps(ubicaciones) {
+    return ubicaciones.map(function (ubicacion, index) {
+        const anterior = index > 0 ? ubicaciones[index - 1] : null;
+        const cambioUbicacion = anterior
+            ? obtenerFirmaUbicacionEsperada(anterior) !== obtenerFirmaUbicacionEsperada(ubicacion)
+            : false;
+
+        return {
+            ubicacion: ubicacion,
+            indiceMapa: index,
+            cambioUbicacion: cambioUbicacion,
+            ubicacionAnteriorNombre: anterior ? anterior.ubicacion_esperada_nombre : null,
+        };
+    }).reverse();
+}
+
+function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento}) {
+    const panel = document.querySelector("[data-gps-historial]");
+
+    if (!panel || !Array.isArray(ubicaciones) || ubicaciones.length === 0) {
+        return;
+    }
+
+    const toggle = panel.querySelector("[data-gps-historial-toggle]");
+    const contenido = panel.querySelector("[data-gps-historial-contenido]");
+    const etiquetaToggle = panel.querySelector("[data-gps-historial-toggle-label]");
+    const cuerpo = panel.querySelector("[data-gps-historial-body]");
+    const vacio = panel.querySelector("[data-gps-historial-vacio]");
+    const resumen = panel.querySelector("[data-gps-historial-resumen]");
+    const paginaTexto = panel.querySelector("[data-gps-historial-pagina]");
+    const anteriorBoton = panel.querySelector("[data-gps-historial-anterior]");
+    const siguienteBoton = panel.querySelector("[data-gps-historial-siguiente]");
+    const filtros = Array.from(panel.querySelectorAll("[data-gps-historial-filtro]"));
+
+    const registros = prepararRegistrosHistorialGps(ubicaciones);
+    let filtroActual = "todos";
+    let paginaActual = 1;
+    let inicializado = false;
+
+    function registrosFiltrados() {
+        return registros.filter(function (registro) {
+            const ubicacion = registro.ubicacion;
+
+            if (filtroActual === "dentro") return ubicacion.dentro_radio === true;
+            if (filtroActual === "fuera") {
+                return ubicacion.dentro_radio === false && ubicacion.coordenada_cero !== true;
+            }
+            if (filtroActual === "cero") return ubicacion.coordenada_cero === true;
+            if (filtroActual === "cambios") return registro.cambioUbicacion;
+            return true;
+        });
+    }
+
+    function crearCelda(texto, clase) {
+        const celda = document.createElement("td");
+        if (clase) celda.className = clase;
+        celda.textContent = texto;
+        return celda;
+    }
+
+    function obtenerEstado(ubicacion) {
+        if (ubicacion.coordenada_cero === true) {
+            return {texto: "GPS 0,0", clase: "gps-historial-estado--cero"};
+        }
+        if (ubicacion.dentro_radio === true) {
+            return {texto: "Dentro", clase: "gps-historial-estado--dentro"};
+        }
+        if (ubicacion.dentro_radio === false) {
+            return {texto: "Fuera", clase: "gps-historial-estado--fuera"};
+        }
+        return {texto: "Sin evaluación", clase: "gps-historial-estado--neutro"};
+    }
+
+    function activarPunto(registro) {
+        const ubicacion = registro.ubicacion;
+        const marcador = marcadoresGps[registro.indiceMapa];
+
+        if (!marcador || ubicacion.coordenada_cero === true) return;
+
+        mapa.setView([ubicacion.latitud, ubicacion.longitud], 17);
+        marcador.openPopup();
+        mapaElemento.scrollIntoView({behavior: "smooth", block: "center"});
+    }
+
+    function crearFila(registro) {
+        const ubicacion = registro.ubicacion;
+        const fila = document.createElement("tr");
+        const coordenadas = ubicacion.coordenada_cero === true
+            ? "0, 0"
+            : `${ubicacion.latitud}, ${ubicacion.longitud}`;
+        const distancia = ubicacion.distancia_metros === null
+            || ubicacion.distancia_metros === undefined
+            ? "—"
+            : `${ubicacion.distancia_metros} m`;
+        const bateria = ubicacion.porcentaje_bateria === null
+            || ubicacion.porcentaje_bateria === undefined
+            ? "—"
+            : `${ubicacion.porcentaje_bateria}%`;
+
+        fila.appendChild(crearCelda(ubicacion.fecha_hora || "—", "gps-historial-fecha"));
+        fila.appendChild(crearCelda(coordenadas, "gps-historial-coordenadas"));
+
+        const celdaEsperada = document.createElement("td");
+        const nombreEsperado = document.createElement("strong");
+        nombreEsperado.textContent = ubicacion.ubicacion_esperada_nombre || "Sin ubicación esperada";
+        celdaEsperada.appendChild(nombreEsperado);
+
+        if (ubicacion.ubicacion_esperada_version) {
+            const version = document.createElement("small");
+            version.className = "gps-historial-version";
+            version.textContent = `Versión ZP: ${ubicacion.ubicacion_esperada_version}`;
+            celdaEsperada.appendChild(version);
+        }
+
+        if (registro.cambioUbicacion) {
+            const cambio = document.createElement("small");
+            cambio.className = "gps-historial-cambio";
+            cambio.textContent = `Cambió desde ${registro.ubicacionAnteriorNombre || "sin ubicación esperada"}`;
+            celdaEsperada.appendChild(cambio);
+        }
+
+        fila.appendChild(celdaEsperada);
+        fila.appendChild(crearCelda(distancia, "gps-historial-distancia"));
+        fila.appendChild(crearCelda(bateria, "gps-historial-bateria"));
+
+        const estado = obtenerEstado(ubicacion);
+        const celdaEstado = document.createElement("td");
+        const badgeEstado = document.createElement("span");
+        badgeEstado.className = `gps-historial-estado ${estado.clase}`;
+        badgeEstado.textContent = estado.texto;
+        celdaEstado.appendChild(badgeEstado);
+        fila.appendChild(celdaEstado);
+
+        if (ubicacion.coordenada_cero !== true) {
+            fila.classList.add("is-clickable");
+            fila.tabIndex = 0;
+            fila.setAttribute("role", "button");
+            fila.title = "Mostrar este punto en el mapa";
+            fila.addEventListener("click", function () { activarPunto(registro); });
+            fila.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    activarPunto(registro);
+                }
+            });
+        }
+
+        return fila;
+    }
+
+    function renderizar() {
+        const filtrados = registrosFiltrados();
+        const totalPaginas = Math.max(1, Math.ceil(filtrados.length / GPS_HISTORIAL_TAMANIO_PAGINA));
+        paginaActual = Math.min(paginaActual, totalPaginas);
+        const inicio = (paginaActual - 1) * GPS_HISTORIAL_TAMANIO_PAGINA;
+        const pagina = filtrados.slice(inicio, inicio + GPS_HISTORIAL_TAMANIO_PAGINA);
+
+        cuerpo.replaceChildren();
+        pagina.forEach(function (registro) {
+            cuerpo.appendChild(crearFila(registro));
+        });
+
+        vacio.hidden = filtrados.length > 0;
+        resumen.textContent = filtrados.length === 1
+            ? "1 registro"
+            : `${filtrados.length} registros`;
+        paginaTexto.textContent = `Página ${paginaActual} de ${totalPaginas}`;
+        anteriorBoton.disabled = paginaActual <= 1;
+        siguienteBoton.disabled = paginaActual >= totalPaginas;
+    }
+
+    toggle.addEventListener("click", function () {
+        const abierto = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", String(!abierto));
+        contenido.hidden = abierto;
+        panel.classList.toggle("is-open", !abierto);
+        etiquetaToggle.textContent = abierto ? "Mostrar historial" : "Ocultar historial";
+
+        if (!abierto && !inicializado) {
+            inicializado = true;
+            renderizar();
+        }
+    });
+
+    filtros.forEach(function (boton) {
+        boton.addEventListener("click", function () {
+            filtroActual = boton.dataset.gpsHistorialFiltro;
+            paginaActual = 1;
+            filtros.forEach(function (item) {
+                item.classList.toggle("is-active", item === boton);
+                item.setAttribute("aria-pressed", String(item === boton));
+            });
+            renderizar();
+        });
+    });
+
+    anteriorBoton.addEventListener("click", function () {
+        if (paginaActual > 1) {
+            paginaActual -= 1;
+            renderizar();
+        }
+    });
+
+    siguienteBoton.addEventListener("click", function () {
+        const totalPaginas = Math.max(
+            1,
+            Math.ceil(registrosFiltrados().length / GPS_HISTORIAL_TAMANIO_PAGINA)
+        );
+        if (paginaActual < totalPaginas) {
+            paginaActual += 1;
+            renderizar();
+        }
+    });
 }

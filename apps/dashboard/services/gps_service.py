@@ -101,6 +101,8 @@ def obtener_referencia_laboratorio():
         "radio_metros": RADIO_LABORATORIO_ZP,
         "operativa": False,
         "origen_ubicacion": "laboratorio_default",
+        "version_zp": None,
+        "archivo_origen": None,
     }
 
 
@@ -123,6 +125,8 @@ def construir_referencia_desde_fila(fila, origen_ubicacion):
             "radio_metros": float(radio),
             "operativa": normalizar_booleano_oracle(fila.get("OPERATIVA")),
             "origen_ubicacion": fila.get("ORIGEN_UBICACION") or origen_ubicacion,
+            "version_zp": fila.get("VERSION_ZP"),
+            "archivo_origen": fila.get("ARCHIVO_ORIGEN"),
         }
     except (ValueError, TypeError):
         return None
@@ -844,6 +848,10 @@ def obtener_contexto_gps(request):
                     "dentro_radio": dentro_radio,
                     "coordenada_cero": coordenada_cero,
                     "ubicacion_esperada_nombre": referencia_esperada["nombre"],
+                    "ubicacion_esperada_latitud": referencia_esperada["latitud"],
+                    "ubicacion_esperada_longitud": referencia_esperada["longitud"],
+                    "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
+                    "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
                 }
 
                 ubicaciones_gps.append(ubicacion_mapa)
