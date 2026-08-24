@@ -680,6 +680,30 @@
     color: #475569;
 }
 
+.gps-historial-estado--sin-transmision {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.gps-historial-fecha strong,
+.gps-historial-fecha small {
+    display: block;
+}
+
+.gps-historial-fecha small {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.gps-historial-fecha .gps-historial-hora-repetida {
+    color: #b45309;
+    font-weight: 700;
+    white-space: normal;
+}
+
 .gps-historial-vacio {
     padding: 24px;
     color: #64748b;

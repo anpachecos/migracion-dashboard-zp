@@ -214,7 +214,7 @@ apps/dashboard/templates/dashboard/
 | `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
 | `panel_baterias.html` | Template del panel de baterías. Muestra búsqueda por AMID, tarjetas resumen, alertas del período, tabla por bloques de 30 minutos y gráficos. | Vigente |
-| `panel_gps.html` | Template del panel GPS. Muestra filtros, métricas, mapa Leaflet y un historial plegable del período que reutiliza los mismos puntos del mapa. | Vigente |
+| `panel_gps.html` | Template del panel GPS. Muestra filtros, métricas, mapa Leaflet y un historial plegable por bloque. Usa `FECHA_REGISTRO` como hora del bloque y separa los bloques sin transmisión de los puntos del mapa. | Vigente |
 | `panel_alertas.html` | Template activo del panel de alertas. Muestra resumen de prioridades, filtros, tabla de alertas, accesos a revisión GPS/Batería y paginación. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
 | `panel_perfil.html` | Perfil y administración. La configuración de alertas se presenta como una tarjeta compacta y no incluye las 27 reglas en el HTML inicial. | Vigente |
@@ -448,10 +448,14 @@ Ejemplo Panel GPS:
 /gps/
 → panel_gps()
 → obtener_contexto_gps()
-→ Oracle: datos GPS + ubicación esperada
+→ Oracle: bloques GPS + ubicación esperada
+→ FECHA_REGISTRO ordena y delimita los bloques
+→ FECHA_HORA se compara con el bloque anterior
+   ├─ cambió: transmisión nueva; puede aparecer en el mapa
+   └─ se repitió: coordenadas NULL; estado “Sin transmisión”
 → panel_gps.html
 → panel_gps.css + panel_gps.js
-→ historial plegable: mismas ubicaciones GPS, 25 filas por página, sin nueva consulta Oracle
+→ historial plegable: todos los bloques, 25 filas por página, sin una segunda consulta Oracle
 ```
 
 ---

@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=12">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=13">
 {% endblock %}
 
 {% block content %}
@@ -288,12 +288,12 @@
 
         </section>
 
-        {% if ubicaciones_gps %}
+        {% if historial_gps %}
         <section class="gps-historial" data-gps-historial>
             <button type="button" class="gps-historial-toggle" data-gps-historial-toggle aria-expanded="false" aria-controls="gps-historial-contenido">
                 <span class="gps-historial-toggle-texto">
                     <strong>Historial GPS del período</strong>
-                    <small>{{ ubicaciones_gps|length }} registros · mapa y tabla usan la misma información</small>
+                    <small>{{ historial_gps|length }} bloques · la hora del bloque se toma desde FECHA_REGISTRO</small>
                 </span>
                 <span class="gps-historial-toggle-accion" data-gps-historial-toggle-label>Mostrar historial</span>
                 <span class="gps-historial-flecha" aria-hidden="true">⌄</span>
@@ -305,6 +305,7 @@
                     <button type="button" data-gps-historial-filtro="dentro" aria-pressed="false">Dentro del radio</button>
                     <button type="button" data-gps-historial-filtro="fuera" aria-pressed="false">Fuera del radio</button>
                     <button type="button" data-gps-historial-filtro="cero" aria-pressed="false">GPS 0,0</button>
+                    <button type="button" data-gps-historial-filtro="sin_transmision" aria-pressed="false">Sin transmisión</button>
                     <button type="button" data-gps-historial-filtro="cambios" aria-pressed="false">Cambios detectados</button>
                 </div>
 
@@ -312,7 +313,7 @@
                     <table class="gps-historial-tabla">
                         <thead>
                             <tr>
-                                <th>Fecha y hora</th>
+                                <th>Bloque / validador</th>
                                 <th>Coordenadas</th>
                                 <th>Ubicación esperada</th>
                                 <th>Distancia</th>
@@ -348,6 +349,7 @@
 {{ longitud|json_script:"gps-longitud" }}
 {{ amid|json_script:"gps-amid" }}
 {{ ubicaciones_gps|json_script:"gps-ubicaciones" }}
+{{ historial_gps|json_script:"gps-historial-registros" }}
 {{ ubicacion_esperada|json_script:"gps-ubicacion-esperada" }}
 {{ ubicacion_laboratorio|json_script:"gps-ubicacion-laboratorio" }}
 
@@ -355,5 +357,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=20"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=21"></script>
 {% endblock %}

@@ -102,6 +102,7 @@ function inicializarMapaGps() {
     const longitudElemento = document.getElementById("gps-longitud");
     const amidElemento = document.getElementById("gps-amid");
     const ubicacionesElemento = document.getElementById("gps-ubicaciones");
+    const historialElemento = document.getElementById("gps-historial-registros");
     const ubicacionEsperadaElemento = document.getElementById("gps-ubicacion-esperada");
 
     const ubicacionLaboratorio = {
@@ -115,6 +116,7 @@ function inicializarMapaGps() {
     const longitud = longitudElemento ? JSON.parse(longitudElemento.textContent) : null;
     const amid = amidElemento ? JSON.parse(amidElemento.textContent) : "";
     const ubicaciones = ubicacionesElemento ? JSON.parse(ubicacionesElemento.textContent) : [];
+    const registrosHistorial = historialElemento ? JSON.parse(historialElemento.textContent) : [];
     const ubicacionEsperada = ubicacionEsperadaElemento ? JSON.parse(ubicacionEsperadaElemento.textContent) : null;
 
     const tieneCoordenadas = latitud !== null && longitud !== null;
@@ -192,7 +194,8 @@ function inicializarMapaGps() {
             marcador.bindPopup(`
                 <strong>${titulo}</strong><br>
                 AMID: ${amid}<br>
-                Fecha/hora: ${ubicacion.fecha_hora || "-"}<br>
+                Hora del bloque: ${ubicacion.fecha_registro || "-"}<br>
+                Hora del validador: ${ubicacion.fecha_hora_validador || "-"}<br>
                 Latitud: ${lat}<br>
                 Longitud: ${lon}<br>
                 Batería: ${ubicacion.porcentaje_bateria ?? "-"}%<br>
@@ -303,7 +306,7 @@ function inicializarMapaGps() {
         });
     }
     inicializarHistorialGps({
-        ubicaciones: ubicaciones,
+        registrosHistorial: registrosHistorial,
         mapa: mapa,
         marcadoresGps: marcadoresGps,
         mapaElemento: mapaElemento,
@@ -321,26 +324,26 @@ function obtenerFirmaUbicacionEsperada(ubicacion) {
     ].join("|");
 }
 
-function prepararRegistrosHistorialGps(ubicaciones) {
-    return ubicaciones.map(function (ubicacion, index) {
-        const anterior = index > 0 ? ubicaciones[index - 1] : null;
+function prepararRegistrosHistorialGps(registrosHistorial) {
+    return registrosHistorial.map(function (ubicacion, index) {
+        const anterior = index > 0 ? registrosHistorial[index - 1] : null;
         const cambioUbicacion = anterior
             ? obtenerFirmaUbicacionEsperada(anterior) !== obtenerFirmaUbicacionEsperada(ubicacion)
             : false;
 
         return {
             ubicacion: ubicacion,
-            indiceMapa: index,
+            indiceMapa: ubicacion.indice_mapa,
             cambioUbicacion: cambioUbicacion,
             ubicacionAnteriorNombre: anterior ? anterior.ubicacion_esperada_nombre : null,
         };
     }).reverse();
 }
 
-function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento}) {
+function inicializarHistorialGps({registrosHistorial, mapa, marcadoresGps, mapaElemento}) {
     const panel = document.querySelector("[data-gps-historial]");
 
-    if (!panel || !Array.isArray(ubicaciones) || ubicaciones.length === 0) {
+    if (!panel || !Array.isArray(registrosHistorial) || registrosHistorial.length === 0) {
         return;
     }
 
@@ -355,7 +358,7 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
     const siguienteBoton = panel.querySelector("[data-gps-historial-siguiente]");
     const filtros = Array.from(panel.querySelectorAll("[data-gps-historial-filtro]"));
 
-    const registros = prepararRegistrosHistorialGps(ubicaciones);
+    const registros = prepararRegistrosHistorialGps(registrosHistorial);
     let filtroActual = "todos";
     let paginaActual = 1;
     let inicializado = false;
@@ -369,6 +372,7 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
                 return ubicacion.dentro_radio === false && ubicacion.coordenada_cero !== true;
             }
             if (filtroActual === "cero") return ubicacion.coordenada_cero === true;
+            if (filtroActual === "sin_transmision") return ubicacion.transmitio_gps === false;
             if (filtroActual === "cambios") return registro.cambioUbicacion;
             return true;
         });
@@ -382,6 +386,9 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
     }
 
     function obtenerEstado(ubicacion) {
+        if (ubicacion.transmitio_gps === false) {
+            return {texto: "Sin transmisión", clase: "gps-historial-estado--sin-transmision"};
+        }
         if (ubicacion.coordenada_cero === true) {
             return {texto: "GPS 0,0", clase: "gps-historial-estado--cero"};
         }
@@ -398,7 +405,7 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
         const ubicacion = registro.ubicacion;
         const marcador = marcadoresGps[registro.indiceMapa];
 
-        if (!marcador || ubicacion.coordenada_cero === true) return;
+        if (!marcador || ubicacion.transmitio_gps === false || ubicacion.coordenada_cero === true) return;
 
         mapa.setView([ubicacion.latitud, ubicacion.longitud], 17);
         marcador.openPopup();
@@ -408,9 +415,15 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
     function crearFila(registro) {
         const ubicacion = registro.ubicacion;
         const fila = document.createElement("tr");
-        const coordenadas = ubicacion.coordenada_cero === true
-            ? "0, 0"
-            : `${ubicacion.latitud}, ${ubicacion.longitud}`;
+        const tieneCoordenadas = ubicacion.latitud !== null
+            && ubicacion.latitud !== undefined
+            && ubicacion.longitud !== null
+            && ubicacion.longitud !== undefined;
+        const coordenadas = ubicacion.transmitio_gps === false || !tieneCoordenadas
+            ? "—"
+            : ubicacion.coordenada_cero === true
+                ? "0, 0"
+                : `${ubicacion.latitud}, ${ubicacion.longitud}`;
         const distancia = ubicacion.distancia_metros === null
             || ubicacion.distancia_metros === undefined
             ? "—"
@@ -420,7 +433,26 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
             ? "—"
             : `${ubicacion.porcentaje_bateria}%`;
 
-        fila.appendChild(crearCelda(ubicacion.fecha_hora || "—", "gps-historial-fecha"));
+        const celdaFecha = document.createElement("td");
+        celdaFecha.className = "gps-historial-fecha";
+        const fechaBloque = document.createElement("strong");
+        fechaBloque.textContent = ubicacion.fecha_registro || "—";
+        celdaFecha.appendChild(fechaBloque);
+
+        const fechaValidador = document.createElement("small");
+        fechaValidador.textContent = ubicacion.fecha_hora_validador
+            ? `Validador: ${ubicacion.fecha_hora_validador}`
+            : "Validador: sin fecha";
+        celdaFecha.appendChild(fechaValidador);
+
+        if (ubicacion.transmitio_gps === false) {
+            const horaRepetida = document.createElement("small");
+            horaRepetida.className = "gps-historial-hora-repetida";
+            horaRepetida.textContent = "Hora repetida: no hubo transmisión nueva";
+            celdaFecha.appendChild(horaRepetida);
+        }
+
+        fila.appendChild(celdaFecha);
         fila.appendChild(crearCelda(coordenadas, "gps-historial-coordenadas"));
 
         const celdaEsperada = document.createElement("td");
@@ -454,7 +486,7 @@ function inicializarHistorialGps({ubicaciones, mapa, marcadoresGps, mapaElemento
         celdaEstado.appendChild(badgeEstado);
         fila.appendChild(celdaEstado);
 
-        if (ubicacion.coordenada_cero !== true) {
+        if (ubicacion.transmitio_gps !== false && tieneCoordenadas && ubicacion.coordenada_cero !== true) {
             fila.classList.add("is-clickable");
             fila.tabIndex = 0;
             fila.setAttribute("role", "button");

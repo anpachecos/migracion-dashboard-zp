@@ -219,8 +219,23 @@ def obtener_rango_fechas_periodo(dias):
 
 def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
     """
-    Obtiene registros GPS directamente desde Oracle usando rango exacto
-    de fecha/hora.
+    Obtiene los bloques creados en Oracle dentro del rango solicitado.
+
+    FECHA_REGISTRO representa la hora del bloque. FECHA_HORA es la hora
+    reportada por el validador: si se repite respecto del bloque anterior,
+    el equipo no transmitió un GPS nuevo y las coordenadas se normalizan a NULL.
+    """
+
+    query_anterior = """
+        SELECT FECHA_HORA
+        FROM (
+            SELECT FECHA_HORA
+            FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
+            WHERE AMID = :amid
+              AND FECHA_REGISTRO < TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
+            ORDER BY FECHA_REGISTRO DESC, ID DESC
+        )
+        WHERE ROWNUM = 1
     """
 
     query = """
@@ -230,6 +245,7 @@ def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
             FEC_DESCARGA,
             FEC_ESTADO,
             FECHA_HORA,
+            FECHA_REGISTRO,
             LATITUD,
             LONGITUD,
             PORCENTAJE_BATERIA,
@@ -237,28 +253,44 @@ def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
             IS_ERROR_OBTENER_GPS
         FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
         WHERE AMID = :amid
-          AND FECHA_HORA >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
-          AND FECHA_HORA < TO_DATE(:fecha_fin, 'YYYY-MM-DD HH24:MI:SS')
-        ORDER BY FECHA_HORA
+          AND FECHA_REGISTRO >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
+          AND FECHA_REGISTRO < TO_DATE(:fecha_fin, 'YYYY-MM-DD HH24:MI:SS')
+        ORDER BY FECHA_REGISTRO, ID
     """
 
+    parametros = {
+        "amid": int(amid),
+        "fecha_inicio": fecha_a_texto_oracle(fecha_inicio),
+        "fecha_fin": fecha_a_texto_oracle(fecha_fin),
+    }
     registros = []
 
     with obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
-                query,
+                query_anterior,
                 {
-                    "amid": int(amid),
-                    "fecha_inicio": fecha_a_texto_oracle(fecha_inicio),
-                    "fecha_fin": fecha_a_texto_oracle(fecha_fin),
-                }
+                    "amid": parametros["amid"],
+                    "fecha_inicio": parametros["fecha_inicio"],
+                },
+            )
+            fila_anterior = cursor.fetchone()
+            fecha_hora_anterior = normalizar_fecha_para_comparar(
+                fila_anterior[0] if fila_anterior else None
             )
 
+            cursor.execute(query, parametros)
             columnas = [col[0].lower() for col in cursor.description]
 
             for fila in cursor.fetchall():
                 datos = dict(zip(columnas, fila))
+                fecha_hora_validador = normalizar_fecha_para_comparar(
+                    datos.get("fecha_hora")
+                )
+                transmitio_gps = (
+                    fecha_hora_validador is not None
+                    and fecha_hora_validador != fecha_hora_anterior
+                )
 
                 registros.append(
                     SimpleNamespace(
@@ -266,14 +298,20 @@ def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
                         amid=datos.get("amid"),
                         fec_descarga=normalizar_fecha_para_comparar(datos.get("fec_descarga")),
                         fec_estado=normalizar_fecha_para_comparar(datos.get("fec_estado")),
-                        fecha_hora=normalizar_fecha_para_comparar(datos.get("fecha_hora")),
-                        latitud=datos.get("latitud"),
-                        longitud=datos.get("longitud"),
+                        fecha_hora=fecha_hora_validador,
+                        fecha_registro=normalizar_fecha_para_comparar(datos.get("fecha_registro")),
+                        fecha_hora_anterior=fecha_hora_anterior,
+                        transmitio_gps=transmitio_gps,
+                        latitud=datos.get("latitud") if transmitio_gps else None,
+                        longitud=datos.get("longitud") if transmitio_gps else None,
                         porcentaje_bateria=datos.get("porcentaje_bateria"),
                         is_contiene_gps=normalizar_booleano_oracle(datos.get("is_contiene_gps")),
                         is_error_obtener_gps=normalizar_booleano_oracle(datos.get("is_error_obtener_gps")),
                     )
                 )
+
+                if fecha_hora_validador is not None:
+                    fecha_hora_anterior = fecha_hora_validador
 
     return registros
 
@@ -685,6 +723,7 @@ def obtener_contexto_gps(request):
     latitud = None
     longitud = None
     ubicaciones_gps = []
+    historial_gps = []
     ubicacion_esperada = None
     usando_ultimo_dia_reportado = False
     fecha_ultimo_dia_reportado = None
@@ -795,6 +834,7 @@ def obtener_contexto_gps(request):
             ultimo_registro_reportado = None
             ultima_ubicacion_valida = None
             ultimo_registro_valido = None
+            ubicaciones_mapa_por_id = {}
 
             for registro in registros_reportados:
                 try:
@@ -804,7 +844,7 @@ def obtener_contexto_gps(request):
                     continue
 
                 referencia_esperada = obtener_referencia_desde_cache(
-                    fecha_consulta=registro.fecha_hora,
+                    fecha_consulta=registro.fecha_registro or registro.fecha_hora,
                     historial_amid=historial_amid,
                     vigente_amid=vigente_amid,
                 )
@@ -840,9 +880,13 @@ def obtener_contexto_gps(request):
                             resumen_gps["registros_fuera_periodo"] += 1
 
                 ubicacion_mapa = {
+                    "id": registro.id,
                     "latitud": lat,
                     "longitud": lon,
                     "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                    "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
+                    "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                    "transmitio_gps": True,
                     "porcentaje_bateria": registro.porcentaje_bateria,
                     "distancia_metros": round(distancia, 2) if distancia is not None else None,
                     "dentro_radio": dentro_radio,
@@ -852,9 +896,11 @@ def obtener_contexto_gps(request):
                     "ubicacion_esperada_longitud": referencia_esperada["longitud"],
                     "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
                     "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
+                    "indice_mapa": len(ubicaciones_gps),
                 }
 
                 ubicaciones_gps.append(ubicacion_mapa)
+                ubicaciones_mapa_por_id[str(registro.id)] = ubicacion_mapa
 
                 ultima_ubicacion_reportada = ubicacion_mapa
                 ultimo_registro_reportado = registro
@@ -862,6 +908,46 @@ def obtener_contexto_gps(request):
                 if not coordenada_cero:
                     ultima_ubicacion_valida = ubicacion_mapa
                     ultimo_registro_valido = registro
+
+            # El historial representa bloques, no sólo puntos del mapa.
+            # FECHA_REGISTRO identifica el bloque; una FECHA_HORA repetida indica
+            # que el validador no transmitió coordenadas nuevas en ese bloque.
+            for registro in registros_periodo_base:
+                ubicacion_transmitida = ubicaciones_mapa_por_id.get(str(registro.id))
+
+                if ubicacion_transmitida is not None:
+                    historial_gps.append(ubicacion_transmitida)
+                    continue
+
+                referencia_esperada = obtener_referencia_desde_cache(
+                    fecha_consulta=registro.fecha_registro or registro.fecha_hora,
+                    historial_amid=historial_amid,
+                    vigente_amid=vigente_amid,
+                )
+
+                historial_gps.append({
+                    "id": registro.id,
+                    "latitud": None,
+                    "longitud": None,
+                    "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                    "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
+                    "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                    "transmitio_gps": registro.transmitio_gps,
+                    "porcentaje_bateria": (
+                        registro.porcentaje_bateria
+                        if registro.transmitio_gps
+                        else None
+                    ),
+                    "distancia_metros": None,
+                    "dentro_radio": None,
+                    "coordenada_cero": False,
+                    "ubicacion_esperada_nombre": referencia_esperada["nombre"],
+                    "ubicacion_esperada_latitud": referencia_esperada["latitud"],
+                    "ubicacion_esperada_longitud": referencia_esperada["longitud"],
+                    "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
+                    "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
+                    "indice_mapa": None,
+                })
 
             if resumen_gps["registros_periodo"] > 0:
                 resumen_gps["porcentaje_cumplimiento_periodo"] = round(
@@ -882,17 +968,25 @@ def obtener_contexto_gps(request):
             # Para estado y última ubicación usamos la última coordenada reportada.
             if ultimo_registro_reportado:
                 ultimo_registro = ultimo_registro_reportado
-                fecha_ultima_referencia = ultimo_registro_reportado.fecha_hora
+                fecha_ultima_referencia = (
+                    ultimo_registro_reportado.fecha_registro
+                    or ultimo_registro_reportado.fecha_hora
+                )
             else:
                 fecha_ultima_referencia = None
 
-            if ultimo_registro and ultimo_registro.fecha_hora:
+            if ultimo_registro and (
+                ultimo_registro.fecha_registro or ultimo_registro.fecha_hora
+            ):
+                fecha_ultima_transmision = (
+                    ultimo_registro.fecha_registro or ultimo_registro.fecha_hora
+                )
                 resumen_gps["texto_ultima_ubicacion"] = (
-                    ultimo_registro.fecha_hora.strftime("%d-%m-%Y %H:%M")
+                    fecha_ultima_transmision.strftime("%d-%m-%Y %H:%M")
                 )
 
                 minutos_desde_ultima = (
-                    obtener_ahora_referencia() - ultimo_registro.fecha_hora
+                    obtener_ahora_referencia() - fecha_ultima_transmision
                 ).total_seconds() / 60
 
                 if minutos_desde_ultima <= 60:
@@ -969,6 +1063,7 @@ def obtener_contexto_gps(request):
         "latitud": latitud,
         "longitud": longitud,
         "ubicaciones_gps": ubicaciones_gps,
+        "historial_gps": historial_gps,
         "ubicacion_esperada": ubicacion_esperada,
         "ubicacion_laboratorio": ubicacion_laboratorio,
         "resumen_gps": resumen_gps,

@@ -14,10 +14,13 @@ oracle/
 │   ├── V007__...
 │   ├── V007_FIX_...
 │   └── V009__detalle_caidas_bateria_fuente_unica.sql
+├── pending/
+│   └── V010__indice_estatus_zp_amid_fecha_registro.sql
 └── diagnostics/
     ├── 00_auditoria_previa.sql
     ├── 01_auditoria_rendimiento_etapa3.sql
-    └── V009_VALIDAR__detalle_caidas_bateria.sql
+    ├── V009_VALIDAR__detalle_caidas_bateria.sql
+    └── V010_VALIDAR__indice_gps_fecha_registro.sql
 ```
 
 ## Uso correcto
@@ -26,6 +29,8 @@ oracle/
   objetos incorporados por este proyecto.
 - `history/` documenta lo que ya se ejecutó. No debe repetirse en el esquema
   actual.
+- `pending/` contiene cambios preparados que todavía deben ejecutarse y
+  validarse en Oracle.
 - `diagnostics/` contiene consultas de inspección sin modificaciones.
 - Los archivos `resultados_*.sql` son exportaciones locales y no se publican.
 
@@ -33,6 +38,23 @@ El baseline presupone que ya existen los objetos heredados, entre ellos
 `ESTATUS_ZP`, `JOBS_STATUS_ZP`, `ALERTA_REGLA_PARAM`,
 `ALERTA_VALIDADOR_RESUMEN`, `AMID_MAESTRO_ALERTAS` y
 `PRC_UPD_ALERTAS_VAL`. No crea el sistema Oracle completo desde cero.
+
+## V010 — índice temporal del historial GPS (pendiente)
+
+El Panel GPS interpreta `FECHA_REGISTRO` como hora del bloque y `FECHA_HORA`
+como hora informada por el validador. Si `FECHA_HORA` no cambia entre dos
+bloques consecutivos, Django muestra el bloque como **Sin transmisión** y no
+reutiliza sus coordenadas.
+
+La consulta del período filtra por `(AMID, FECHA_REGISTRO)`. Para que siga
+siendo escalable sobre `ESTATUS_ZP`, se debe ejecutar una vez
+`pending/V010__indice_estatus_zp_amid_fecha_registro.sql`, idealmente fuera de
+hora punta, y luego validar con
+`diagnostics/V010_VALIDAR__indice_gps_fecha_registro.sql`. El script es
+idempotente, no modifica datos y evita crear un índice si ya existe uno
+compatible.
+
+Una vez ejecutado y validado, V010 debe moverse de `pending/` a `history/`.
 
 ## V009 — detalle de caídas
 

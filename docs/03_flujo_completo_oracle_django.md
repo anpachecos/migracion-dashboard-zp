@@ -391,7 +391,10 @@ Durante la auditoría no presentaban fallos.
 
 - Las estadísticas Oracle estaban actualizadas.
 - `(AMID, FECHA_HORA_BLOQUE)` cubre la lectura principal de batería.
-- `(AMID, FECHA_HORA)` reduce la vista de estatus al AMID solicitado.
+- `(AMID, FECHA_HORA)` sigue siendo útil para búsquedas por la hora informada
+  por el validador.
+- El historial del Panel GPS filtra por la hora real del bloque; V010 agrega
+  `(AMID, FECHA_REGISTRO)` sin modificar datos de `ESTATUS_ZP`.
 - La tabla resumen tiene solo 930 filas; no necesita más índices.
 - No se eliminaron índices porque también pueden servir a los jobs.
 - Las conversiones de fechas de texto siguen siendo una limitación heredada de
