@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}Dashboard Zonas Pagas{% endblock %}</title>
 
-    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=15">
+    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=16">
 
     {% block extra_css %}{% endblock %}
     <link rel="icon" type="image/png" href="{% static 'dashboard/img/zp3.png' %}">
@@ -115,7 +115,19 @@
 
 </div>
 
+<button
+    type="button"
+    class="dashboard-scroll-explorar"
+    data-dashboard-scroll-explorar
+    aria-label="Explorar contenido más abajo"
+    hidden
+>
+    <span>Explorar más abajo</span>
+    <span class="dashboard-scroll-explorar-flecha" aria-hidden="true">↓</span>
+</button>
+
 {% block extra_js %}{% endblock %}
+<script src="{% static 'dashboard/js/scroll_explorar.js' %}?v=1"></script>
 
 </body>
 </html>

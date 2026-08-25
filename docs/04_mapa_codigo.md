@@ -278,7 +278,8 @@ apps/dashboard/static/dashboard/js/
 ├── panel_alertas.js
 ├── panel_baterias.js
 ├── panel_gps.js
-└── panel_perfil.js
+├── panel_perfil.js
+└── scroll_explorar.js
 ```
 
 | Archivo | Descripción | Estado |
@@ -287,6 +288,7 @@ apps/dashboard/static/dashboard/js/
 | `panel_gps.js` | Maneja mapa y puntos GPS; construye bajo demanda la tabla histórica, sus filtros y paginación, y permite volver desde una fila al marcador. | Vigente |
 | `panel_alertas.js` | Comportamiento dinámico del Panel Alertas. | Vigente |
 | `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
+| `scroll_explorar.js` | Control global accesible: muestra una ayuda flotante solo si queda contenido bajo la pantalla, avanza la vista y se oculta al llegar al final. | Vigente |
 
 ---
 

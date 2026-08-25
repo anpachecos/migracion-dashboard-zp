@@ -499,6 +499,14 @@
     color: #15803d;
 }
 
+.gps-resumen-fila--sin-transmision {
+    color: #64748b;
+}
+
+.gps-resumen-fila--sin-transmision strong {
+    color: #475569;
+}
+
 .gps-resumen-fila--advertencia {
     color: #f59e0b;
 }

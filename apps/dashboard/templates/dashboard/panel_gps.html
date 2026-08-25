@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=18">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=19">
 {% endblock %}
 
 {% block content %}
@@ -390,6 +390,11 @@
                                 <span>Con coordenadas válidas</span>
                                 <strong>{{ resumen_gps.registros_gps_validos_periodo }}</strong>
                             </div>
+                            <div class="gps-resumen-fila gps-resumen-fila--sin-transmision">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-signal"></use></svg>
+                                <span>Sin transmisión</span>
+                                <strong>{{ resumen_gps.registros_sin_transmision_periodo }}</strong>
+                            </div>
                             <div class="gps-resumen-fila gps-resumen-fila--advertencia">
                                 <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-warning"></use></svg>
                                 <span>Coordenadas 0,0</span>
@@ -537,5 +542,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=24"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=26"></script>
 {% endblock %}

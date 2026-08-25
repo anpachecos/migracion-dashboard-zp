@@ -552,20 +552,32 @@ function inicializarHistorialGps({registrosHistorial, mapa, marcadoresGps, mapaE
     }
 
     function mostrarHistorial(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
         establecerHistorialAbierto(true);
 
-        if (!event) {
-            window.requestAnimationFrame(function () {
-                panel.scrollIntoView({behavior: "smooth", block: "start"});
+        window.requestAnimationFrame(function () {
+            const posicionContenido = contenido.getBoundingClientRect().top + window.scrollY;
+
+            window.scrollTo({
+                top: Math.max(0, posicionContenido - 16),
+                behavior: "smooth"
             });
-        }
+        });
     }
 
     botonMostrar.addEventListener("click", mostrarHistorial);
 
-    toggle.addEventListener("click", function () {
+    toggle.addEventListener("click", function (event) {
         const abierto = toggle.getAttribute("aria-expanded") === "true";
-        establecerHistorialAbierto(!abierto);
+
+        if (abierto) {
+            establecerHistorialAbierto(false);
+        } else {
+            mostrarHistorial(event);
+        }
     });
 
     if (window.location.hash === "#historial-gps") {

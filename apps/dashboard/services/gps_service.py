@@ -664,6 +664,7 @@ def crear_resumen_gps(dias):
         "registros_totales_periodo": 0,
         "registros_gps_reportados_periodo": 0,
         "registros_gps_validos_periodo": 0,
+        "registros_sin_transmision_periodo": 0,
         "registros_gps_cero_periodo": 0,
 
         "porcentaje_cumplimiento_periodo": None,
@@ -713,6 +714,7 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
         "registros_totales_periodo": 0,
         "registros_gps_reportados_periodo": 0,
         "registros_gps_validos_periodo": 0,
+        "registros_sin_transmision_periodo": 0,
         "registros_gps_cero_periodo": 0,
 
         "porcentaje_cumplimiento_periodo": None,
@@ -878,6 +880,11 @@ def obtener_contexto_gps(request):
             if gps_tiene_coordenadas_validas_no_cero(registro)
         ]
 
+        registros_sin_transmision = [
+            registro for registro in registros_periodo_base
+            if registro.transmitio_gps is False
+        ]
+
         registros_cero = [
             registro for registro in registros_periodo_base
             if gps_es_coordenada_cero(registro)
@@ -885,6 +892,9 @@ def obtener_contexto_gps(request):
 
         resumen_gps["registros_gps_reportados_periodo"] = len(registros_reportados)
         resumen_gps["registros_gps_validos_periodo"] = len(registros_validos)
+        resumen_gps["registros_sin_transmision_periodo"] = len(
+            registros_sin_transmision
+        )
         resumen_gps["registros_gps_cero_periodo"] = len(registros_cero)
 
         try:
