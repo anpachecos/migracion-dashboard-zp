@@ -653,6 +653,7 @@ def crear_resumen_gps(dias):
         "registros_dentro_periodo": 0,
         "registros_fuera_periodo": 0,
 
+        "registros_totales_periodo": 0,
         "registros_gps_reportados_periodo": 0,
         "registros_gps_validos_periodo": 0,
         "registros_gps_cero_periodo": 0,
@@ -661,23 +662,33 @@ def crear_resumen_gps(dias):
         "clase_cumplimiento_periodo": "",
 
         "texto_periodo": textos_periodo["texto_periodo"],
+        "texto_fechas_periodo": textos_periodo["texto_periodo"],
+        "texto_horario_periodo": "",
         "texto_cumplimiento": textos_periodo["texto_cumplimiento"],
         "texto_dentro": textos_periodo["texto_dentro"],
         "texto_fuera": textos_periodo["texto_fuera"],
 
         "clase_ultima_ubicacion": "",
         "texto_ultima_ubicacion": "-",
+        "texto_tiempo_desde_ultima": "",
     }
 
 
 def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
     if fecha_desde == fecha_hasta:
-        texto_periodo = f"{fecha_desde.strftime('%d-%m-%Y')} {hora_desde} a {hora_hasta}"
+        texto_fechas_periodo = fecha_desde.strftime("%d-%m-%Y")
+        texto_periodo = f"{texto_fechas_periodo} {hora_desde} a {hora_hasta}"
     else:
+        texto_fechas_periodo = (
+            f"{fecha_desde.strftime('%d-%m-%Y')} "
+            f"al {fecha_hasta.strftime('%d-%m-%Y')}"
+        )
         texto_periodo = (
             f"{fecha_desde.strftime('%d-%m-%Y')} {hora_desde} "
             f"a {fecha_hasta.strftime('%d-%m-%Y')} {hora_hasta}"
         )
+
+    texto_horario_periodo = f"Desde {hora_desde} hasta {hora_hasta}"
 
     return {
         "errores_gps_periodo": 0,
@@ -691,6 +702,7 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
         "registros_fuera_periodo": 0,
 
         # Resumen informativo.
+        "registros_totales_periodo": 0,
         "registros_gps_reportados_periodo": 0,
         "registros_gps_validos_periodo": 0,
         "registros_gps_cero_periodo": 0,
@@ -699,12 +711,15 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
         "clase_cumplimiento_periodo": "",
 
         "texto_periodo": texto_periodo,
+        "texto_fechas_periodo": texto_fechas_periodo,
+        "texto_horario_periodo": texto_horario_periodo,
         "texto_cumplimiento": "Cumplimiento período",
         "texto_dentro": "Dentro período",
         "texto_fuera": "Fuera período",
 
         "clase_ultima_ubicacion": "",
         "texto_ultima_ubicacion": "-",
+        "texto_tiempo_desde_ultima": "",
     }
 
 
@@ -795,6 +810,8 @@ def obtener_contexto_gps(request):
         except Exception as error:
             mensaje = f"Error consultando datos GPS en Oracle: {error}"
             registros_periodo_base = []
+
+        resumen_gps["registros_totales_periodo"] = len(registros_periodo_base)
 
         resumen_gps["errores_gps_periodo"] = sum(
             1 for registro in registros_periodo_base
@@ -985,9 +1002,29 @@ def obtener_contexto_gps(request):
                     fecha_ultima_transmision.strftime("%d-%m-%Y %H:%M")
                 )
 
-                minutos_desde_ultima = (
-                    obtener_ahora_referencia() - fecha_ultima_transmision
-                ).total_seconds() / 60
+                minutos_desde_ultima = max(
+                    0,
+                    (
+                        obtener_ahora_referencia() - fecha_ultima_transmision
+                    ).total_seconds() / 60,
+                )
+
+                if minutos_desde_ultima < 1:
+                    resumen_gps["texto_tiempo_desde_ultima"] = "Hace menos de 1 min"
+                elif minutos_desde_ultima < 60:
+                    resumen_gps["texto_tiempo_desde_ultima"] = (
+                        f"Hace {int(minutos_desde_ultima)} min"
+                    )
+                elif minutos_desde_ultima < 1440:
+                    resumen_gps["texto_tiempo_desde_ultima"] = (
+                        f"Hace {int(minutos_desde_ultima // 60)} h"
+                    )
+                else:
+                    dias_desde_ultima = int(minutos_desde_ultima // 1440)
+                    sufijo_dia = "día" if dias_desde_ultima == 1 else "días"
+                    resumen_gps["texto_tiempo_desde_ultima"] = (
+                        f"Hace {dias_desde_ultima} {sufijo_dia}"
+                    )
 
                 if minutos_desde_ultima <= 60:
                     resumen_gps["clase_ultima_ubicacion"] = "gps-estado-ok"
@@ -1037,6 +1074,7 @@ def obtener_contexto_gps(request):
                     "dentro_radio": dentro_radio_actual,
                     "operativa": referencia_actual["operativa"],
                     "origen_ubicacion": referencia_actual["origen_ubicacion"],
+                    "version_zp": referencia_actual.get("version_zp"),
                     "ultima_reportada_es_cero": ultima_reportada_es_cero,
                 }
 

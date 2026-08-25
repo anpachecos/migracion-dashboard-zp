@@ -342,14 +342,19 @@ function prepararRegistrosHistorialGps(registrosHistorial) {
 
 function inicializarHistorialGps({registrosHistorial, mapa, marcadoresGps, mapaElemento}) {
     const panel = document.querySelector("[data-gps-historial]");
+    const botonMostrar = document.querySelector("[data-gps-mostrar-historial]");
 
-    if (!panel || !Array.isArray(registrosHistorial) || registrosHistorial.length === 0) {
+    if (
+        !panel
+        || !botonMostrar
+        || !Array.isArray(registrosHistorial)
+        || registrosHistorial.length === 0
+    ) {
         return;
     }
 
     const toggle = panel.querySelector("[data-gps-historial-toggle]");
     const contenido = panel.querySelector("[data-gps-historial-contenido]");
-    const etiquetaToggle = panel.querySelector("[data-gps-historial-toggle-label]");
     const cuerpo = panel.querySelector("[data-gps-historial-body]");
     const vacio = panel.querySelector("[data-gps-historial-vacio]");
     const resumen = panel.querySelector("[data-gps-historial-resumen]");
@@ -524,18 +529,38 @@ function inicializarHistorialGps({registrosHistorial, mapa, marcadoresGps, mapaE
         siguienteBoton.disabled = paginaActual >= totalPaginas;
     }
 
-    toggle.addEventListener("click", function () {
-        const abierto = toggle.getAttribute("aria-expanded") === "true";
-        toggle.setAttribute("aria-expanded", String(!abierto));
-        contenido.hidden = abierto;
-        panel.classList.toggle("is-open", !abierto);
-        etiquetaToggle.textContent = abierto ? "Mostrar historial" : "Ocultar historial";
+    function establecerHistorialAbierto(abierto) {
+        contenido.hidden = !abierto;
+        panel.classList.toggle("is-open", abierto);
+        toggle.setAttribute("aria-expanded", String(abierto));
+        botonMostrar.setAttribute("aria-expanded", String(abierto));
 
-        if (!abierto && !inicializado) {
+        if (abierto && !inicializado) {
             inicializado = true;
             renderizar();
         }
+    }
+
+    function mostrarHistorial(event) {
+        establecerHistorialAbierto(true);
+
+        if (!event) {
+            window.requestAnimationFrame(function () {
+                panel.scrollIntoView({behavior: "smooth", block: "start"});
+            });
+        }
+    }
+
+    botonMostrar.addEventListener("click", mostrarHistorial);
+
+    toggle.addEventListener("click", function () {
+        const abierto = toggle.getAttribute("aria-expanded") === "true";
+        establecerHistorialAbierto(!abierto);
     });
+
+    if (window.location.hash === "#historial-gps") {
+        mostrarHistorial();
+    }
 
     filtros.forEach(function (boton) {
         boton.addEventListener("click", function () {

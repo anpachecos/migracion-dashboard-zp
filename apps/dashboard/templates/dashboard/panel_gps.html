@@ -5,12 +5,72 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=13">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=17">
 {% endblock %}
 
 {% block content %}
 
 <section class="panel-gps">
+
+    <svg class="gps-iconos-defs" aria-hidden="true">
+        <symbol id="gps-icon-search" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="6"></circle>
+            <path d="m16 16 4 4"></path>
+        </symbol>
+        <symbol id="gps-icon-calendar" viewBox="0 0 24 24">
+            <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+            <path d="M8 3v4M16 3v4M4 10h16"></path>
+        </symbol>
+        <symbol id="gps-icon-file" viewBox="0 0 24 24">
+            <path d="M6 3h8l4 4v14H6z"></path>
+            <path d="M14 3v5h5M9 13h6M9 17h6"></path>
+        </symbol>
+        <symbol id="gps-icon-signal" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.5 18.5a9 9 0 0 1 0-13M18.5 5.5a9 9 0 0 1 0 13M12 14v7"></path>
+        </symbol>
+        <symbol id="gps-icon-pin" viewBox="0 0 24 24">
+            <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0z"></path>
+            <circle cx="12" cy="10" r="2.5"></circle>
+        </symbol>
+        <symbol id="gps-icon-target" viewBox="0 0 24 24">
+            <circle cx="11" cy="13" r="8"></circle>
+            <circle cx="11" cy="13" r="3"></circle>
+            <path d="M15 9l5-5M16 4h4v4"></path>
+        </symbol>
+        <symbol id="gps-icon-building" viewBox="0 0 24 24">
+            <path d="M4 21h16M6 21V7l6-4 6 4v14M9 10h2M13 10h2M9 14h2M13 14h2M11 21v-3h2v3"></path>
+        </symbol>
+        <symbol id="gps-icon-list" viewBox="0 0 24 24">
+            <path d="M9 6h11M9 12h11M9 18h11"></path>
+            <circle cx="4.5" cy="6" r="1"></circle>
+            <circle cx="4.5" cy="12" r="1"></circle>
+            <circle cx="4.5" cy="18" r="1"></circle>
+        </symbol>
+        <symbol id="gps-icon-chart" viewBox="0 0 24 24">
+            <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path>
+        </symbol>
+        <symbol id="gps-icon-records" viewBox="0 0 24 24">
+            <rect x="5" y="3" width="14" height="18" rx="2"></rect>
+            <path d="M9 8h6M9 12h6M9 16h4"></path>
+        </symbol>
+        <symbol id="gps-icon-check" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="m8 12 3 3 5-6"></path>
+        </symbol>
+        <symbol id="gps-icon-warning" viewBox="0 0 24 24">
+            <path d="M12 3 2.5 20h19z"></path>
+            <path d="M12 9v5M12 17h.01"></path>
+        </symbol>
+        <symbol id="gps-icon-inside" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
+        </symbol>
+        <symbol id="gps-icon-outside" viewBox="0 0 24 24">
+            <circle cx="10" cy="14" r="7"></circle>
+            <path d="M14 10l6-6M16 4h4v4"></path>
+        </symbol>
+    </svg>
 
     <header class="panel-header gps-header-compacto">
         <h1>Ubicación GPS</h1>
@@ -90,7 +150,8 @@
 
                 <div class="gps-acciones-filtro">
                     <button type="submit" class="gps-btn-buscar">
-                        Buscar
+                        <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-search"></use></svg>
+                        <span>Buscar</span>
                     </button>
 
                     <a
@@ -98,7 +159,8 @@
                         href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}&rango_manual=0"
                         title="Restablece el filtro a hoy de 00:00 a 23:30"
                     >
-                        Hoy
+                        <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-calendar"></use></svg>
+                        <span>Hoy</span>
                     </a>
 
                     {% if amid %}
@@ -107,7 +169,8 @@
                             href="{% url 'dashboard:exportar_gps_excel' %}?amid={{ amid }}&fecha_desde={{ fecha_desde }}&fecha_hasta={{ fecha_hasta }}&hora_desde={{ hora_desde }}&hora_hasta={{ hora_hasta }}"
                             title="Exporta a Excel los registros GPS del AMID consultado."
                         >
-                            Exportar Excel
+                            <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-file"></use></svg>
+                            <span>Exportar Excel</span>
                         </a>
                     {% else %}
                         <a
@@ -115,7 +178,8 @@
                             href="#"
                             title="Busca un AMID antes de exportar."
                         >
-                            Exportar Excel
+                            <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-file"></use></svg>
+                            <span>Exportar Excel</span>
                         </a>
                     {% endif %}
                 </div>
@@ -127,36 +191,58 @@
         <section class="gps-fila-metricas">
 
             <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio == True %}gps-card-ok{% elif ubicacion_esperada and ubicacion_esperada.dentro_radio == False %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
-                <span>Estado ubicación</span>
-                <strong>
-                    {% if ubicacion_esperada %}
-                        {% if ubicacion_esperada.dentro_radio == True %}
-                            Dentro del radio
-                        {% elif ubicacion_esperada.dentro_radio == False %}
-                            Fuera del radio
+                <span class="gps-metrica-icono" aria-hidden="true">
+                    <svg class="gps-icono gps-icono-grande"><use href="#gps-icon-signal"></use></svg>
+                </span>
+                <div class="gps-metrica-contenido">
+                    <span class="gps-metrica-etiqueta">Estado ubicación</span>
+                    <strong>
+                        {% if ubicacion_esperada %}
+                            {% if ubicacion_esperada.dentro_radio == True %}
+                                Dentro del radio
+                            {% elif ubicacion_esperada.dentro_radio == False %}
+                                Fuera del radio
+                            {% else %}
+                                Sin GPS válido
+                            {% endif %}
                         {% else %}
-                            Sin GPS válido
+                            Sin referencia
                         {% endif %}
-                    {% else %}
-                        Sin referencia
-                    {% endif %}
-                </strong>
+                    </strong>
+                </div>
             </article>
 
             <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_ultima_ubicacion }}">
-                <span>Última ubicación</span>
-                <strong>{{ resumen_gps.texto_ultima_ubicacion }}</strong>
+                <span class="gps-metrica-icono" aria-hidden="true">
+                    <svg class="gps-icono gps-icono-grande"><use href="#gps-icon-pin"></use></svg>
+                </span>
+                <div class="gps-metrica-contenido">
+                    <span class="gps-metrica-etiqueta">Última ubicación</span>
+                    <div class="gps-metrica-valor">
+                        <strong>{{ resumen_gps.texto_ultima_ubicacion }}</strong>
+                        {% if resumen_gps.texto_tiempo_desde_ultima %}
+                            <small class="gps-tiempo-relativo {{ resumen_gps.clase_ultima_ubicacion }}">
+                                {{ resumen_gps.texto_tiempo_desde_ultima }}
+                            </small>
+                        {% endif %}
+                    </div>
+                </div>
             </article>
 
             <article class="gps-resumen-card gps-card-estado {{ resumen_gps.clase_cumplimiento_periodo }}">
-                <span>{{ resumen_gps.texto_cumplimiento }}</span>
-                <strong>
-                    {% if resumen_gps.porcentaje_cumplimiento_periodo is not None %}
-                        {{ resumen_gps.porcentaje_cumplimiento_periodo }}%
-                    {% else %}
-                        Sin datos
-                    {% endif %}
-                </strong>
+                <span class="gps-metrica-icono" aria-hidden="true">
+                    <svg class="gps-icono gps-icono-grande"><use href="#gps-icon-target"></use></svg>
+                </span>
+                <div class="gps-metrica-contenido">
+                    <span class="gps-metrica-etiqueta">{{ resumen_gps.texto_cumplimiento }}</span>
+                    <strong>
+                        {% if resumen_gps.porcentaje_cumplimiento_periodo is not None %}
+                            {{ resumen_gps.porcentaje_cumplimiento_periodo }}%
+                        {% else %}
+                            Sin datos
+                        {% endif %}
+                    </strong>
+                </div>
             </article>
 
         </section>
@@ -167,29 +253,38 @@
             </div>
         {% endif %}
 
-        <section class="gps-fila-mapa">
+        <section class="gps-fila-mapa" id="mapa-gps-bloque">
 
             <aside class="gps-info-lateral">
 
                 {% if ultimo_registro %}
 
-                    <div class="gps-card gps-card-compacta">
-                        <h2>Ubicación esperada</h2>
+                    <div class="gps-card gps-card-compacta gps-card-ubicacion">
+                        <h2 class="gps-card-titulo">
+                            <span aria-hidden="true">
+                                <svg class="gps-icono"><use href="#gps-icon-pin"></use></svg>
+                            </span>
+                            Ubicación esperada
+                        </h2>
 
                         {% if ubicacion_esperada %}
-                            <div class="gps-dato">
+                            <div class="gps-dato gps-dato-destacado">
                                 <span>Lugar esperado</span>
                                 <strong>{{ ubicacion_esperada.nombre }}</strong>
                             </div>
 
-                            {% if ubicacion_esperada.origen_ubicacion == "laboratorio_default" %}
-                                <div class="gps-dato">
-                                    <span>Origen</span>
-                                    <strong>Laboratorio por defecto</strong>
-                                </div>
-                            {% endif %}
+                            <div class="gps-dato">
+                                <span>Versión de ubicación</span>
+                                <strong>
+                                    {% if ubicacion_esperada.version_zp %}
+                                        Versión ZP: {{ ubicacion_esperada.version_zp }}
+                                    {% else %}
+                                        Sin versión registrada
+                                    {% endif %}
+                                </strong>
+                            </div>
 
-                            <div class="gps-dato gps-dato-doble">
+                            <div class="gps-dato gps-dato-doble gps-ubicacion-medidas">
                                 <div>
                                     <span>Radio</span>
                                     <strong>{{ ubicacion_esperada.radio_metros }} m</strong>
@@ -197,7 +292,7 @@
 
                                 <div>
                                     <span>Distancia</span>
-                                    <strong>
+                                    <strong {% if ubicacion_esperada.dentro_radio == False %}class="gps-valor-alerta"{% endif %}>
                                         {% if ubicacion_esperada.distancia_metros is not None %}
                                             {{ ubicacion_esperada.distancia_metros }} m
                                         {% else %}
@@ -211,48 +306,44 @@
                         {% endif %}
                     </div>
 
-                    <div class="gps-card gps-card-compacta">
-                        <h2>Resumen</h2>
+                    <div class="gps-card gps-card-compacta gps-card-resumen">
+                        <h2 class="gps-card-titulo">
+                            <span aria-hidden="true">
+                                <svg class="gps-icono"><use href="#gps-icon-chart"></use></svg>
+                            </span>
+                            Resumen del período
+                        </h2>
 
-                        <div class="gps-dato">
-                            <span>Período visualizado</span>
-                            <strong>{{ resumen_gps.texto_periodo }}</strong>
+                        <div class="gps-resumen-rango">
+                            <strong>{{ resumen_gps.texto_fechas_periodo }}</strong>
+                            <small>{{ resumen_gps.texto_horario_periodo }}</small>
                         </div>
 
-                        <div class="gps-dato">
-                            <span>Registros GPS reportados</span>
-                            <strong>{{ resumen_gps.registros_gps_reportados_periodo }}</strong>
-                        </div>
-
-                        <div class="gps-dato gps-dato-doble">
-                            <div>
-                                <span>GPS válidos</span>
-                                <strong class="gps-estado-ok">
-                                    {{ resumen_gps.registros_gps_validos_periodo }}
-                                </strong>
+                        <div class="gps-resumen-lista">
+                            <div class="gps-resumen-fila">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-records"></use></svg>
+                                <span>Registros totales</span>
+                                <strong>{{ resumen_gps.registros_totales_periodo }}</strong>
                             </div>
-
-                            <div>
-                                <span>GPS 0,0</span>
-                                <strong class="gps-estado-advertencia">
-                                    {{ resumen_gps.registros_gps_cero_periodo }}
-                                </strong>
+                            <div class="gps-resumen-fila gps-resumen-fila--ok">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-check"></use></svg>
+                                <span>Con coordenadas válidas</span>
+                                <strong>{{ resumen_gps.registros_gps_validos_periodo }}</strong>
                             </div>
-                        </div>
-
-                        <div class="gps-dato gps-dato-doble">
-                            <div>
-                                <span>{{ resumen_gps.texto_dentro }}</span>
-                                <strong class="gps-estado-ok">
-                                    {{ resumen_gps.registros_dentro_periodo }}
-                                </strong>
+                            <div class="gps-resumen-fila gps-resumen-fila--advertencia">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-warning"></use></svg>
+                                <span>Coordenadas 0,0</span>
+                                <strong>{{ resumen_gps.registros_gps_cero_periodo }}</strong>
                             </div>
-
-                            <div>
-                                <span>{{ resumen_gps.texto_fuera }}</span>
-                                <strong class="gps-estado-alerta">
-                                    {{ resumen_gps.registros_fuera_periodo }}
-                                </strong>
+                            <div class="gps-resumen-fila gps-resumen-fila--dentro">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-inside"></use></svg>
+                                <span>Dentro del radio</span>
+                                <strong>{{ resumen_gps.registros_dentro_periodo }}</strong>
+                            </div>
+                            <div class="gps-resumen-fila gps-resumen-fila--fuera">
+                                <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-outside"></use></svg>
+                                <span>Fuera del radio</span>
+                                <strong>{{ resumen_gps.registros_fuera_periodo }}</strong>
                             </div>
                         </div>
                     </div>
@@ -274,12 +365,27 @@
 
                 <div class="gps-controles-mapa">
                     <button type="button" id="btn-mostrar-laboratorio">
-                        Mostrar laboratorio
+                        <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-building"></use></svg>
+                        <span>Mostrar laboratorio</span>
                     </button>
 
                     <button type="button" id="btn-mostrar-esperada">
-                        Mostrar ubicación esperada
+                        <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-pin"></use></svg>
+                        <span>Mostrar ubicación esperada</span>
                     </button>
+
+                    {% if historial_gps %}
+                        <a
+                            class="gps-ir-historial"
+                            href="#historial-gps"
+                            data-gps-mostrar-historial
+                            aria-controls="historial-gps"
+                            aria-expanded="false"
+                        >
+                            <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-list"></use></svg>
+                            <span>Ver historial GPS</span>
+                        </a>
+                    {% endif %}
                 </div>
 
                 <div id="mapa-gps"></div>
@@ -289,15 +395,29 @@
         </section>
 
         {% if historial_gps %}
-        <section class="gps-historial" data-gps-historial>
-            <button type="button" class="gps-historial-toggle" data-gps-historial-toggle aria-expanded="false" aria-controls="gps-historial-contenido">
-                <span class="gps-historial-toggle-texto">
-                    <strong>Historial GPS del período</strong>
-                    <small>{{ historial_gps|length }} bloques · la hora del bloque se toma desde FECHA_REGISTRO</small>
-                </span>
-                <span class="gps-historial-toggle-accion" data-gps-historial-toggle-label>Mostrar historial</span>
-                <span class="gps-historial-flecha" aria-hidden="true">⌄</span>
-            </button>
+        <section id="historial-gps" class="gps-historial" data-gps-historial>
+            <div class="gps-historial-cabecera">
+                <button
+                    type="button"
+                    class="gps-historial-toggle"
+                    data-gps-historial-toggle
+                    aria-controls="gps-historial-contenido"
+                    aria-expanded="false"
+                >
+                    <span class="gps-historial-titulo">
+                        <strong>
+                            <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-list"></use></svg>
+                            Historial GPS del período
+                        </strong>
+                        <small>Revisa los registros de ubicación dentro del rango seleccionado.</small>
+                    </span>
+                    <span class="gps-historial-flecha" aria-hidden="true">⌄</span>
+                </button>
+
+                <a class="gps-volver-mapa" href="#mapa-gps-bloque">
+                    Volver al mapa <span aria-hidden="true">↑</span>
+                </a>
+            </div>
 
             <div id="gps-historial-contenido" class="gps-historial-contenido" data-gps-historial-contenido hidden>
                 <div class="gps-historial-filtros" role="group" aria-label="Filtrar historial GPS">
@@ -357,5 +477,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=21"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=23"></script>
 {% endblock %}
