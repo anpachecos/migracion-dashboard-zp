@@ -1057,3 +1057,122 @@
         justify-content: space-between;
     }
 }
+/* Horario vigente de la zona paga */
+.gps-horario-zp-card {
+    padding: 14px 16px;
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.gps-horario-zp-cabecera,
+.gps-horario-zp-cuerpo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.gps-horario-zp-cabecera {
+    padding-bottom: 11px;
+    margin-bottom: 11px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.gps-horario-zp-titulo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.gps-horario-zp-titulo > span {
+    display: inline-flex;
+    padding: 7px;
+    border-radius: 9px;
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+.gps-horario-zp-titulo h2,
+.gps-horario-zp-titulo p { margin: 0; }
+.gps-horario-zp-titulo h2 { color: #111827; font-size: 16px; }
+
+.gps-horario-zp-titulo p,
+.gps-horario-zp-accion small {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.gps-horario-zp-estado {
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.gps-horario-zp-estado.is-available { color: #166534; background: #dcfce7; }
+.gps-horario-zp-estado.is-empty { color: #92400e; background: #fef3c7; }
+
+.gps-horario-zp-lista {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.gps-horario-zp-lista > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: #f8fafc;
+}
+
+.gps-horario-zp-lista span { color: #64748b; font-size: 11px; }
+.gps-horario-zp-lista strong { color: #1e293b; font-size: 13px; }
+
+.gps-horario-zp-accion {
+    min-width: 265px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+    text-align: right;
+}
+
+.gps-btn-horario-zp {
+    min-height: 38px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #93c5fd;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.gps-btn-horario-zp:hover:not(:disabled),
+.gps-btn-horario-zp.is-active {
+    color: #ffffff;
+    background: #2563eb;
+}
+
+.gps-btn-horario-zp:disabled {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+@media (max-width: 1000px) {
+    .gps-horario-zp-cuerpo,
+    .gps-horario-zp-cabecera {
+        align-items: stretch;
+        flex-direction: column;
+    }

@@ -25,6 +25,8 @@ function configurarFormularioGps() {
     const inputHoraDesde = formulario.querySelector('select[name="hora_desde"]');
     const inputHoraHasta = formulario.querySelector('select[name="hora_hasta"]');
     const inputRangoManual = formulario.querySelector('input[name="rango_manual"]');
+    const inputHorarioZp = formulario.querySelector('input[name="horario_zp"]');
+    const botonHorarioZp = document.querySelector("[data-horario-zp-toggle]");
 
     let usuarioCambioRango = false;
 
@@ -50,6 +52,14 @@ function configurarFormularioGps() {
 
     if (inputHoraHasta) {
         inputHoraHasta.addEventListener("change", marcarRangoManual);
+    }
+
+    if (botonHorarioZp && inputHorarioZp) {
+        botonHorarioZp.addEventListener("click", function () {
+            usuarioCambioRango = true;
+            inputHorarioZp.value = inputHorarioZp.value === "1" ? "0" : "1";
+            formulario.requestSubmit();
+        });
     }
 
     formulario.addEventListener("submit", function () {

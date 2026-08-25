@@ -10,9 +10,20 @@ function configurarFiltrosAutomaticos() {
     const filtroDias = document.getElementById("dias");
     const filtroHoraInicio = document.getElementById("hora_inicio");
     const filtroHoraFin = document.getElementById("hora_fin");
+    const inputHorarioZp = document.getElementById("horario_zp_bateria");
+    const botonHorarioZp = form
+        ? form.closest(".contenedor").querySelector("[data-horario-zp-toggle]")
+        : null;
 
     if (!form) {
         return;
+    }
+
+    if (botonHorarioZp && inputHorarioZp) {
+        botonHorarioZp.addEventListener("click", function () {
+            inputHorarioZp.value = inputHorarioZp.value === "1" ? "0" : "1";
+            form.requestSubmit();
+        });
     }
 
     function enviarFormularioAutomatico() {

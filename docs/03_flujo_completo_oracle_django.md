@@ -210,6 +210,18 @@ no deben sumarse ambas columnas.
 
 `UBICACION_ESPERADA_VALIDADOR` mantiene la ubicación vigente de cada AMID. Contiene coordenadas, radio permitido, zona, operador, horarios y otros datos operacionales.
 
+Los paneles Baterías y GPS leen de esa misma fila los horarios vigentes:
+
+- `HORARIO`: tramo AM de lunes a viernes;
+- `HORARIO_LABORAL_PM`: tramo PM de lunes a viernes;
+- `HORARIO_SABADO`: tramo del sábado;
+- `HORARIO_DOMINGO`: tramo del domingo.
+
+Django solo interpreta valores `HH:MM - HH:MM`. Si el AMID no tiene ubicación,
+el horario del día está vacío o el formato no es válido, conserva todos los
+datos. Esta regla evita que una configuración incompleta o el laboratorio
+oculten información operacional.
+
 `HISTORIAL_UBICACION_ESPERADA` conserva las versiones anteriores con fechas de inicio y fin de vigencia.
 
 `PRC_LIMPIAR_HIST_UBICACION` elimina por defecto versiones cuyo fin de vigencia tiene más de 16 días.
@@ -352,12 +364,25 @@ Consulta:
 
 Python no vuelve a buscar el registro más cercano de cada bloque ni detecta
 caídas por su cuenta. Ambos paneles utilizan la misma fuente Oracle.
+El botón **Horario Zona Paga** reduce las columnas de la tabla a los bloques de
+media hora incluidos en el horario vigente del día actual. Los gráficos y la
+consulta Oracle permanecen completos; es un filtro reversible de presentación.
 
 ### Panel GPS
 
 Consulta la vista normalizada dentro del rango solicitado y las tablas de
 ubicación esperada. El historial detallado solo se lee cuando el usuario abre un
 AMID o solicita una exportación.
+
+El botón **Horario Zona Paga** se aplica después de consultar el rango y antes de
+armar el resumen, el mapa y el historial. Para cada registro usa su propia
+`FECHA_REGISTRO`: lunes a viernes combina AM y PM, sábado usa
+`HORARIO_SABADO` y domingo `HORARIO_DOMINGO`. Si una fecha no tiene horario, sus
+registros se conservan sin filtrar.
+
+No se creó una tabla, vista ni job adicional en Oracle. La consulta vigente es
+por AMID sobre `UBICACION_ESPERADA_VALIDADOR`, y el parser/filtro se comparte en
+`horarios_zp_service.py` para evitar reglas duplicadas entre paneles.
 
 ---
 

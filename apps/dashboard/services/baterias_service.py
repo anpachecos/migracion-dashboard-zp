@@ -3,6 +3,11 @@ from types import SimpleNamespace
 
 from django.utils import timezone
 
+from apps.dashboard.services.horarios_zp_service import (
+    crear_configuracion_horario_zp,
+    obtener_columnas_media_hora_para_hoy,
+    obtener_datos_horario_zp_oracle,
+)
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 """
@@ -628,6 +633,7 @@ def evaluar_error_bateria(valor):
 
 def obtener_contexto_baterias(request):
     amid = request.GET.get("amid", "").strip()
+    horario_zp_solicitado = request.GET.get("horario_zp", "0") == "1"
 
     # El panel de baterías trabaja siempre con 14 días completos.
     # Se eliminan filtros manuales para simplificar el uso operativo.
@@ -644,6 +650,11 @@ def obtener_contexto_baterias(request):
     mensaje = ""
 
     horario_sugerido_aplicado = False
+    horario_zp_activo = False
+    horario_zp = crear_configuracion_horario_zp(
+        fecha_referencia=obtener_ahora_referencia()
+    )
+    aviso_horario_zp = ""
 
     clase_bateria_actual = "tarjeta-neutra"
 
@@ -698,11 +709,40 @@ def obtener_contexto_baterias(request):
             mensaje = f"Error consultando datos de baterías en Oracle: {error}"
 
         if ultimo_registro:
+            try:
+                datos_horario_zp = obtener_datos_horario_zp_oracle(amid)
+                horario_zp = crear_configuracion_horario_zp(
+                    datos=datos_horario_zp,
+                    fecha_referencia=obtener_ahora_referencia(),
+                )
+            except Exception:
+                # El horario es una ayuda visual. Una falla en esta consulta
+                # nunca debe impedir revisar los datos de batería.
+                aviso_horario_zp = (
+                    "No fue posible consultar el horario vigente; "
+                    "la tabla se mantiene completa."
+                )
+
+            columnas_horario_zp = []
+
+            if horario_zp_solicitado and not horario_zp["tiene_horario_hoy"]:
+                horario_zp_solicitado = False
+
+            if horario_zp_solicitado and horario_zp["tiene_horario_hoy"]:
+                columnas_horario_zp = obtener_columnas_media_hora_para_hoy(
+                    horario_zp
+                )
+                horario_zp_activo = bool(columnas_horario_zp)
+                horario_sugerido_aplicado = horario_zp_activo
+
             columnas_horas, tabla_bateria = construir_tabla_bateria(
                 bloques=bloques,
                 cantidad_dias=dias,
                 hora_inicio=hora_inicio,
                 hora_fin=hora_fin,
+                columnas_horas_filtradas=(
+                    columnas_horario_zp if horario_zp_activo else None
+                ),
             )
 
             datos_grafico_periodo = construir_datos_grafico_periodo(
@@ -771,6 +811,10 @@ def obtener_contexto_baterias(request):
         "datos_grafico_dia": datos_grafico_dia,
         "mensaje": mensaje,
         "horario_sugerido_aplicado": horario_sugerido_aplicado,
+        "horario_zp_solicitado": horario_zp_solicitado,
+        "horario_zp_activo": horario_zp_activo,
+        "horario_zp": horario_zp,
+        "aviso_horario_zp": aviso_horario_zp,
         "datos_grafico_periodo": datos_grafico_periodo,
         "clase_bateria_actual": clase_bateria_actual,
 
@@ -826,12 +870,17 @@ def construir_tabla_bateria(
     hora_inicio="00:00",
     hora_fin="23:30",
     registros=None,
+    columnas_horas_filtradas=None,
 ):
     """
     Arma la tabla visual usando bloques ya preparados por Oracle.
     Ya no calcula cercanía de registros en Python.
     """
-    columnas_horas = generar_columnas_media_hora(hora_inicio, hora_fin)
+    columnas_horas = (
+        list(columnas_horas_filtradas)
+        if columnas_horas_filtradas is not None
+        else generar_columnas_media_hora(hora_inicio, hora_fin)
+    )
     fechas = generar_fechas_ultimos_dias(cantidad_dias)
 
     # Compatibilidad: views.py puede llamar construir_tabla_bateria(

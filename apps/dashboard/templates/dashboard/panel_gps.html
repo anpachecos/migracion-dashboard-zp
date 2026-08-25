@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=17">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_gps.css' %}?v=18">
 {% endblock %}
 
 {% block content %}
@@ -70,6 +70,10 @@
             <circle cx="10" cy="14" r="7"></circle>
             <path d="M14 10l6-6M16 4h4v4"></path>
         </symbol>
+        <symbol id="gps-icon-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 7v5l3 2"></path>
+        </symbol>
     </svg>
 
     <header class="panel-header gps-header-compacto">
@@ -90,6 +94,12 @@
                     id="rango_manual"
                     name="rango_manual"
                     value="{{ rango_manual|default:'0' }}"
+                >
+                <input
+                    type="hidden"
+                    id="horario_zp_gps"
+                    name="horario_zp"
+                    value="{% if horario_zp_solicitado %}1{% else %}0{% endif %}"
                 >
 
                 <div class="gps-campo-busqueda">
@@ -156,7 +166,7 @@
 
                     <a
                         class="gps-btn-hoy"
-                        href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}&rango_manual=0"
+                        href="{% url 'dashboard:panel_gps' %}?amid={{ amid }}&rango_manual=0&horario_zp={% if horario_zp_solicitado %}1{% else %}0{% endif %}"
                         title="Restablece el filtro a hoy de 00:00 a 23:30"
                     >
                         <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-calendar"></use></svg>
@@ -251,6 +261,56 @@
             <div class="gps-mensaje">
                 {{ mensaje }}
             </div>
+        {% endif %}
+
+        {% if amid %}
+        <section class="gps-horario-zp-card">
+            <div class="gps-horario-zp-cabecera">
+                <div class="gps-horario-zp-titulo">
+                    <span aria-hidden="true">
+                        <svg class="gps-icono"><use href="#gps-icon-clock"></use></svg>
+                    </span>
+                    <div>
+                        <h2>Horario Zona Paga</h2>
+                        <p>{{ horario_zp.ubicacion }}</p>
+                    </div>
+                </div>
+                <span class="gps-horario-zp-estado {% if horario_zp.tiene_horario_hoy %}is-available{% else %}is-empty{% endif %}">
+                    {{ horario_zp.texto_hoy }}
+                </span>
+            </div>
+
+            <div class="gps-horario-zp-cuerpo">
+                <div class="gps-horario-zp-lista">
+                    {% for item in horario_zp.items %}
+                        <div>
+                            <span>{{ item.etiqueta }}</span>
+                            <strong>{{ item.valor }}</strong>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="gps-horario-zp-accion">
+                    <small>
+                        {% if horario_zp_activo %}
+                            Mapa, resumen e historial filtrados según el horario de cada fecha.
+                        {% else %}
+                            {{ aviso_horario_zp|default:horario_zp.mensaje_hoy }}
+                        {% endif %}
+                    </small>
+                    <button
+                        type="button"
+                        class="gps-btn-horario-zp {% if horario_zp_activo %}is-active{% endif %}"
+                        data-horario-zp-toggle
+                        aria-pressed="{% if horario_zp_activo %}true{% else %}false{% endif %}"
+                        {% if not horario_zp.tiene_horario_hoy %}disabled{% endif %}
+                    >
+                        <svg class="gps-icono" aria-hidden="true"><use href="#gps-icon-clock"></use></svg>
+                        {% if horario_zp_activo %}Quitar filtro Horario Zona Paga{% elif horario_zp.tiene_horario_hoy %}Horario Zona Paga{% else %}Sin horario asignado hoy{% endif %}
+                    </button>
+                </div>
+            </div>
+        </section>
         {% endif %}
 
         <section class="gps-fila-mapa" id="mapa-gps-bloque">
@@ -477,5 +537,5 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'dashboard/js/panel_gps.js' %}?v=23"></script>
+<script src="{% static 'dashboard/js/panel_gps.js' %}?v=24"></script>
 {% endblock %}

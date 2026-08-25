@@ -662,3 +662,113 @@ th.hora-diagonal > span {
         min-height: 280px;
     }
 }
+/* Horario vigente de la zona paga */
+.horario-zp-card {
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.horario-zp-cabecera,
+.horario-zp-contenido {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: center;
+}
+
+.horario-zp-cabecera {
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.horario-zp-cabecera h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+}
+
+.horario-zp-cabecera p,
+.horario-zp-accion small {
+    margin: 0;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.horario-zp-estado {
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.horario-zp-estado--ok { color: #166534; background: #dcfce7; }
+.horario-zp-estado--sin { color: #92400e; background: #fef3c7; }
+
+.horario-zp-lista {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+.horario-zp-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 9px 11px;
+    border-radius: 9px;
+    background: #f8fafc;
+}
+
+.horario-zp-item span { color: #64748b; font-size: 11px; }
+.horario-zp-item strong { color: #1e293b; font-size: 13px; }
+
+.horario-zp-accion {
+    min-width: 235px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    text-align: right;
+}
+
+.btn-horario-zp {
+    min-height: 38px;
+    padding: 8px 13px;
+    border: 1px solid #93c5fd;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-horario-zp:hover:not(:disabled),
+.btn-horario-zp.is-active {
+    color: #ffffff;
+    background: #2563eb;
+}
+
+.btn-horario-zp:disabled {
+    border-color: #d1d5db;
+    background: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+    .horario-zp-contenido,
+    .horario-zp-cabecera {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .horario-zp-lista {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .horario-zp-accion {
+        min-width: 0;
+        align-items: stretch;

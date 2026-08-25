@@ -4,6 +4,10 @@ import math
 
 from django.utils import timezone
 
+from apps.dashboard.services.horarios_zp_service import (
+    crear_configuracion_horario_zp,
+    filtrar_registros_por_horario_zp,
+)
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 
@@ -511,6 +515,10 @@ def obtener_ubicacion_vigente_amid(cursor, amid):
             OPERATIVA,
             VERSION_ZP,
             ARCHIVO_ORIGEN,
+            HORARIO,
+            HORARIO_LABORAL_PM,
+            HORARIO_SABADO,
+            HORARIO_DOMINGO,
             FECHA_CARGA
         FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
         WHERE AMID = :amid
@@ -725,6 +733,7 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
 
 def obtener_contexto_gps(request):
     amid = request.GET.get("amid", "").strip()
+    horario_zp_solicitado = request.GET.get("horario_zp", "0") == "1"
     rango_manual = request.GET.get("rango_manual", "0")
 
     filtros_fecha = obtener_rango_fechas_gps(request)
@@ -742,6 +751,13 @@ def obtener_contexto_gps(request):
     ubicacion_esperada = None
     usando_ultimo_dia_reportado = False
     fecha_ultimo_dia_reportado = None
+    historial_amid = []
+    vigente_amid = None
+    horario_zp_activo = False
+    horario_zp = crear_configuracion_horario_zp(
+        fecha_referencia=obtener_ahora_referencia()
+    )
+    aviso_horario_zp = ""
 
     ubicacion_laboratorio = {
         "nombre": NOMBRE_LABORATORIO_ZP,
@@ -811,6 +827,36 @@ def obtener_contexto_gps(request):
             mensaje = f"Error consultando datos GPS en Oracle: {error}"
             registros_periodo_base = []
 
+        try:
+            with obtener_conexion_oracle() as conexion:
+                with conexion.cursor() as cursor:
+                    historial_amid = obtener_historial_ubicacion_amid(cursor, amid)
+                    vigente_amid = obtener_ubicacion_vigente_amid(cursor, amid)
+
+            horario_zp = crear_configuracion_horario_zp(
+                datos=vigente_amid,
+                fecha_referencia=obtener_ahora_referencia(),
+            )
+        except Exception as error:
+            aviso_horario_zp = (
+                "No fue posible consultar el horario vigente; "
+                "los registros se mantienen sin filtro."
+            )
+            if not mensaje:
+                mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
+
+        if horario_zp_solicitado and not horario_zp["tiene_horario_hoy"]:
+            horario_zp_solicitado = False
+
+        if horario_zp_solicitado and horario_zp["tiene_horario_hoy"]:
+            registros_periodo_base, horario_zp_activo = (
+                filtrar_registros_por_horario_zp(
+                    registros=registros_periodo_base,
+                    configuracion=horario_zp,
+                    atributo_fecha="fecha_registro",
+                )
+            )
+
         resumen_gps["registros_totales_periodo"] = len(registros_periodo_base)
 
         resumen_gps["errores_gps_periodo"] = sum(
@@ -842,11 +888,6 @@ def obtener_contexto_gps(request):
         resumen_gps["registros_gps_cero_periodo"] = len(registros_cero)
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    historial_amid = obtener_historial_ubicacion_amid(cursor, amid)
-                    vigente_amid = obtener_ubicacion_vigente_amid(cursor, amid)
-
             ultima_ubicacion_reportada = None
             ultimo_registro_reportado = None
             ultima_ubicacion_valida = None
@@ -1105,6 +1146,11 @@ def obtener_contexto_gps(request):
         "ubicacion_esperada": ubicacion_esperada,
         "ubicacion_laboratorio": ubicacion_laboratorio,
         "resumen_gps": resumen_gps,
+
+        "horario_zp_solicitado": horario_zp_solicitado,
+        "horario_zp_activo": horario_zp_activo,
+        "horario_zp": horario_zp,
+        "aviso_horario_zp": aviso_horario_zp,
 
         "usando_ultimo_dia_reportado": usando_ultimo_dia_reportado,
         "fecha_ultimo_dia_reportado": fecha_ultimo_dia_reportado,

@@ -4,7 +4,7 @@
 {% block title %}Baterías | Dashboard ZP{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=16">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_baterias.css' %}?v=17">
 {% endblock %}
 
 {% block content %}
@@ -19,6 +19,13 @@
 
     <section class="buscador">
         <form method="get" class="form-filtros" id="form-filtros-bateria">
+
+            <input
+                type="hidden"
+                id="horario_zp_bateria"
+                name="horario_zp"
+                value="{% if horario_zp_solicitado %}1{% else %}0{% endif %}"
+            >
 
             <div class="grupo-filtro grupo-amid">
                 <label for="amid">Buscar AMID</label>
@@ -175,13 +182,60 @@
             </section>
         {% endif %}
 
+        <section class="horario-zp-card">
+            <div class="horario-zp-cabecera">
+                <div>
+                    <h2><span aria-hidden="true">🕒</span> Horario Zona Paga</h2>
+                    <p>{{ horario_zp.ubicacion }}</p>
+                </div>
+                <span class="horario-zp-estado {% if horario_zp.tiene_horario_hoy %}horario-zp-estado--ok{% else %}horario-zp-estado--sin{% endif %}">
+                    {{ horario_zp.texto_hoy }}
+                </span>
+            </div>
+
+            <div class="horario-zp-contenido">
+                <div class="horario-zp-lista">
+                    {% for item in horario_zp.items %}
+                        <div class="horario-zp-item">
+                            <span>{{ item.etiqueta }}</span>
+                            <strong>{{ item.valor }}</strong>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="horario-zp-accion">
+                    <small>{{ aviso_horario_zp|default:horario_zp.mensaje_hoy }}</small>
+                    <button
+                        type="button"
+                        class="btn-horario-zp {% if horario_zp_activo %}is-active{% endif %}"
+                        data-horario-zp-toggle
+                        aria-pressed="{% if horario_zp_activo %}true{% else %}false{% endif %}"
+                        {% if not horario_zp.tiene_horario_hoy %}disabled{% endif %}
+                    >
+                        <span aria-hidden="true">🕒</span>
+                        {% if horario_zp_activo %}
+                            Quitar filtro Horario Zona Paga
+                        {% elif horario_zp.tiene_horario_hoy %}
+                            Horario Zona Paga
+                        {% else %}
+                            Sin horario asignado hoy
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <!-- Tabla batería por media hora -->
         <section class="seccion">
             <div class="titulo-tabla">
                 <div>
                     <h2>Tabla detalle de batería</h2>
                     <p class="texto-ayuda">
-                        Período consultado: últimos 14 días, bloques de 00:00 a 23:30.
+                        {% if horario_zp_activo %}
+                            Últimos 14 días; columnas filtradas por el horario vigente de hoy ({{ horario_zp.dia_hoy }}).
+                        {% else %}
+                            Período consultado: últimos 14 días, bloques de 00:00 a 23:30.
+                        {% endif %}
                     </p>
                 </div>
             </div>
@@ -278,13 +332,6 @@
             </div>
         </section>
 
-        {% if horario_sugerido_aplicado %}
-            <section class="mensaje mensaje-info">
-                Se aplicó automáticamente el horario sugerido:
-                <strong>{{ hora_inicio }}</strong> a <strong>{{ hora_fin }}</strong>.
-            </section>
-        {% endif %}
-
     {% elif amid and not mensaje %}
 
         <section class="mensaje">
@@ -311,5 +358,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'dashboard/js/panel_baterias.js' %}?v=16"></script>
+<script src="{% static 'dashboard/js/panel_baterias.js' %}?v=17"></script>
 {% endblock %}
