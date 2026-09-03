@@ -1,0 +1,27 @@
+{% load static %}
+<details class="alertas-filtro-encabezado{% if filtro_activo %} filtro-activo{% endif %}{% if alinear_derecha %} menu-derecha{% endif %}">
+    <summary
+        aria-label="{{ titulo }}"
+        title="{% if filtro_activo %}Filtro activo; abre para cambiar{% else %}{{ titulo }}{% endif %}"
+    >
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13a1.5 1.5 0 0 1 1.15 2.46L14 13.24V18a1 1 0 0 1-.45.83l-3 2A1 1 0 0 1 9 20v-6.76L4.35 6.46A1.5 1.5 0 0 1 4 5.5Z"/>
+        </svg>
+    </summary>
+    <div class="alertas-filtro-menu" role="menu" aria-label="{{ titulo }}">
+        <strong>{{ titulo }}</strong>
+        {% for opcion in opciones %}
+            <a
+                role="menuitem"
+                class="{% if opcion.activo %}opcion-activa{% endif %}"
+                href="{% if opcion.querystring %}?{{ opcion.querystring }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}"
+            >
+                <span>{{ opcion.etiqueta }}</span>
+                {% if opcion.activo %}<span aria-hidden="true">✓</span>{% endif %}
+            </a>
+        {% endfor %}
+        {% if ayuda %}
+            <small>{{ ayuda }}</small>
+        {% endif %}
+    </div>
+</details>

@@ -14,9 +14,9 @@ Usuario → URL Django → View → Service Python → Oracle → Contexto → T
 
 | Panel | Objetivo | Archivo principal |
 |---|---|---|
-| Baterías | Revisar evolución de batería por AMID | `baterias_service.py`, `panel_baterias.html` |
-| GPS | Revisar ubicación reportada y ubicación esperada | `gps_service.py`, `panel_gps.html` |
-| Alertas | Mostrar validadores con prioridad crítica, alta, advertencia u OK | `alertas_service.py`, `panel_alertas.html` |
+| Baterías | Revisar evolución por bloques, caídas oficiales y horario vigente del AMID | `baterias_service.py`, `panel_baterias.html` |
+| GPS | Revisar transmisiones, ubicación esperada, radio e historial del período | `gps_service.py`, `panel_gps.html` |
+| Alertas | Mostrar prioridades y permitir exclusiones personales por AMID o ubicación | `alertas_service.py`, `preferencias_alertas_service.py`, `panel_alertas.html` |
 | Perfil | Administrar usuarios, reglas y procesos | `views.py`, `panel_perfil.html`, `reglas_alertas_service.py` |
 
 ## Capas del sistema
@@ -28,7 +28,7 @@ Usuario → URL Django → View → Service Python → Oracle → Contexto → T
 | Services Python | Consultan Oracle y preparan la información. |
 | Templates HTML | Muestran la información. |
 | CSS/JS | Controlan diseño y comportamiento visual. |
-| SQLite | Mantiene usuarios, sesiones y logs propios de Django. |
+| SQLite | Mantiene usuarios, sesiones, logs y preferencias personales de exclusión. |
 
 ## Estado de organización
 
@@ -36,6 +36,10 @@ Usuario → URL Django → View → Service Python → Oracle → Contexto → T
 - La lógica de clasificación de alertas está centralizada en Oracle.
 - Los SQL actuales, históricos y de diagnóstico están separados.
 - Los archivos generados, resultados Oracle y secretos están excluidos de Git.
+- Baterías y Alertas consumen la misma tabla Oracle de eventos de caída.
+- Baterías y GPS reutilizan un único intérprete de horarios Zona Paga.
+- El Panel GPS distingue transmisión válida, coordenadas `0,0` y bloques sin
+  transmisión usando `FECHA_REGISTRO` como referencia temporal del bloque.
 
 Como mantenimiento futuro queda revisar los comandos históricos de importación
 SQLite antes de eliminarlos y separar secciones de `views.py` si continúa

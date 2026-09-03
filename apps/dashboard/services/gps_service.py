@@ -704,8 +704,9 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
         "clase_errores_gps_periodo": "gps-estado-ok",
 
         # Base de cumplimiento:
-        # coordenadas válidas + coordenadas 0,0.
-        # GPS 0,0 cuenta como fuera del radio.
+        # toda transmisión GPS, incluyendo 0,0.
+        # Los bloques sin transmisión se informan por separado y no forman
+        # parte del denominador.
         "registros_periodo": 0,
         "registros_dentro_periodo": 0,
         "registros_fuera_periodo": 0,
@@ -921,12 +922,8 @@ def obtener_contexto_gps(request):
 
                 if coordenada_cero:
                     distancia = None
-                    dentro_radio = False
-
-                    # Regla operacional:
-                    # 0,0 cuenta como fuera del radio.
+                    dentro_radio = None
                     resumen_gps["registros_periodo"] += 1
-                    resumen_gps["registros_fuera_periodo"] += 1
                 else:
                     distancia = calcular_distancia_metros(
                         lat,
@@ -1098,7 +1095,7 @@ def obtener_contexto_gps(request):
 
                 if ultima_reportada_es_cero:
                     distancia_actual = None
-                    dentro_radio_actual = False
+                    dentro_radio_actual = None
                 elif ultima_ubicacion_reportada:
                     distancia_actual = calcular_distancia_metros(
                         ultima_ubicacion_reportada["latitud"],

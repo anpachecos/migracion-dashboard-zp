@@ -5,7 +5,7 @@
 {% block title %}Panel de Alertas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=9">
+<link rel="stylesheet" href="{% static 'dashboard/css/panel_alertas.css' %}?v=13">
 {% endblock %}
 
 {% block content %}
@@ -28,7 +28,29 @@
                 {% endif %}
             </p>
         </div>
+        <div class="alertas-header-acciones">
+            <a
+                class="btn-exportar-alertas"
+                href="{% url 'dashboard:exportar_alertas_excel' %}"
+                title="Exporta todos los AMID activos sin aplicar filtros ni exclusiones."
+            >
+                <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 2.5L17.5 8H14ZM8 12h2.2l1.3 2.1 1.3-2.1H15l-2.3 3.5L15.2 19H13l-1.5-2.2L10 19H7.8l2.5-3.5Zm8-1h2v8h-2Z"/>
+                </svg>
+                <span>Exportar Excel</span>
+            </a>
+        </div>
     </div>
+
+    {% if messages %}
+        <div class="alertas-mensajes" aria-live="polite">
+            {% for message in messages %}
+                <div class="alertas-mensaje {{ message.tags }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     <details class="preferencias-alertas">
         <summary>
@@ -239,6 +261,13 @@
 
     <form method="get" class="alertas-filtros">
 
+        <input type="hidden" name="orden" value="{{ orden_serializado }}">
+        <input type="hidden" name="ubicacion" value="{{ filtro_ubicacion }}">
+        <input type="hidden" name="nivel" value="{{ filtro_nivel }}">
+        <input type="hidden" name="nivel_gps" value="{{ filtro_nivel_gps }}">
+        <input type="hidden" name="nivel_bateria" value="{{ filtro_nivel_bateria }}">
+        <input type="hidden" name="estatus" value="{{ filtro_estatus }}">
+
         <div class="campo-filtro">
             <label for="amid">AMID</label>
             <input
@@ -247,18 +276,14 @@
                 name="amid"
                 value="{{ filtro_amid }}"
                 placeholder="Ej: 7500679"
-            >
-        </div>
-
-        <div class="campo-filtro">
-            <label for="nivel">Prioridad</label>
-            <select id="nivel" name="nivel">
-                <option value="">Todas</option>
-                <option value="CRITICA" {% if filtro_nivel == "CRITICA" %}selected{% endif %}>Crítica</option>
-                <option value="ALTA" {% if filtro_nivel == "ALTA" %}selected{% endif %}>Alta</option>
-                <option value="ADVERTENCIA" {% if filtro_nivel == "ADVERTENCIA" %}selected{% endif %}>Advertencia</option>
-                <option value="OK" {% if filtro_nivel == "OK" %}selected{% endif %}>OK</option>
-            </select>
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="7"
+                pattern="(?:7[5-9][0-9]{5}|[89][0-9]{6})"
+                title="Ingresa solo números, hasta 7 dígitos y un valor desde 7500000."
+                aria-describedby="ayuda-amid-alertas"
+                data-filtro-amid
+            >         
         </div>
 
         <div class="campo-filtro">
@@ -283,16 +308,6 @@
             </select>
         </div>
 
-        <div class="campo-filtro">
-            <label for="estatus">Último estatus</label>
-            <select id="estatus" name="estatus">
-                <option value="">Todos</option>
-                <option value="CON_ESTATUS" {% if filtro_estatus == "CON_ESTATUS" %}selected{% endif %}>Con estatus</option>
-                <option value="ANTIGUO" {% if filtro_estatus == "ANTIGUO" %}selected{% endif %}>Hace más de 1 hora</option>
-                <option value="SIN_ESTATUS" {% if filtro_estatus == "SIN_ESTATUS" %}selected{% endif %}>Sin estatus hoy</option>
-            </select>
-        </div>
-
         <div class="campo-check">
             <label>
                 <input
@@ -312,17 +327,76 @@
 
     </form>
 
+    <div class="alertas-orden-ayuda">
+        <span>
+            Orden combinado por prioridad, GPS, batería y estatus.
+            Usa las flechas para ordenar y los embudos para combinar filtros.
+        </span>
+        <a href="{% url 'dashboard:panel_alertas' %}">
+            Restablecer filtros y orden
+        </a>
+    </div>
+
     <div class="alertas-tabla-contenedor">
 
         <table class="alertas-tabla">
             <thead>
                 <tr>
-                    <th>Prioridad</th>
+                    <th>
+                        <div class="alertas-encabezado-acciones">
+                            <span>Prioridad</span>
+                            <a
+                                class="alertas-orden-control"
+                                href="?{{ orden_encabezados.prioridad.querystring }}"
+                                aria-label="Invertir orden de prioridad global"
+                                title="{% if orden_encabezados.prioridad.direccion == 'asc' %}Crítica → Alta → Advertencia → OK{% else %}OK → Advertencia → Alta → Crítica{% endif %}; pulsa para invertir"
+                            >{{ orden_encabezados.prioridad.simbolo }}</a>
+                            {% include "dashboard/partials/filtro_encabezado_alertas.html" with filtro_activo=filtro_nivel opciones=filtros_encabezados.prioridad titulo="Filtrar prioridad" ayuda="También puedes filtrar seleccionando una tarjeta de resumen." %}
+                        </div>
+                    </th>
                     <th>AMID</th>
-                    <th>Ubicaci&oacute;n actual</th>
-                    <th>Último estatus</th>
-                    <th>GPS</th>
-                    <th>Batería</th>
+                    <th>
+                        <div class="alertas-encabezado-acciones">
+                            <span>Ubicaci&oacute;n actual</span>
+                            {% include "dashboard/partials/filtro_ubicacion_alertas.html" %}
+                        </div>
+                    </th>
+                    <th>
+                        <div class="alertas-encabezado-acciones">
+                            <span>Último estatus</span>
+                            <a
+                                class="alertas-orden-control"
+                                href="?{{ orden_encabezados.estatus.querystring }}"
+                                aria-label="Invertir orden del último estatus"
+                                title="{% if orden_encabezados.estatus.direccion == 'asc' %}Con estatus → Hace más de 1 hora → Sin estatus{% else %}Sin estatus → Hace más de 1 hora → Con estatus{% endif %}; pulsa para invertir"
+                            >{{ orden_encabezados.estatus.simbolo }}</a>
+                            {% include "dashboard/partials/filtro_encabezado_alertas.html" with filtro_activo=filtro_estatus opciones=filtros_encabezados.estatus titulo="Filtrar último estatus" ayuda="Puedes combinar este filtro con prioridad, GPS y batería." %}
+                        </div>
+                    </th>
+                    <th>
+                        <div class="alertas-encabezado-acciones">
+                            <span>GPS</span>
+                            <a
+                                class="alertas-orden-control"
+                                href="?{{ orden_encabezados.gps.querystring }}"
+                                aria-label="Invertir orden de alerta GPS"
+                                title="{% if orden_encabezados.gps.direccion == 'asc' %}Crítica → Alta → Advertencia → OK{% else %}OK → Advertencia → Alta → Crítica{% endif %}; pulsa para invertir"
+                            >{{ orden_encabezados.gps.simbolo }}</a>
+                            {% include "dashboard/partials/filtro_encabezado_alertas.html" with filtro_activo=filtro_nivel_gps opciones=filtros_encabezados.gps titulo="Filtrar alerta GPS" ayuda="Selecciona el nivel GPS que quieres mostrar." alinear_derecha=1 %}
+                        </div>
+                    </th>
+                    <th>
+                        <div class="alertas-encabezado-acciones">
+                            <span>Batería</span>
+                            <a
+                                class="alertas-orden-control"
+                                href="?{{ orden_encabezados.bateria.querystring }}"
+                                aria-label="Invertir orden de alerta de batería"
+                                title="{% if orden_encabezados.bateria.direccion == 'asc' %}Crítica → Alta → Advertencia → OK{% else %}OK → Advertencia → Alta → Crítica{% endif %}; pulsa para invertir"
+                            >{{ orden_encabezados.bateria.simbolo }}</a>
+                            {% include "dashboard/partials/filtro_encabezado_alertas.html" with filtro_activo=filtro_nivel_bateria opciones=filtros_encabezados.bateria titulo="Filtrar alerta de batería" ayuda="Selecciona el nivel de batería que quieres mostrar." alinear_derecha=1 %}
+                        </div>
+                    </th>
                 </tr>
             </thead>
 
@@ -461,5 +535,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=4"></script>
+<script src="{% static 'dashboard/js/panel_alertas.js' %}?v=7"></script>
 {% endblock %}

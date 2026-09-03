@@ -200,7 +200,7 @@
 
         <section class="gps-fila-metricas">
 
-            <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.dentro_radio == True %}gps-card-ok{% elif ubicacion_esperada and ubicacion_esperada.dentro_radio == False %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
+            <article class="gps-resumen-card gps-card-estado {% if ubicacion_esperada and ubicacion_esperada.ultima_reportada_es_cero %}gps-estado-advertencia{% elif ubicacion_esperada and ubicacion_esperada.dentro_radio == True %}gps-card-ok{% elif ubicacion_esperada and ubicacion_esperada.dentro_radio == False %}gps-card-alerta{% else %}gps-card-neutral{% endif %}">
                 <span class="gps-metrica-icono" aria-hidden="true">
                     <svg class="gps-icono gps-icono-grande"><use href="#gps-icon-signal"></use></svg>
                 </span>
@@ -208,7 +208,9 @@
                     <span class="gps-metrica-etiqueta">Estado ubicación</span>
                     <strong>
                         {% if ubicacion_esperada %}
-                            {% if ubicacion_esperada.dentro_radio == True %}
+                            {% if ubicacion_esperada.ultima_reportada_es_cero %}
+                                Coordenadas 0,0
+                            {% elif ubicacion_esperada.dentro_radio == True %}
                                 Dentro del radio
                             {% elif ubicacion_esperada.dentro_radio == False %}
                                 Fuera del radio

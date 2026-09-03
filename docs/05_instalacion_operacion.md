@@ -53,9 +53,12 @@ python manage.py runserver
 | `/login/`, `/logout/` | Sesión. |
 | `/`, `/baterias/` | Baterías. |
 | `/gps/`, `/alertas/`, `/perfil/` | Paneles GPS, alertas y perfil. |
+| `/alertas/buscar-exclusiones/` | Sugerencias JSON acotadas para AMID y ubicaciones; requiere login. |
+| `/alertas/caidas-bateria/` | Detalle JSON de eventos oficiales de caída; se consulta al desplegar una alerta. |
 | `/perfil/reglas-alertas/editor/` | Fragmento protegido del editor; se solicita sólo al desplegar la configuración. |
 | `/perfil/ejecutar-comando/` | Acciones administrativas. |
-| `/baterias/exportar/`, `/gps/exportar/`, `/alertas/exportar/` | Exportaciones XLSX. |
+| `/baterias/exportar/`, `/gps/exportar/` | Exportaciones XLSX vigentes. |
+| `/alertas/exportar/` | Ruta conservada, pero la exportación está deshabilitada en el flujo actual. |
 | `/admin/` | Administración Django. |
 
 ## Comandos
@@ -83,6 +86,19 @@ Use `python manage.py <comando> --help` antes de operaciones de escritura o elim
 No se requieren migraciones Django ni scripts Oracle para el rediseño. Si se agrega una clave nueva a `CLAVES_PERMITIDAS`, también se debe documentar en `catalogo_reglas_alertas.py`; la validación al importar impide publicar un catálogo incompleto.
 
 La interfaz no calcula una vista previa de AMID afectados. Para incorporar esa función de manera segura se necesita un procedimiento Oracle de simulación de solo lectura que acepte parámetros candidatos. No usar actualizaciones temporales con `ROLLBACK`, porque pueden bloquear la tabla global y el recálculo completo puede ser costoso.
+
+## Operación de preferencias de alertas
+
+- La tarjeta de preferencias se carga cerrada y muestra el total de exclusiones.
+- El buscador comienza con dos caracteres, espera 300 ms y devuelve hasta 15
+  sugerencias; no se deben reemplazar estos límites por una precarga completa.
+- **Guardar preferencias** reemplaza atómicamente en SQLite las exclusiones del
+  usuario. **Restablecer preferencias** deja ambas listas vacías.
+- Las exclusiones se aplican a tarjetas, tabla, filtros y paginación del usuario,
+  pero no actualizan objetos Oracle.
+- Si cambian los modelos `AlertaAmidExcluido` o `AlertaUbicacionExcluida`, sí se
+  requiere `makemigrations` y `migrate`. Los cambios visuales no los requieren.
+
 ## Despliegue y diagnóstico
 
 En producción: `DEBUG=False`, clave única, hosts restrictivos, `migrate`, `check --deploy`, pruebas, `collectstatic` y servidor WSGI para `config.wsgi:application`. Proteja `.env` y SQLite con ACL.

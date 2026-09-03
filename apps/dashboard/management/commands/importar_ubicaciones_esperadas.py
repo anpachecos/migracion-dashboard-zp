@@ -659,21 +659,33 @@ class Command(BaseCommand):
         cerrados_historial = 0
         nuevos_historial = 0
 
+        # El Excel ya fue procesado antes de llegar a este punto. El maestro
+        # activo es el universo oficial para detectar validadores ausentes y
+        # evita que un AMID nuevo quede fuera por no existir aun en la tabla
+        # vigente. Los AMID ajenos al maestro activo no se modifican aqui.
         cursor.execute(
             """
             SELECT
-                AMID,
-                SERIE_VALIDADOR
-            FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
+                maestro.AMID,
+                vigente.SERIE_VALIDADOR
+            FROM (
+                SELECT DISTINCT
+                    TRIM(CAST(AMID AS VARCHAR2(20))) AS AMID
+                FROM USR_LAB.AMID_MAESTRO_ALERTAS
+                WHERE ACTIVO = 1
+            ) maestro
+            LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR vigente
+              ON vigente.AMID = maestro.AMID
+            ORDER BY maestro.AMID
             """
         )
 
-        filas_vigentes = cursor.fetchall()
+        filas_maestro = cursor.fetchall()
         columnas = [col[0] for col in cursor.description]
 
-        for fila in filas_vigentes:
-            vigente = dict(zip(columnas, fila))
-            amid = str(vigente["AMID"]).strip()
+        for fila in filas_maestro:
+            registro_maestro = dict(zip(columnas, fila))
+            amid = str(registro_maestro["AMID"]).strip()
 
             if amid in amids_excel:
                 continue
@@ -686,7 +698,7 @@ class Command(BaseCommand):
             datos_laboratorio.update({
                 "AMID": amid,
                 "NOMBRE": NOMBRE_LABORATORIO_ZP,
-                "SERIE_VALIDADOR": vigente.get("SERIE_VALIDADOR"),
+                "SERIE_VALIDADOR": registro_maestro.get("SERIE_VALIDADOR"),
                 "IDDS": amid,
                 "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
                 "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,

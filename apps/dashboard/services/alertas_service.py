@@ -7,11 +7,66 @@ from django.core.cache import cache
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
-ORDEN_PRIORIDAD = {
-    "CRITICA": 1,
-    "ALTA": 2,
-    "ADVERTENCIA": 3,
-    "OK": 4,
+ORDEN_ALERTAS_PREDETERMINADO = (
+    ("prioridad", "asc"),
+    ("gps", "asc"),
+    ("bateria", "asc"),
+    ("estatus", "asc"),
+)
+CAMPOS_ORDEN_ALERTAS = tuple(campo for campo, _ in ORDEN_ALERTAS_PREDETERMINADO)
+DIRECCIONES_ORDEN_ALERTAS = frozenset({"asc", "desc"})
+OPCIONES_NIVEL_ALERTA = (
+    ("todas", "", "Todas"),
+    ("critica", "CRITICA", "Crítica"),
+    ("alta", "ALTA", "Alta"),
+    ("advertencia", "ADVERTENCIA", "Advertencia"),
+    ("ok", "OK", "OK"),
+)
+NIVELES_ALERTA_VALIDOS = frozenset(valor for _, valor, _ in OPCIONES_NIVEL_ALERTA if valor)
+OPCIONES_ESTATUS_ALERTA = (
+    ("todos", "", "Todos"),
+    ("con_estatus", "CON_ESTATUS", "Con estatus"),
+    ("antiguo", "ANTIGUO", "Hace más de 1 hora"),
+    ("sin_estatus", "SIN_ESTATUS", "Sin estatus hoy"),
+)
+ESTATUS_ALERTA_VALIDOS = frozenset(valor for _, valor, _ in OPCIONES_ESTATUS_ALERTA if valor)
+
+SQL_ORDEN_ALERTAS = {
+    "prioridad": """
+        CASE NIVEL_ALERTA_GLOBAL
+            WHEN 'CRITICA' THEN 1
+            WHEN 'ALTA' THEN 2
+            WHEN 'ADVERTENCIA' THEN 3
+            WHEN 'OK' THEN 4
+            ELSE 5
+        END
+    """.strip(),
+    "gps": """
+        CASE NIVEL_ALERTA_GPS
+            WHEN 'CRITICA' THEN 1
+            WHEN 'ALTA' THEN 2
+            WHEN 'ADVERTENCIA' THEN 3
+            WHEN 'OK' THEN 4
+            ELSE 5
+        END
+    """.strip(),
+    "bateria": """
+        CASE NIVEL_ALERTA_BATERIA
+            WHEN 'CRITICA' THEN 1
+            WHEN 'ALTA' THEN 2
+            WHEN 'ADVERTENCIA' THEN 3
+            WHEN 'OK' THEN 4
+            ELSE 5
+        END
+    """.strip(),
+    "estatus": """
+        CASE
+            WHEN ULTIMO_ESTATUS >= TRUNC(SYSDATE)
+             AND ULTIMO_ESTATUS >= SYSDATE - (1/24) THEN 1
+            WHEN ULTIMO_ESTATUS >= TRUNC(SYSDATE) THEN 2
+            ELSE 3
+        END
+    """.strip(),
 }
 
 ALERTAS_POR_PAGINA = 10
@@ -23,6 +78,8 @@ UBICACION_SIN_ASIGNAR = "Sin ubicaci\u00f3n asignada"
 MIN_CARACTERES_BUSQUEDA_ALERTAS = 2
 LIMITE_SUGERENCIAS_ALERTAS = 15
 MAX_LIMITE_SUGERENCIAS_ALERTAS = 20
+AMID_MINIMO_ALERTAS = 7_500_000
+AMID_MAX_DIGITOS_ALERTAS = 7
 
 
 def normalizar_numero(valor, default=0):
@@ -35,6 +92,109 @@ def normalizar_texto(valor, default=""):
     if valor is None:
         return default
     return str(valor)
+
+
+def normalizar_amid_alertas(valor):
+    """Valida el AMID opcional recibido desde el filtro del panel."""
+
+    amid = str(valor or "").strip()
+    if not amid:
+        return ""
+
+    if not amid.isascii() or not amid.isdigit():
+        raise ValueError("El AMID debe contener solo números.")
+
+    if len(amid) > AMID_MAX_DIGITOS_ALERTAS:
+        raise ValueError("El AMID puede tener como máximo 7 dígitos.")
+
+    if int(amid) < AMID_MINIMO_ALERTAS:
+        raise ValueError("El AMID debe ser mayor o igual a 7500000.")
+
+    return amid
+
+
+def normalizar_filtro_alertas(valor, permitidos):
+    """Normaliza un filtro de URL y descarta opciones desconocidas."""
+    valor_normalizado = str(valor or "").strip().upper()
+    return valor_normalizado if valor_normalizado in permitidos else ""
+
+
+def normalizar_orden_alertas(valor):
+    """Normaliza las direcciones manteniendo los cinco niveles permitidos."""
+
+    direcciones = dict(ORDEN_ALERTAS_PREDETERMINADO)
+
+    if isinstance(valor, str):
+        elementos = []
+        for fragmento in valor.split(","):
+            campo, separador, direccion = fragmento.strip().partition(":")
+            if separador:
+                elementos.append((campo, direccion))
+    else:
+        elementos = valor or ()
+
+    for elemento in elementos:
+        try:
+            campo, direccion = elemento
+        except (TypeError, ValueError):
+            continue
+
+        campo = str(campo).strip().lower()
+        direccion = str(direccion).strip().lower()
+        if campo in direcciones and direccion in DIRECCIONES_ORDEN_ALERTAS:
+            direcciones[campo] = direccion
+
+    return tuple((campo, direcciones[campo]) for campo in CAMPOS_ORDEN_ALERTAS)
+
+
+def serializar_orden_alertas(orden):
+    """Convierte el orden validado a un valor compacto para la URL."""
+
+    return ",".join(
+        f"{campo}:{direccion}"
+        for campo, direccion in normalizar_orden_alertas(orden)
+    )
+
+
+def alternar_direccion_orden_alertas(orden, campo_objetivo):
+    """Invierte un nivel sin descartar los demás criterios de orden."""
+
+    campo_objetivo = str(campo_objetivo or "").strip().lower()
+    orden_normalizado = normalizar_orden_alertas(orden)
+    if campo_objetivo not in CAMPOS_ORDEN_ALERTAS:
+        return orden_normalizado
+
+    return tuple(
+        (
+            campo,
+            ((
+                "desc" if direccion == "asc" else "asc"
+            ) if campo == campo_objetivo else direccion),
+        )
+        for campo, direccion in orden_normalizado
+    )
+
+
+def construir_orden_alertas(orden):
+    """Construye un ORDER BY seguro para ordenar antes de paginar."""
+
+    segmentos = []
+    for campo, direccion in normalizar_orden_alertas(orden):
+        direccion_sql = "ASC" if direccion == "asc" else "DESC"
+        segmentos.append(f"{SQL_ORDEN_ALERTAS[campo]} {direccion_sql}")
+
+        if campo == "estatus":
+            detalle_estatus = (
+                "ULTIMO_ESTATUS DESC NULLS LAST"
+                if direccion == "asc"
+                else "ULTIMO_ESTATUS ASC NULLS FIRST"
+            )
+            segmentos.append(detalle_estatus)
+
+    # Desempate estable para que un registro no cambie de página al recargar.
+    segmentos.append("AMID ASC")
+
+    return "ORDER BY\n                " + ",\n                ".join(segmentos)
 
 
 def construir_condicion_problema(problema):
@@ -120,7 +280,10 @@ def calcular_estado_estatus(ultimo_estatus):
 
 def _armar_filtros_alertas(
     amid=None,
+    ubicacion=None,
     nivel=None,
+    nivel_gps=None,
+    nivel_bateria=None,
     tipo_alerta=None,
     problema=None,
     estatus=None,
@@ -138,9 +301,25 @@ def _armar_filtros_alertas(
         filtros.append("r.AMID = :amid")
         params["amid"] = int(amid)
 
+    if ubicacion:
+        params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
+        params["ubicacion"] = f"%{str(ubicacion).strip().upper()}%"
+        filtros.append(
+            "UPPER(NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar)) "
+            "LIKE :ubicacion"
+        )
+
     if nivel:
         filtros.append("NIVEL_ALERTA_GLOBAL = :nivel")
         params["nivel"] = nivel.upper()
+
+    if nivel_gps:
+        filtros.append("NIVEL_ALERTA_GPS = :nivel_gps")
+        params["nivel_gps"] = nivel_gps.upper()
+
+    if nivel_bateria:
+        filtros.append("NIVEL_ALERTA_BATERIA = :nivel_bateria")
+        params["nivel_bateria"] = nivel_bateria.upper()
 
     if tipo_alerta == "GPS":
         filtros.append("NIVEL_ALERTA_GPS <> 'OK'")
@@ -182,7 +361,10 @@ def _armar_filtros_alertas(
 
 def contar_alertas_validadores(
     amid=None,
+    ubicacion=None,
     nivel=None,
+    nivel_gps=None,
+    nivel_bateria=None,
     tipo_alerta=None,
     problema=None,
     estatus=None,
@@ -192,7 +374,10 @@ def contar_alertas_validadores(
 ):
     filtros, params = _armar_filtros_alertas(
         amid=amid,
+        ubicacion=ubicacion,
         nivel=nivel,
+        nivel_gps=nivel_gps,
+        nivel_bateria=nivel_bateria,
         tipo_alerta=tipo_alerta,
         problema=problema,
         estatus=estatus,
@@ -223,7 +408,10 @@ def contar_alertas_validadores(
 
 def obtener_alertas_validadores(
     amid=None,
+    ubicacion=None,
     nivel=None,
+    nivel_gps=None,
+    nivel_bateria=None,
     tipo_alerta=None,
     problema=None,
     estatus=None,
@@ -231,6 +419,7 @@ def obtener_alertas_validadores(
     limite=500,
     offset=0,
     ordenar=True,
+    orden=None,
     amids_excluidos=None,
     ubicaciones_excluidas=None,
 ):
@@ -241,7 +430,10 @@ def obtener_alertas_validadores(
 
     filtros, params = _armar_filtros_alertas(
         amid=amid,
+        ubicacion=ubicacion,
         nivel=nivel,
+        nivel_gps=nivel_gps,
+        nivel_bateria=nivel_bateria,
         tipo_alerta=tipo_alerta,
         problema=problema,
         estatus=estatus,
@@ -256,49 +448,9 @@ def obtener_alertas_validadores(
 
     order_sql = ""
     if ordenar:
-        order_sql = """
-            ORDER BY
-                CASE
-                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
-                     AND NIVEL_ALERTA_GPS = 'CRITICA'
-                     AND NIVEL_ALERTA_BATERIA = 'CRITICA' THEN 1
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
-                     AND NIVEL_ALERTA_GPS = 'CRITICA' THEN 2
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA'
-                     AND NIVEL_ALERTA_BATERIA = 'CRITICA' THEN 3
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA' THEN 4
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
-                     AND NIVEL_ALERTA_GPS = 'ALTA'
-                     AND NIVEL_ALERTA_BATERIA = 'ALTA' THEN 5
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
-                     AND NIVEL_ALERTA_GPS = 'ALTA' THEN 6
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA'
-                     AND NIVEL_ALERTA_BATERIA = 'ALTA' THEN 7
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ALTA' THEN 8
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA'
-                     AND NIVEL_ALERTA_GPS = 'ADVERTENCIA'
-                     AND NIVEL_ALERTA_BATERIA = 'ADVERTENCIA' THEN 9
-
-                    WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA' THEN 10
-
-                    ELSE 11
-                END,
-                CASE
-                    WHEN ULTIMO_ESTATUS IS NULL OR ULTIMO_ESTATUS < TRUNC(SYSDATE) THEN 1
-                    WHEN ULTIMO_ESTATUS < SYSDATE - (1/24) THEN 2
-                    ELSE 3
-                END,
-                ULTIMO_ESTATUS ASC NULLS FIRST,
-                AMID
-        """
+        order_sql = construir_orden_alertas(orden)
+    else:
+        order_sql = "ORDER BY AMID ASC"
 
     query = f"""
         SELECT *
@@ -418,6 +570,27 @@ def obtener_alertas_validadores(
             alertas.append(item)
 
     return alertas
+
+
+def obtener_alertas_para_exportar():
+    """
+    Obtiene el universo completo de AMID activos para la exportacion Excel.
+
+    La exportacion no recibe filtros del panel ni exclusiones de usuario. Solo
+    se ejecuta al descargar el archivo, por lo que no agrega trabajo al render
+    normal de la pagina.
+    """
+
+    total_activos = contar_alertas_validadores(solo_con_alerta=False)
+    if total_activos == 0:
+        return []
+
+    return obtener_alertas_validadores(
+        solo_con_alerta=False,
+        limite=total_activos,
+        offset=0,
+        orden=ORDEN_ALERTAS_PREDETERMINADO,
+    )
 
 
 def obtener_ubicaciones_alertas_disponibles():
@@ -594,21 +767,41 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
 
 def construir_querystring_filtro(
     amid="",
+    ubicacion="",
     nivel="",
+    nivel_gps="",
+    nivel_bateria="",
     tipo_alerta="",
     problema="",
     estatus="",
     mostrar_todos=False,
     nivel_override=None,
+    nivel_gps_override=None,
+    nivel_bateria_override=None,
+    estatus_override=None,
+    ubicacion_override=None,
+    orden=None,
 ):
     params = {}
 
     if amid:
         params["amid"] = amid
 
+    ubicacion_final = ubicacion_override if ubicacion_override is not None else ubicacion
+    if ubicacion_final:
+        params["ubicacion"] = ubicacion_final
+
     nivel_final = nivel_override if nivel_override is not None else nivel
     if nivel_final:
         params["nivel"] = nivel_final
+
+    nivel_gps_final = nivel_gps_override if nivel_gps_override is not None else nivel_gps
+    if nivel_gps_final:
+        params["nivel_gps"] = nivel_gps_final
+
+    nivel_bateria_final = nivel_bateria_override if nivel_bateria_override is not None else nivel_bateria
+    if nivel_bateria_final:
+        params["nivel_bateria"] = nivel_bateria_final
 
     if tipo_alerta:
         params["tipo_alerta"] = tipo_alerta
@@ -616,8 +809,13 @@ def construir_querystring_filtro(
     if problema:
         params["problema"] = problema
 
-    if estatus:
-        params["estatus"] = estatus
+    estatus_final = estatus_override if estatus_override is not None else estatus
+    if estatus_final:
+        params["estatus"] = estatus_final
+
+    orden_normalizado = normalizar_orden_alertas(orden)
+    if orden_normalizado != ORDEN_ALERTAS_PREDETERMINADO:
+        params["orden"] = serializar_orden_alertas(orden_normalizado)
 
     if mostrar_todos or nivel_final == "OK":
         params["mostrar_todos"] = "1"
@@ -629,12 +827,24 @@ def obtener_contexto_alertas(request, preferencias=None):
     preferencias = preferencias or {}
     amids_excluidos = preferencias.get("amids_excluidos", [])
     ubicaciones_excluidas = preferencias.get("ubicaciones_excluidas", [])
-    amid = request.GET.get("amid", "").strip()
-    nivel = request.GET.get("nivel", "").strip().upper()
+    amid = normalizar_amid_alertas(request.GET.get("amid"))
+    ubicacion = request.GET.get("ubicacion", "").strip()
+    nivel = normalizar_filtro_alertas(request.GET.get("nivel"), NIVELES_ALERTA_VALIDOS)
+    nivel_gps = normalizar_filtro_alertas(
+        request.GET.get("nivel_gps"), NIVELES_ALERTA_VALIDOS
+    )
+    nivel_bateria = normalizar_filtro_alertas(
+        request.GET.get("nivel_bateria"), NIVELES_ALERTA_VALIDOS
+    )
     tipo_alerta = request.GET.get("tipo_alerta", "").strip().upper()
     problema = request.GET.get("problema", "").strip()
-    estatus = request.GET.get("estatus", "").strip().upper()
+    estatus = normalizar_filtro_alertas(
+        request.GET.get("estatus"), ESTATUS_ALERTA_VALIDOS
+    )
     mostrar_todos = request.GET.get("mostrar_todos") == "1"
+    orden = normalizar_orden_alertas(
+        request.GET.get("orden", "")
+    )
     page = request.GET.get("page", "1").strip()
 
     try:
@@ -648,7 +858,10 @@ def obtener_contexto_alertas(request, preferencias=None):
 
     total_alertas = contar_alertas_validadores(
         amid=amid if amid else None,
+        ubicacion=ubicacion if ubicacion else None,
         nivel=nivel if nivel else None,
+        nivel_gps=nivel_gps if nivel_gps else None,
+        nivel_bateria=nivel_bateria if nivel_bateria else None,
         tipo_alerta=tipo_alerta if tipo_alerta else None,
         problema=problema if problema else None,
         estatus=estatus if estatus else None,
@@ -666,7 +879,10 @@ def obtener_contexto_alertas(request, preferencias=None):
 
     alertas = obtener_alertas_validadores(
         amid=amid if amid else None,
+        ubicacion=ubicacion if ubicacion else None,
         nivel=nivel if nivel else None,
+        nivel_gps=nivel_gps if nivel_gps else None,
+        nivel_bateria=nivel_bateria if nivel_bateria else None,
         tipo_alerta=tipo_alerta if tipo_alerta else None,
         problema=problema if problema else None,
         estatus=estatus if estatus else None,
@@ -674,6 +890,7 @@ def obtener_contexto_alertas(request, preferencias=None):
         limite=ALERTAS_POR_PAGINA,
         offset=offset,
         ordenar=True,
+        orden=orden,
         amids_excluidos=amids_excluidos,
         ubicaciones_excluidas=ubicaciones_excluidas,
     )
@@ -696,61 +913,97 @@ def obtener_contexto_alertas(request, preferencias=None):
 
     querystring_sin_page = construir_querystring_filtro(
         amid=amid,
+        ubicacion=ubicacion,
         nivel=nivel,
+        nivel_gps=nivel_gps,
+        nivel_bateria=nivel_bateria,
         tipo_alerta=tipo_alerta,
         problema=problema,
         estatus=estatus,
         mostrar_todos=mostrar_todos,
+        orden=orden,
     )
 
-    cards_filtros = {
-        "critica": construir_querystring_filtro(
-            amid=amid,
-            nivel=nivel,
-            tipo_alerta=tipo_alerta,
-            problema=problema,
-            estatus=estatus,
-            mostrar_todos=mostrar_todos,
-            nivel_override="CRITICA",
-        ),
-        "alta": construir_querystring_filtro(
-            amid=amid,
-            nivel=nivel,
-            tipo_alerta=tipo_alerta,
-            problema=problema,
-            estatus=estatus,
-            mostrar_todos=mostrar_todos,
-            nivel_override="ALTA",
-        ),
-        "advertencia": construir_querystring_filtro(
-            amid=amid,
-            nivel=nivel,
-            tipo_alerta=tipo_alerta,
-            problema=problema,
-            estatus=estatus,
-            mostrar_todos=mostrar_todos,
-            nivel_override="ADVERTENCIA",
-        ),
-        "ok": construir_querystring_filtro(
-            amid=amid,
-            nivel=nivel,
-            tipo_alerta=tipo_alerta,
-            problema=problema,
-            estatus=estatus,
-            mostrar_todos=True,
-            nivel_override="OK",
-        ),
+    parametros_querystring = {
+        "amid": amid,
+        "ubicacion": ubicacion,
+        "nivel": nivel,
+        "nivel_gps": nivel_gps,
+        "nivel_bateria": nivel_bateria,
+        "tipo_alerta": tipo_alerta,
+        "problema": problema,
+        "estatus": estatus,
+        "mostrar_todos": mostrar_todos,
+        "orden": orden,
     }
+
+    parametros_sin_ubicacion = dict(parametros_querystring)
+    parametros_sin_ubicacion["ubicacion_override"] = ""
+    ubicacion_limpiar = construir_querystring_filtro(**parametros_sin_ubicacion)
+
+    def construir_opciones_encabezado(opciones, filtro_actual, nombre_override):
+        resultado = []
+        for clave, valor, etiqueta in opciones:
+            parametros = dict(parametros_querystring)
+            parametros[nombre_override] = valor
+            resultado.append(
+                {
+                    "clave": clave,
+                    "valor": valor,
+                    "etiqueta": etiqueta,
+                    "activo": filtro_actual == valor,
+                    "querystring": construir_querystring_filtro(**parametros),
+                }
+            )
+        return resultado
+
+    filtros_encabezados = {
+        "prioridad": construir_opciones_encabezado(OPCIONES_NIVEL_ALERTA, nivel, "nivel_override"),
+        "estatus": construir_opciones_encabezado(OPCIONES_ESTATUS_ALERTA, estatus, "estatus_override"),
+        "gps": construir_opciones_encabezado(OPCIONES_NIVEL_ALERTA, nivel_gps, "nivel_gps_override"),
+        "bateria": construir_opciones_encabezado(OPCIONES_NIVEL_ALERTA, nivel_bateria, "nivel_bateria_override"),
+    }
+    cards_filtros = {
+        opcion["clave"]: opcion["querystring"]
+        for opcion in filtros_encabezados["prioridad"]
+    }
+
+    orden_encabezados = {}
+    for campo_orden, direccion_orden in orden:
+        orden_alternado = alternar_direccion_orden_alertas(orden, campo_orden)
+        orden_encabezados[campo_orden] = {
+            "direccion": direccion_orden,
+            "simbolo": "▲" if direccion_orden == "asc" else "▼",
+            "querystring": construir_querystring_filtro(
+                amid=amid,
+                ubicacion=ubicacion,
+                nivel=nivel,
+                nivel_gps=nivel_gps,
+                nivel_bateria=nivel_bateria,
+                tipo_alerta=tipo_alerta,
+                problema=problema,
+                estatus=estatus,
+                mostrar_todos=mostrar_todos,
+                orden=orden_alternado,
+            ),
+        }
 
     return {
         "alertas": alertas,
         "resumen_alertas": resumen,
         "filtro_amid": amid,
+        "filtro_ubicacion": ubicacion,
         "filtro_nivel": nivel,
+        "filtro_nivel_gps": nivel_gps,
+        "filtro_nivel_bateria": nivel_bateria,
         "filtro_tipo_alerta": tipo_alerta,
         "filtro_problema": problema,
         "filtro_estatus": estatus,
         "mostrar_todos": mostrar_todos,
+        "orden_serializado": serializar_orden_alertas(orden),
+        "orden_encabezados": orden_encabezados,
+        "filtros_encabezados": filtros_encabezados,
+        "ubicacion_limpiar": ubicacion_limpiar,
         "page_obj": page_obj,
         "querystring_sin_page": querystring_sin_page,
         "cards_filtros": cards_filtros,

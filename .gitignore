@@ -130,6 +130,8 @@ probar_oracle.py
 probar_conexion_oracle_server.py
 medir_oracle.py
 como activar.txt
+# Manual operativo local: puede adaptarse con datos propios del servidor
+/MANUAL_DESPLIEGUE_SERVIDOR_LOCAL.md
 # Resultados locales de diagnósticos Oracle (pueden contener metadatos reales)
 oracle/diagnostics/resultados_*.sql
 oracle/diagnostics/output/

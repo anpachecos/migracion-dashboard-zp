@@ -1,5 +1,62 @@
 document.addEventListener("DOMContentLoaded", function () {
     const formulario = document.getElementById("preferencias-alertas-form");
+    const filtrosEncabezado = Array.from(
+        document.querySelectorAll(".alertas-filtro-encabezado")
+    );
+
+    if (filtrosEncabezado.length) {
+        document.addEventListener("click", function (evento) {
+            filtrosEncabezado.forEach(function (filtro) {
+                if (filtro.open && !filtro.contains(evento.target)) {
+                    filtro.removeAttribute("open");
+                }
+            });
+        });
+
+        document.addEventListener("keydown", function (evento) {
+            const filtroAbierto = filtrosEncabezado.find(function (filtro) {
+                return filtro.open;
+            });
+            if (evento.key === "Escape" && filtroAbierto) {
+                filtroAbierto.removeAttribute("open");
+                const control = filtroAbierto.querySelector("summary");
+                if (control) {
+                    control.focus();
+                }
+            }
+        });
+    }
+
+    const formularioFiltros = document.querySelector(".alertas-filtros");
+    const campoAmidFiltro = document.querySelector("[data-filtro-amid]");
+
+    if (formularioFiltros && campoAmidFiltro) {
+        const validarAmid = function () {
+            const valor = campoAmidFiltro.value.trim();
+            let mensaje = "";
+
+            if (valor && Number(valor) < 7500000) {
+                mensaje = "El AMID debe ser mayor o igual a 7500000.";
+            }
+
+            campoAmidFiltro.setCustomValidity(mensaje);
+            return !mensaje;
+        };
+
+        campoAmidFiltro.addEventListener("input", function () {
+            campoAmidFiltro.value = campoAmidFiltro.value
+                .replace(/[^0-9]/g, "")
+                .slice(0, 7);
+            validarAmid();
+        });
+
+        formularioFiltros.addEventListener("submit", function (evento) {
+            if (!validarAmid() || !campoAmidFiltro.checkValidity()) {
+                evento.preventDefault();
+                campoAmidFiltro.reportValidity();
+            }
+        });
+    }
 
     if (!formulario) {
         return;

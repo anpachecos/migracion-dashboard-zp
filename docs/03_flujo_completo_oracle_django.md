@@ -353,6 +353,42 @@ El detalle desplegable consulta `ALERTA_BATERIA_CAIDA_EVENTO` únicamente cuando
 el usuario lo abre. Las solicitudes web no vuelven a ejecutar las reglas ni
 reconstruyen caídas desde los bloques.
 
+La sección **Configurar alertas que no quiero ver** permanece cerrada al cargar
+la página. Sus exclusiones son propias de cada usuario y se guardan en SQLite
+mediante `AlertaAmidExcluido` y `AlertaUbicacionExcluida`; no actualizan Oracle.
+Al consultar el panel se incorporan a las condiciones SQL enlazadas para que
+tarjetas, totales, tabla y paginación trabajen sobre el mismo conjunto visible.
+
+El buscador no precarga todos los AMID ni todas las ubicaciones. Después de dos
+caracteres espera 300 ms, cancela la solicitud anterior si el usuario continúa
+escribiendo y solicita hasta 15 resultados a
+`/alertas/buscar-exclusiones/`. El navegador conserva una caché por término
+durante la página actual.
+
+La tabla se ordena en Oracle antes de aplicar `ROW_NUMBER()` y la paginación.
+Utiliza cuatro criterios combinados: prioridad global, GPS, batería y vigencia
+del último estatus. Cada encabezado muestra una flecha que invierte únicamente
+la dirección de ese criterio sin eliminar los demás. Los mismos cuatro
+encabezados incluyen un embudo para filtrar por nivel global, nivel GPS, nivel de
+batería o vigencia del estatus. Los filtros se pueden combinar, se conservan al
+paginar u ordenar y usan parámetros enlazados en la consulta. El filtro global
+permanece sincronizado con las tarjetas de resumen. El formulario superior ya no
+duplica los selectores de prioridad ni último estatus.
+Ubicación actual agrega un quinto embudo, exclusivamente de filtro y sin criterio
+de orden. Busca coincidencias parciales mediante un parámetro enlazado y no carga
+el catálogo completo de ubicaciones en el HTML inicial.
+
+El orden predeterminado es crítica, alta, advertencia y OK para los tres niveles
+de alerta. Por eso crítica/crítica/crítica aparece primero, seguida de
+crítica/crítica/alta y las demás combinaciones. Para estatus, el orden inicial
+es: recibido hoy hace una hora o menos, recibido hoy hace más de una hora y sin
+estatus hoy. AMID se usa únicamente como desempate ascendente para mantener
+estable la paginación y no tiene control visible.
+
+Los valores de la URL se validan contra campos y direcciones permitidos; nunca
+se insertan directamente en el SQL. **Restablecer filtros y orden** elimina todos
+los filtros de la URL y recupera el orden inicial completo.
+
 ### Panel Baterías
 
 Consulta:
@@ -370,15 +406,50 @@ consulta Oracle permanecen completos; es un filtro reversible de presentación.
 
 ### Panel GPS
 
-Consulta la vista normalizada dentro del rango solicitado y las tablas de
-ubicación esperada. El historial detallado solo se lee cuando el usuario abre un
-AMID o solicita una exportación.
+Consulta la vista normalizada dentro del rango solicitado y la ubicación
+esperada vigente o histórica que corresponde a cada bloque. `FECHA_REGISTRO`
+es la hora de referencia y orden del bloque. `FECHA_HORA` es la hora informada
+por el validador: si se repite respecto del bloque anterior, el bloque se marca
+como **Sin transmisión** y sus coordenadas se normalizan a `NULL` para no
+dibujarlo como un punto nuevo.
+
+El resumen separa cinco categorías:
+
+| Categoría | Criterio |
+|---|---|
+| Registros totales | Bloques del rango después del filtro horario, si está activo. |
+| Con coordenadas válidas | Nueva transmisión con latitud/longitud informadas y distintas de `0,0`. |
+| Sin transmisión | `FECHA_HORA` repetida; no existe una posición nueva para ese bloque. |
+| Coordenadas `0,0` | Existe transmisión, pero no representa una ubicación geográfica utilizable. |
+| Dentro / fuera del radio | Solo coordenadas válidas, comparadas con la referencia mediante distancia Haversine. |
+
+Por tanto, una coordenada `0,0` nunca se etiqueta como **Fuera del radio**. En la
+tarjeta **Estado ubicación** se presenta como **Coordenadas 0,0**. Para una
+coordenada válida, **Fuera del radio** significa que su distancia supera
+`RADIO_METROS`.
+
+El cumplimiento conserva la regla operacional acordada:
+
+```text
+cumplimiento = coordenadas válidas dentro del radio
+               / transmisiones GPS del período
+```
+
+Las transmisiones `0,0` forman parte del denominador y reducen el porcentaje.
+Los bloques sin transmisión se muestran en el resumen y el historial, pero se
+excluyen del denominador.
 
 El botón **Horario Zona Paga** se aplica después de consultar el rango y antes de
 armar el resumen, el mapa y el historial. Para cada registro usa su propia
 `FECHA_REGISTRO`: lunes a viernes combina AM y PM, sábado usa
 `HORARIO_SABADO` y domingo `HORARIO_DOMINGO`. Si una fecha no tiene horario, sus
 registros se conservan sin filtrar.
+
+El mapa y el historial reutilizan los mismos registros recibidos en el render
+inicial. La tabla permanece plegada, se construye en el navegador cuando se
+abre y no provoca una segunda consulta Oracle. Los accesos **Ver historial GPS**
+y **Volver al mapa** guían el desplazamiento; el control global **Explorar más
+abajo** aparece únicamente cuando queda contenido fuera de la pantalla.
 
 No se creó una tabla, vista ni job adicional en Oracle. La consulta vigente es
 por AMID sobre `UBICACION_ESPERADA_VALIDADOR`, y el parser/filtro se comparte en
@@ -404,7 +475,7 @@ El historial de valores vive en Oracle; el archivo local registra la ejecución.
 
 | Job | Función | Frecuencia | Duración observada |
 |---|---|---|---:|
-| `JOB_ACTUALIZAR_BATERIA_BLOQUES` | Prepara bloques de batería | cada 30 minutos | ~1:06 |
+| `JOB_ACTUALIZAR_BATERIA_BLOQUES` | Prepara bloques de batería | cada 30 minutos | ~1:15 |
 | `JOB_UPD_ALERTAS_VAL` | Refresca eventos de caída y calcula el resumen completo | cada 30 minutos | ~3:10 antes de V009; volver a medir |
 | `JOB_UPD_AMID_ALERTAS` | Sincroniza maestro de AMID | diario | ~0:04 |
 
@@ -418,8 +489,9 @@ Durante la auditoría no presentaban fallos.
 - `(AMID, FECHA_HORA_BLOQUE)` cubre la lectura principal de batería.
 - `(AMID, FECHA_HORA)` sigue siendo útil para búsquedas por la hora informada
   por el validador.
-- El historial del Panel GPS filtra por la hora real del bloque; V010 agrega
-  `(AMID, FECHA_REGISTRO)` sin modificar datos de `ESTATUS_ZP`.
+- El historial del Panel GPS filtra por la hora real del bloque. V010 propone
+  `(AMID, FECHA_REGISTRO)` sin modificar datos de `ESTATUS_ZP`, pero permanece
+  en `oracle/pending/` y no debe considerarse aplicado todavía.
 - La tabla resumen tiene solo 930 filas; no necesita más índices.
 - No se eliminaron índices porque también pueden servir a los jobs.
 - Las conversiones de fechas de texto siguen siendo una limitación heredada de

@@ -1,0 +1,44 @@
+<details class="alertas-filtro-encabezado{% if filtro_ubicacion %} filtro-activo{% endif %}">
+    <summary
+        aria-label="Filtrar por ubicación actual"
+        title="{% if filtro_ubicacion %}Filtro activo; abre para cambiar{% else %}Filtrar por ubicación actual{% endif %}"
+    >
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13a1.5 1.5 0 0 1 1.15 2.46L14 13.24V18a1 1 0 0 1-.45.83l-3 2A1 1 0 0 1 9 20v-6.76L4.35 6.46A1.5 1.5 0 0 1 4 5.5Z"/>
+        </svg>
+    </summary>
+    <div class="alertas-filtro-menu alertas-filtro-menu-ubicacion">
+        <strong>Filtrar ubicación actual</strong>
+        <form method="get" class="alertas-filtro-form">
+            <input type="hidden" name="amid" value="{{ filtro_amid }}">
+            <input type="hidden" name="nivel" value="{{ filtro_nivel }}">
+            <input type="hidden" name="nivel_gps" value="{{ filtro_nivel_gps }}">
+            <input type="hidden" name="nivel_bateria" value="{{ filtro_nivel_bateria }}">
+            <input type="hidden" name="tipo_alerta" value="{{ filtro_tipo_alerta }}">
+            <input type="hidden" name="problema" value="{{ filtro_problema }}">
+            <input type="hidden" name="estatus" value="{{ filtro_estatus }}">
+            <input type="hidden" name="orden" value="{{ orden_serializado }}">
+            {% if mostrar_todos %}
+                <input type="hidden" name="mostrar_todos" value="1">
+            {% endif %}
+
+            <label for="filtro-ubicacion-actual">Nombre o parte del nombre</label>
+            <input
+                type="search"
+                id="filtro-ubicacion-actual"
+                name="ubicacion"
+                value="{{ filtro_ubicacion }}"
+                placeholder="Ejemplo: Vespucio"
+                maxlength="150"
+                autocomplete="off"
+            >
+            <div class="alertas-filtro-form-acciones">
+                <button type="submit">Aplicar</button>
+                <a href="{% if ubicacion_limpiar %}?{{ ubicacion_limpiar }}{% else %}{% url 'dashboard:panel_alertas' %}{% endif %}">
+                    Quitar filtro
+                </a>
+            </div>
+            <small>Busca coincidencias dentro del nombre de la ubicación.</small>
+        </form>
+    </div>
+</details>

@@ -16,6 +16,7 @@ from django.utils import timezone
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from apps.dashboard.services.alertas_service import (
     LIMITE_SUGERENCIAS_ALERTAS,
@@ -24,6 +25,7 @@ from apps.dashboard.services.alertas_service import (
     buscar_ubicaciones_alertas,
     obtener_contexto_alertas,
     obtener_ubicaciones_alertas_disponibles,
+    obtener_alertas_para_exportar,
 )
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 from apps.dashboard.services.preferencias_alertas_service import (
@@ -232,7 +234,12 @@ def panel_alertas(request):
 
     preferencias = obtener_preferencias_alertas_usuario(request.user)
 
-    contexto = obtener_contexto_alertas(request, preferencias=preferencias)
+    try:
+        contexto = obtener_contexto_alertas(request, preferencias=preferencias)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("dashboard:panel_alertas")
+
     contexto.update(
         {
             "preferencias_alertas": preferencias,
@@ -252,19 +259,196 @@ def panel_alertas(request):
     return render(request, "dashboard/panel_alertas.html", contexto)
 
 
+COLUMNAS_EXCEL_ALERTAS = (
+    ("Prioridad", "nivel_alerta_global"),
+    ("AMID", "amid"),
+    ("Ubicación actual", "ubicacion_actual"),
+    ("Último estatus", "ultimo_estatus"),
+    ("Estado del estatus", "texto_estatus"),
+    ("GPS", "nivel_alerta_gps"),
+    ("Motivo GPS", "motivo_alerta_gps"),
+    ("Registros GPS hoy", "gps_total_hoy"),
+    ("GPS 0,0 hoy", "gps_cero_hoy"),
+    ("GPS 0,0 histórico", "gps_cero_hist"),
+    ("GPS 0,0 % hoy", "gps_cero_porc_hoy"),
+    ("GPS 0,0 % histórico", "gps_cero_porc_hist"),
+    ("Racha máxima GPS 0,0", "racha_max_gps_cero"),
+    ("Batería", "nivel_alerta_bateria"),
+    ("Motivo batería", "motivo_alerta_bateria"),
+    ("Batería actual (%)", "bateria_actual"),
+    ("Caídas hoy", "caidas_hoy"),
+    ("Caídas históricas", "caidas_hist"),
+    ("Caída máxima hoy", "caida_max_hoy"),
+    ("Caída máxima histórica", "caida_max_hist"),
+    ("Batería 0 hoy", "bateria_cero_hoy"),
+    ("Batería 0 histórica", "bateria_cero_hist"),
+    ("Motivo principal", "motivo_principal"),
+    ("Acción sugerida", "accion_sugerida"),
+    ("Fecha actualización", "fecha_actualizacion"),
+)
+
+
+def crear_excel_alertas(alertas, fecha_generacion=None):
+    """Construye la hoja formateada con todos los AMID activos."""
+
+    fecha_generacion = fecha_generacion or obtener_ahora_referencia()
+    wb = Workbook()
+    wb.properties.title = "Panel de Alertas"
+    wb.properties.subject = "Alertas vigentes de validadores activos"
+
+    ws = wb.active
+    ws.title = "Panel de Alertas"
+    ultima_columna = get_column_letter(len(COLUMNAS_EXCEL_ALERTAS))
+
+    ws.merge_cells(f"A1:{ultima_columna}1")
+    ws["A1"] = "Panel de Alertas - Validadores activos"
+    ws["A1"].fill = PatternFill("solid", fgColor="1F4E78")
+    ws["A1"].font = Font(color="FFFFFF", bold=True, size=16)
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    ws.merge_cells(f"A2:{ultima_columna}2")
+    ws["A2"] = (
+        f"Exportado: {fecha_generacion.strftime('%d-%m-%Y %H:%M:%S')} | "
+        f"Total AMID activos: {len(alertas)} | Sin filtros ni exclusiones de usuario"
+    )
+    ws["A2"].fill = PatternFill("solid", fgColor="D9EAF7")
+    ws["A2"].font = Font(color="1F2937", italic=True)
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[2].height = 22
+
+    fila_encabezados = 4
+    ws.append([])
+    ws.append([titulo for titulo, _ in COLUMNAS_EXCEL_ALERTAS])
+
+    for alerta in alertas:
+        fila = []
+        for _, clave in COLUMNAS_EXCEL_ALERTAS:
+            valor = alerta.get(clave)
+            if clave == "amid" and valor is not None:
+                valor = str(valor)
+            fila.append(preparar_valor_excel(valor))
+        ws.append(fila)
+
+    fill_encabezado = PatternFill("solid", fgColor="1F4E78")
+    borde_encabezado = Border(
+        bottom=Side(style="thin", color="B4C7E7")
+    )
+    for celda in ws[fila_encabezados]:
+        celda.fill = fill_encabezado
+        celda.font = Font(color="FFFFFF", bold=True)
+        celda.alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True,
+        )
+        celda.border = borde_encabezado
+    ws.row_dimensions[fila_encabezados].height = 34
+
+    if alertas:
+        tabla = Table(
+            displayName="TablaPanelAlertas",
+            ref=f"A{fila_encabezados}:{ultima_columna}{ws.max_row}",
+        )
+        tabla.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium2",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        ws.add_table(tabla)
+
+    colores_nivel = {
+        "CRITICA": ("F8D7DA", "842029"),
+        "ALTA": ("FCE5CD", "9C5700"),
+        "ADVERTENCIA": ("FFF3CD", "664D03"),
+        "OK": ("D1E7DD", "0F5132"),
+    }
+    columnas_nivel = (1, 6, 14)
+    colores_estatus = {
+        "Con estatus": ("D1E7DD", "0F5132"),
+        "Hace más de 1 hora": ("FFF3CD", "664D03"),
+        "Sin estatus hoy": ("F8D7DA", "842029"),
+    }
+
+    for numero_fila in range(fila_encabezados + 1, ws.max_row + 1):
+        for numero_columna in columnas_nivel:
+            celda = ws.cell(numero_fila, numero_columna)
+            colores = colores_nivel.get(str(celda.value or "").upper())
+            if colores:
+                celda.fill = PatternFill("solid", fgColor=colores[0])
+                celda.font = Font(color=colores[1], bold=True)
+            celda.alignment = Alignment(horizontal="center", vertical="center")
+
+        celda_estatus = ws.cell(numero_fila, 5)
+        colores = colores_estatus.get(str(celda_estatus.value or ""))
+        if colores:
+            celda_estatus.fill = PatternFill("solid", fgColor=colores[0])
+            celda_estatus.font = Font(color=colores[1], bold=True)
+
+        ws.cell(numero_fila, 2).number_format = "@"
+        for numero_columna in (4, 25):
+            ws.cell(numero_fila, numero_columna).number_format = "dd-mm-yyyy hh:mm:ss"
+        for numero_columna in (11, 12, 16, 19, 20):
+            ws.cell(numero_fila, numero_columna).number_format = "0.00"
+
+    anchos = {
+        "A": 14, "B": 13, "C": 38, "D": 20, "E": 20,
+        "F": 14, "G": 38, "H": 18, "I": 14, "J": 18,
+        "K": 16, "L": 20, "M": 22, "N": 14, "O": 40,
+        "P": 18, "Q": 13, "R": 18, "S": 18, "T": 22,
+        "U": 16, "V": 20, "W": 40, "X": 28, "Y": 20,
+    }
+    for columna, ancho in anchos.items():
+        ws.column_dimensions[columna].width = ancho
+
+    for fila in ws.iter_rows(
+        min_row=fila_encabezados + 1,
+        max_row=ws.max_row,
+        min_col=1,
+        max_col=len(COLUMNAS_EXCEL_ALERTAS),
+    ):
+        for celda in fila:
+            celda.alignment = Alignment(vertical="center", wrap_text=True)
+
+    ws.freeze_panes = "A5"
+    ws.sheet_view.zoomScale = 85
+    ws.auto_filter.ref = f"A{fila_encabezados}:{ultima_columna}{ws.max_row}"
+    ws.print_title_rows = f"1:{fila_encabezados}"
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    return wb
+
+
 @login_required
 def exportar_alertas_excel(request):
-    """
-    Exportación de alertas deshabilitada temporalmente.
+    """Exporta todos los AMID activos, sin filtros ni preferencias de usuario."""
 
-    El panel de Alertas está en mantención y el flujo antiguo dependía
-    de EstadoValidadorLimpio en SQLite.
-    """
-    return HttpResponse(
-        "La exportación de alertas está temporalmente en mantención. "
-        "Los datos operativos ahora se consultan desde Oracle.",
-        status=503,
+    alertas = obtener_alertas_para_exportar()
+    fecha_generacion = obtener_ahora_referencia()
+    wb = crear_excel_alertas(alertas, fecha_generacion=fecha_generacion)
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    nombre_archivo = (
+        "panel_alertas_"
+        f"{fecha_generacion.strftime('%Y%m%d_%H%M%S')}.xlsx"
     )
+    response = HttpResponse(
+        output.getvalue(),
+        content_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{nombre_archivo}"'
+    )
+    return response
+
 @login_required
 def panel_baterias(request):
     contexto = obtener_contexto_baterias(request)

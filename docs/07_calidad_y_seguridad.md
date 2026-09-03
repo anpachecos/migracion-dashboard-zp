@@ -14,12 +14,31 @@ En producción, añadir `python manage.py check --deploy`. Los cambios Oracle re
 | Área | Verificación |
 |---|---|
 | Rutas | Login, permisos, HTTP y errores. |
-| Baterías | AMID válido/inválido, bloques, resumen y XLSX. |
-| GPS | Coordenadas válidas/cero, referencia/fallback y XLSX. |
-| Alertas | Prioridades, filtros, paginación, totales y XLSX. |
+| Baterías | AMID válido/inválido, bloques, eventos oficiales, Horario Zona Paga reversible y XLSX. |
+| GPS | Transmisión válida, repetida, `0,0`, radio, cumplimiento, horario, historial, mapa y XLSX. |
+| Alertas | Orden y filtros combinables por prioridad/GPS/batería/estatus; filtro parcial por ubicación sin orden; sincronización con tarjetas, restablecimiento completo, conservación al paginar, totales, detalle de caídas, exclusiones por usuario y XLSX completo sin filtros. |
 | Reglas | Permiso, allowlist, valores, commit y recálculo. |
 | Importación | Archivo válido/inválido, duplicados, rollback e historial. |
 | Scheduler | Instancia única, reintentos y solapamiento. |
+
+Las pruebas unitarias actuales ya cubren el intérprete de horarios para días
+hábiles y sábado, además de verificar que GPS filtre cada registro por su fecha
+y conserve los días sin horario. Aún falta automatizar la matriz completa de
+estados GPS y cumplimiento.
+
+## Prueba manual mínima del Panel GPS
+
+1. Seleccionar un rango que contenga una coordenada válida dentro del radio,
+   una válida fuera, una transmisión `0,0` y un bloque sin transmisión.
+2. Confirmar que solo la coordenada válida fuera aumenta **Fuera del radio**.
+3. Confirmar que `0,0` aparece en su categoría y reduce el cumplimiento.
+4. Confirmar que **Sin transmisión** aparece en su categoría y no entra en el
+   denominador del cumplimiento.
+5. Abrir **Historial GPS del período** desde el mapa y desde su encabezado;
+   ambos accesos deben mostrar las filas y desplazar la vista hasta el contenido.
+6. Activar **Horario Zona Paga** y comprobar que el resumen, mapa e historial
+   muestran el mismo subconjunto. Si hoy no tiene horario, el filtro debe quedar
+   inactivo y no ocultar registros.
 
 ## Seguridad
 

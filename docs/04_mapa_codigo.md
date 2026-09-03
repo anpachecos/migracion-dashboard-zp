@@ -155,8 +155,10 @@ apps/dashboard/services/
 ├── baterias_service.py
 ├── catalogo_reglas_alertas.py
 ├── gps_service.py
+├── horarios_zp_service.py
 ├── logs_service.py
 ├── oracle_connection.py
+├── preferencias_alertas_service.py
 ├── reglas_alertas_service.py
 ├── scheduler.py
 └── __init__.py
@@ -166,11 +168,12 @@ apps/dashboard/services/
 |---|---|---|
 | `oracle_connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza la creación del pool y la obtención de conexiones. | Vigente |
 | `baterias_service.py` | Prepara tarjetas, tabla y gráficos del Panel Baterías. Lee el resumen y el detalle oficial de caídas desde Oracle. | Vigente |
-| `gps_service.py` | Prepara los datos del Panel GPS: última ubicación, puntos del mapa, referencia esperada histórica por fecha, versión ZP y validación contra radio. | Vigente |
-| `alertas_service.py` | Consulta desde Oracle la tabla resumen de alertas y prepara cards, filtros, paginación y tabla del Panel Alertas. | Vigente |
-
+| `gps_service.py` | Prepara el Panel GPS: bloques ordenados por `FECHA_REGISTRO`, estado de transmisión, puntos del mapa, referencia esperada histórica, versión ZP, distancia, cumplimiento e historial. | Vigente |
+| `alertas_service.py` | Consulta el resumen Oracle, aplica filtros y exclusiones, valida cuatro criterios combinados de orden antes de paginar y entrega búsquedas acotadas. La exportación usa una lectura explícita de todos los AMID activos, sin filtros ni preferencias personales. | Vigente |
 | `catalogo_reglas_alertas.py` | Define nombres legibles, agrupación, unidades y ayudas del editor. Valida que sus 27 claves coincidan con la lista permitida, pero no contiene lógica de clasificación. | Vigente |
+| `horarios_zp_service.py` | Consulta e interpreta los cuatro horarios vigentes de `UBICACION_ESPERADA_VALIDADOR`. Es compartido por Baterías y GPS. | Vigente |
 | `reglas_alertas_service.py` | Consulta y actualiza reglas configurables desde el Perfil/Admin. Mantiene el guardado, validación Oracle y selección de recálculo rápido o completo. | Vigente |
+| `preferencias_alertas_service.py` | Lee y guarda atómicamente en SQLite las exclusiones de AMID y ubicaciones propias de cada usuario. | Vigente |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
 | `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
 | `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
@@ -213,9 +216,9 @@ apps/dashboard/templates/dashboard/
 |---|---|---|
 | `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
-| `panel_baterias.html` | Template del panel de baterías. Muestra búsqueda por AMID, tarjetas resumen, alertas del período, tabla por bloques de 30 minutos y gráficos. | Vigente |
-| `panel_gps.html` | Template del panel GPS. Muestra filtros, métricas, mapa Leaflet y un historial plegable por bloque. Usa `FECHA_REGISTRO` como hora del bloque y separa los bloques sin transmisión de los puntos del mapa. | Vigente |
-| `panel_alertas.html` | Template activo del panel de alertas. Muestra resumen de prioridades, filtros, tabla de alertas, accesos a revisión GPS/Batería y paginación. | Vigente |
+| `panel_baterias.html` | Muestra búsqueda por AMID, horarios vigentes, filtro Horario Zona Paga, tarjetas, eventos oficiales, bloques y gráficos. | Vigente |
+| `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |
+| `panel_alertas.html` | Muestra filtros y orden combinables tipo Excel en Prioridad/GPS/Batería/Estatus, además de filtro por texto —sin orden— en Ubicación actual. El filtro global se sincroniza con las tarjetas. Incluye restablecimiento completo, tabla, detalle de caídas, preferencias personales plegables y descarga Excel completa. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
 | `panel_perfil.html` | Perfil y administración. La configuración de alertas se presenta como una tarjeta compacta y no incluye las 27 reglas en el HTML inicial. | Vigente |
 | `partials/editor_reglas_alertas.html` | Formulario del editor que Django devuelve bajo demanda. Conserva las dos formas de guardado. | Vigente |
@@ -259,10 +262,10 @@ apps/dashboard/static/dashboard/css/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.css` | Estilos generales compartidos por todo el dashboard. | Vigente |
+| `base_dashboard.css` | Estilos generales compartidos, incluida la ayuda flotante de exploración vertical. | Vigente |
 | `login.css` | Estilos de la pantalla de login. | Vigente |
-| `panel_baterias.css` | Estilos propios del Panel Baterías. | Vigente |
-| `panel_gps.css` | Estilos propios del Panel GPS. | Vigente |
+| `panel_baterias.css` | Estilos del Panel Baterías, tarjeta de horarios y filtro de columnas. | Vigente |
+| `panel_gps.css` | Estilos del Panel GPS, tarjetas de estado, mapa, horarios e historial plegable. | Vigente |
 | `panel_alertas.css` | Estilos propios del Panel Alertas. | Vigente |
 | `panel_perfil.css` | Estilos generales del Panel Perfil. | Vigente |
 | `panel_perfil_reglas.css` | Estilos aislados del editor de reglas, sus pestañas, acordeones y controles. | Vigente |
@@ -284,9 +287,9 @@ apps/dashboard/static/dashboard/js/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `panel_baterias.js` | Maneja gráficos y comportamiento dinámico del Panel Baterías. | Vigente |
-| `panel_gps.js` | Maneja mapa y puntos GPS; construye bajo demanda la tabla histórica, sus filtros y paginación, y permite volver desde una fila al marcador. | Vigente |
-| `panel_alertas.js` | Comportamiento dinámico del Panel Alertas. | Vigente |
+| `panel_baterias.js` | Maneja gráficos y activa de forma reversible las columnas correspondientes al horario de hoy. | Vigente |
+| `panel_gps.js` | Maneja mapa, horario, historial plegable, filtros, paginación, scroll guiado y selección de registros. | Vigente |
+| `panel_alertas.js` | Maneja detalle de caídas y autocompletados de exclusiones con debounce, cancelación, caché local y chips removibles. | Vigente |
 | `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
 | `scroll_explorar.js` | Control global accesible: muestra una ayuda flotante solo si queda contenido bajo la pantalla, avanza la vista y se oculta al llegar al final. | Vigente |
 
@@ -336,7 +339,7 @@ apps/dashboard/management/commands/
 | Comando | Descripción | Estado |
 |---|---|---|
 | `probar_oracle.py` | Comando Django vigente para probar la conexión Oracle desde consola o desde acciones administrativas. Ejecuta `SELECT SYSDATE FROM dual` y registra el resultado en logs. | Vigente |
-| `importar_ubicaciones_esperadas.py` | Importa ubicaciones esperadas desde archivo Excel hacia Oracle. | Vigente |
+| `importar_ubicaciones_esperadas.py` | Importa primero las ubicaciones del Excel y luego reconcilia todos los AMID activos del maestro; los ausentes quedan en Laboratorio Zonas Pagas y generan historial desde la carga actual. | Vigente |
 | `registrar_estado_oracle.py` | Registra estado o disponibilidad de Oracle en logs. | Vigente |
 | `limpiar_historial_ubicacion_oracle.py` | Limpia historial antiguo de ubicaciones esperadas en Oracle. | Vigente |
 | `limpiar_tablas_sqlite_antiguas.py` | Limpieza puntual de tablas antiguas en SQLite. | Uso puntual |
@@ -438,10 +441,20 @@ Ejemplo Panel Alertas:
 ```txt
 /alertas/
 → panel_alertas()
+→ SQLite: preferencias del usuario
 → obtener_contexto_alertas()
-→ Oracle: VW_ALERTA_VALIDADOR_ACTIVA
+→ Oracle: VW_ALERTA_VALIDADOR_ACTIVA + filtros de exclusión enlazados
 → panel_alertas.html
-→ panel_alertas.css
+→ autocompletado bajo demanda: GET /alertas/buscar-exclusiones/
+→ detalle bajo demanda: GET /alertas/caidas-bateria/
+```
+
+Las exclusiones afectan únicamente la visibilidad para el usuario conectado.
+No modifican el resumen, los eventos ni las reglas de Oracle.
+
+```txt
+2 caracteres → espera 300 ms → máximo 15 sugerencias
+→ seleccionar → chip local → Guardar preferencias → SQLite
 ```
 
 Ejemplo Panel GPS:
@@ -455,9 +468,16 @@ Ejemplo Panel GPS:
 → FECHA_HORA se compara con el bloque anterior
    ├─ cambió: transmisión nueva; puede aparecer en el mapa
    └─ se repitió: coordenadas NULL; estado “Sin transmisión”
+→ clasificación de una transmisión
+   ├─ coordenadas 0,0: estado propio; sin distancia
+   └─ coordenadas válidas: Haversine contra RADIO_METROS
+      ├─ distancia <= radio: dentro
+      └─ distancia > radio: fuera
+→ Horario Zona Paga opcional según el día de cada FECHA_REGISTRO
 → panel_gps.html
 → panel_gps.css + panel_gps.js
-→ historial plegable: todos los bloques, 25 filas por página, sin una segunda consulta Oracle
+→ historial plegable: todos los bloques, 25 filas por página, sin segunda consulta Oracle
+→ cumplimiento: dentro / transmisiones; 0,0 reduce y “Sin transmisión” se excluye
 ```
 
 ---
@@ -495,6 +515,8 @@ apps/dashboard/services/oracle_connection.py
 apps/dashboard/services/baterias_service.py
 apps/dashboard/services/gps_service.py
 apps/dashboard/services/alertas_service.py
+apps/dashboard/services/horarios_zp_service.py
+apps/dashboard/services/preferencias_alertas_service.py
 apps/dashboard/services/reglas_alertas_service.py
 apps/dashboard/templates/dashboard/base_dashboard.html
 apps/dashboard/templates/dashboard/panel_baterias.html
@@ -511,11 +533,10 @@ apps/dashboard/static/dashboard/js/
 
 - Separar código vigente de código antiguo.
 - Revisar comandos que pertenecen al flujo antiguo SQLite.
-- Documentar tablas, vistas, procedures y jobs de Oracle.
-- Unificar la lógica de alertas de batería entre Panel Baterías y Panel Alertas.
 - Revisar si `panel_alertas_mantencion.html` sigue siendo necesario.
-- Revisar si `panel_alertas.js` todavía se usa.
 - Ordenar `views.py` por secciones o evaluar separación futura.
+- Ampliar las pruebas automáticas de GPS para transmisión, `0,0`, radio y cumplimiento.
+- Evaluar V010 con un plan de ejecución antes de sacar el script de `oracle/pending/`.
 - Confirmar que `.env`, `db.sqlite3`, `venv/`, `__pycache__/` y archivos temporales estén ignorados por Git.
 
 ---

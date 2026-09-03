@@ -52,4 +52,8 @@ Cuando cambie el flujo Oracle o Django:
 1. actualizar el archivo de `oracle/current/`;
 2. agregar una migración puntual al historial si fue necesario ejecutar SQL;
 3. actualizar el documento 03;
-4. resumir la decisión en el documento 08.
+4. actualizar el mapa de archivos (04) si se agregaron servicios, templates o
+   scripts;
+5. actualizar contratos de datos (06) y pruebas (07) cuando cambien las reglas
+   funcionales;
+6. resumir en el documento 08 únicamente los cambios del proceso de alertas.
