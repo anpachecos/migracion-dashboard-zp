@@ -40,6 +40,9 @@ from apps.dashboard.services.reglas_alertas_service import (
     recalculo_en_curso,
     usuario_puede_editar_reglas,
 )
+from apps.dashboard.services.ubicaciones_service import (
+    sincronizar_amids_ubicaciones_oracle,
+)
 
 from .models import LogImportacion
 from .services.baterias_service import (
@@ -79,6 +82,17 @@ def ejecutar_comando_admin(request):
     try:
         if accion == "probar_oracle":
             call_command("probar_oracle", stdout=salida, stderr=salida)
+
+        elif accion == "sincronizar_amids_ubicaciones":
+            resultado = sincronizar_amids_ubicaciones_oracle()
+            salida.write(
+                "Sincronización Oracle finalizada.\n"
+                f"Ubicaciones creadas: {resultado['ubicaciones_creadas']}\n"
+                f"Historiales abiertos: {resultado['historiales_creados']}\n"
+                f"AMID activos sin ubicación: {resultado['sin_ubicacion']}\n"
+                "AMID activos sin historial abierto: "
+                f"{resultado['sin_historial_abierto']}"
+            )
 
         elif accion == "importar_ubicaciones":
             archivo = request.FILES.get("archivo_version_zp")

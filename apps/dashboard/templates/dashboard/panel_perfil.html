@@ -138,6 +138,18 @@
             <p>Verifica si la conexión directa a Oracle está disponible.</p>
             <button type="submit">Ejecutar prueba</button>
         </form>
+
+        <form method="post" action="{% url 'dashboard:ejecutar_comando_admin' %}" class="admin-comando-card admin-comando-card-ubicaciones">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="sincronizar_amids_ubicaciones">
+            <h3>Completar ubicaciones faltantes</h3>
+            <p>
+                Ejecuta ahora la sincronización de Oracle. Solo agrega AMID activos
+                faltantes con Laboratorio Zonas Pagas y abre su historial desde hoy.
+            </p>
+            <span class="admin-programacion">Automático todos los días a las 06:10</span>
+            <button type="submit">Sincronizar ahora</button>
+        </form>
     </div>
 </section>
 

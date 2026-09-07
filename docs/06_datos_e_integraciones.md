@@ -27,6 +27,7 @@ No deben copiarse datos operativos a SQLite en el flujo vigente.
 | PRC_RECLASIFICAR_ALERTAS | Valida y reaplica solo clasificación. |
 | PRC_RECALCULAR_ALERTAS_SEGURO | Valida y ejecuta el cálculo completo. |
 | `PRC_LIMPIAR_HIST_UBICACION` | Limpia historial según retención. |
+| `PRC_SINC_UBIC_AMID` | Agrega ubicaciones faltantes desde el maestro activo y abre su historial desde la fecha real de incorporación. |
 
 El baseline vigente se versiona en `oracle/current/`; las migraciones ejecutadas se conservan en `oracle/history/` y los resultados de auditoría no se publican.
 
@@ -79,6 +80,14 @@ copia de `ALERTA_VALIDADOR_RESUMEN` ni de las ubicaciones Oracle.
   Un AMID activo presente en el Excel conserva su ubicación real; uno ausente
   se registra como Laboratorio Zonas Pagas. La primera vigencia comienza en la
   fecha de esa carga y no se reconstruye historial anterior.
+- V011 agrega una reconciliación preventiva completamente Oracle. El job
+  `JOB_SINC_UBIC_AMID`, programado a las 06:10 después de la actualización del
+  maestro, asigna Laboratorio Zonas Pagas solo a AMID activos sin fila vigente
+  y abre el historial faltante con `SYSDATE`. No modifica ubicaciones ya
+  asignadas. Mientras V011 siga en `oracle/pending/`, este job aún no forma
+  parte del esquema desplegado.
+- El botón **Sincronizar ahora** del Perfil reutiliza exactamente
+  `PRC_SINC_UBIC_AMID`. Django no contiene una segunda versión de la regla.
 
 ## Fechas y cambios
 

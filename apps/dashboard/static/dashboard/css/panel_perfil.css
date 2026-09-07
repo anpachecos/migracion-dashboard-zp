@@ -233,6 +233,19 @@
     line-height: 1.4;
 }
 
+.admin-comando-card-ubicaciones {
+    border-color: #bfdbfe;
+    background: #f8fbff;
+}
+
+.admin-programacion {
+    display: block;
+    margin: -4px 0 12px;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .admin-comando-card button,
 .form-subida-version button {
     width: 100%;

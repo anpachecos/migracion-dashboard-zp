@@ -15,12 +15,14 @@ oracle/
 │   ├── V007_FIX_...
 │   └── V009__detalle_caidas_bateria_fuente_unica.sql
 ├── pending/
-│   └── V010__indice_estatus_zp_amid_fecha_registro.sql
+│   ├── V010__indice_estatus_zp_amid_fecha_registro.sql
+│   └── V011__sincronizar_amids_ubicaciones.sql
 └── diagnostics/
     ├── 00_auditoria_previa.sql
     ├── 01_auditoria_rendimiento_etapa3.sql
     ├── V009_VALIDAR__detalle_caidas_bateria.sql
-    └── V010_VALIDAR__indice_gps_fecha_registro.sql
+    ├── V010_VALIDAR__indice_gps_fecha_registro.sql
+    └── V011_VALIDAR__sincronizar_amids_ubicaciones.sql
 ```
 
 ## Uso correcto
@@ -55,6 +57,24 @@ idempotente, no modifica datos y evita crear un índice si ya existe uno
 compatible.
 
 Una vez ejecutado y validado, V010 debe moverse de `pending/` a `history/`.
+
+## V011 — AMID activos sin ubicación (pendiente)
+
+V011 crea `PRC_SINC_UBIC_AMID` y `JOB_SINC_UBIC_AMID`. El procedimiento agrega
+en `UBICACION_ESPERADA_VALIDADOR` únicamente los AMID activos del maestro que
+no tengan fila, usando Laboratorio Zonas Pagas como estado seguro. Luego abre
+el historial que falte desde `SYSDATE`; nunca inventa vigencias anteriores.
+
+El job se ejecuta diariamente a las 06:10, después de
+`JOB_UPD_AMID_ALERTAS` (06:00). El mismo procedimiento se puede disparar desde
+el botón administrativo del Perfil. El script hace una primera reparación
+inmediata, no altera ubicaciones existentes y puede repetirse sin duplicar
+filas en condiciones normales.
+
+Ejecutar `pending/V011__sincronizar_amids_ubicaciones.sql` como script completo
+y luego `diagnostics/V011_VALIDAR__sincronizar_amids_ubicaciones.sql`. Los dos
+contadores de faltantes deben dar cero y la consulta de historiales duplicados
+no debe devolver filas. Solo entonces mover V011 a `history/`.
 
 ## V009 — detalle de caídas
 

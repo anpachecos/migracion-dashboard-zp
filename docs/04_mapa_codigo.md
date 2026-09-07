@@ -155,6 +155,7 @@ apps/dashboard/services/
 ├── baterias_service.py
 ├── catalogo_reglas_alertas.py
 ├── gps_service.py
+├── ubicaciones_service.py
 ├── horarios_zp_service.py
 ├── logs_service.py
 ├── oracle_connection.py
@@ -174,6 +175,7 @@ apps/dashboard/services/
 | `horarios_zp_service.py` | Consulta e interpreta los cuatro horarios vigentes de `UBICACION_ESPERADA_VALIDADOR`. Es compartido por Baterías y GPS. | Vigente |
 | `reglas_alertas_service.py` | Consulta y actualiza reglas configurables desde el Perfil/Admin. Mantiene el guardado, validación Oracle y selección de recálculo rápido o completo. | Vigente |
 | `preferencias_alertas_service.py` | Lee y guarda atómicamente en SQLite las exclusiones de AMID y ubicaciones propias de cada usuario. | Vigente |
+| `ubicaciones_service.py` | Invoca `PRC_SINC_UBIC_AMID` desde la acción administrativa y valida que no queden AMID activos sin ubicación o historial abierto. No decide ubicaciones en Python. | Pendiente de desplegar V011 |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
 | `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
 | `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
@@ -220,7 +222,7 @@ apps/dashboard/templates/dashboard/
 | `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |
 | `panel_alertas.html` | Muestra filtros y orden combinables tipo Excel en Prioridad/GPS/Batería/Estatus, además de filtro por texto —sin orden— en Ubicación actual. El filtro global se sincroniza con las tarjetas. Incluye restablecimiento completo, tabla, detalle de caídas, preferencias personales plegables y descarga Excel completa. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
-| `panel_perfil.html` | Perfil y administración. La configuración de alertas se presenta como una tarjeta compacta y no incluye las 27 reglas en el HTML inicial. | Vigente |
+| `panel_perfil.html` | Perfil y administración. Incluye la carga Excel, el disparador manual de sincronización Oracle y la configuración diferida de reglas. | Vigente; sincronización requiere V011 |
 | `partials/editor_reglas_alertas.html` | Formulario del editor que Django devuelve bajo demanda. Conserva las dos formas de guardado. | Vigente |
 | `partials/reglas_alertas_categoria.html` | Presenta pestañas, acordeones, controles y detalle técnico de cada regla. | Vigente |
 

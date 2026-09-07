@@ -226,6 +226,23 @@ oculten información operacional.
 
 `PRC_LIMPIAR_HIST_UBICACION` elimina por defecto versiones cuyo fin de vigencia tiene más de 16 días.
 
+V011 incorpora `PRC_SINC_UBIC_AMID` para cerrar el hueco entre el maestro y
+las ubicaciones. El procedimiento toma todos los AMID activos de
+`AMID_MAESTRO_ALERTAS` y actúa únicamente cuando falta información:
+
+1. Si no existe la fila vigente, la crea en Laboratorio Zonas Pagas.
+2. Si no existe un historial abierto, copia la fila vigente y abre su vigencia
+   con `SYSDATE`.
+3. No actualiza ubicaciones existentes ni reconstruye fechas anteriores.
+
+`JOB_SINC_UBIC_AMID` ejecuta este procedimiento diariamente a las 06:10, diez
+minutos después de `JOB_UPD_AMID_ALERTAS`. El Perfil ofrece además
+**Sincronizar ahora** a administradores; Django solo invoca el procedimiento y
+muestra sus contadores, por lo que la regla sigue centralizada en Oracle.
+
+Una carga Excel posterior reemplaza normalmente el laboratorio por la ubicación
+real y conserva ambas vigencias. No es necesario subir dos veces el archivo.
+
 ---
 
 ## Cálculo de alertas GPS
@@ -478,8 +495,12 @@ El historial de valores vive en Oracle; el archivo local registra la ejecución.
 | `JOB_ACTUALIZAR_BATERIA_BLOQUES` | Prepara bloques de batería | cada 30 minutos | ~1:15 |
 | `JOB_UPD_ALERTAS_VAL` | Refresca eventos de caída y calcula el resumen completo | cada 30 minutos | ~3:10 antes de V009; volver a medir |
 | `JOB_UPD_AMID_ALERTAS` | Sincroniza maestro de AMID | diario | ~0:04 |
+| `JOB_SINC_UBIC_AMID` | Completa ubicación vigente e historial de AMID activos faltantes | diario, 06:10 | medir después de V011 |
 
 Durante la auditoría no presentaban fallos.
+
+La última fila corresponde a V011 y no debe considerarse activa hasta ejecutar
+y validar los scripts ubicados en `oracle/pending/` y `oracle/diagnostics/`.
 
 ---
 

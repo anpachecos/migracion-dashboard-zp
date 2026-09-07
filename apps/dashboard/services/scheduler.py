@@ -1,6 +1,5 @@
 import logging
 import time
-from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.conf import settings
@@ -17,15 +16,12 @@ Retención actual:
 - UBICACION_ESPERADA_VALIDADOR: tabla vigente, no se limpia por fecha.
 - SQLite: solo usuarios, sesiones, permisos, admin, migraciones y logs.
 '''
-job_ubicaciones_running = False
 job_estado_oracle_running = False
 
 logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
 scheduler_started = False
-
-job_ubicaciones_running = False
 
 job_limpieza_historial_ubicacion_running = False
 
@@ -111,88 +107,6 @@ def ejecutar_comando_con_reintentos(nombre_comando, *args, max_intentos=3, esper
 
     raise ultimo_error
 
-
-def importar_ubicaciones_esperadas_job():
-    """
-    Importa diariamente las ubicaciones esperadas desde el Excel base.
-
-    Nota:
-    El comando importar_ubicaciones_esperadas ya registra el detalle del proceso
-    en SQLite con origen UBICACIONES_ORACLE.
-    Este job solo registra errores propios del scheduler, por ejemplo:
-    - archivo no encontrado
-    - excepción al ejecutar el comando
-    """
-
-    global job_ubicaciones_running
-
-    if job_ubicaciones_running:
-        logger.warning(
-            "La importación de ubicaciones esperadas ya está en ejecución. "
-            "Se omite esta corrida."
-        )
-
-        registrar_log_importacion(
-            origen="SCHEDULER",
-            estado="ADVERTENCIA",
-            mensaje=(
-                "Se omitió la importación automática de ubicaciones porque "
-                "ya había una ejecución en curso."
-            ),
-        )
-
-        return
-
-    job_ubicaciones_running = True
-    fecha_inicio = timezone.now()
-
-    try:
-        ruta_excel = Path(settings.BASE_DIR) / "VERSION ZONA PAGA.xlsx"
-
-        if not ruta_excel.exists():
-            mensaje = f"No se encontró el archivo de ubicaciones esperadas: {ruta_excel}"
-            logger.warning(mensaje)
-
-            registrar_log_importacion(
-                origen="SCHEDULER",
-                estado="ERROR",
-                fecha_inicio=fecha_inicio,
-                fecha_fin=timezone.now(),
-                mensaje=mensaje,
-            )
-
-            return
-
-        logger.info(
-            "Iniciando importación automática de ubicaciones esperadas desde: %s",
-            ruta_excel,
-        )
-
-        ejecutar_comando_con_reintentos(
-            "importar_ubicaciones_esperadas",
-            str(ruta_excel),
-            max_intentos=3,
-            esperas=[10, 20, 30],
-        )
-
-        logger.info(
-            "Importación automática de ubicaciones esperadas finalizada. "
-            "El detalle quedó registrado por el comando UBICACIONES_ORACLE."
-        )
-
-    except Exception as error:
-        logger.exception("Error en importación automática de ubicaciones esperadas.")
-
-        registrar_log_importacion(
-            origen="SCHEDULER",
-            estado="ERROR",
-            fecha_inicio=fecha_inicio,
-            fecha_fin=timezone.now(),
-            mensaje=f"Error en scheduler automático de ubicaciones esperadas: {error}",
-        )
-
-    finally:
-        job_ubicaciones_running = False
 
 def registrar_estado_oracle_job():
     """
@@ -312,7 +226,10 @@ def iniciar_scheduler():
 
     Actualmente:
     - Estado Oracle: cada 30 minutos.
-    - Ubicaciones esperadas: todos los días a las 18:45.
+    - Limpieza del historial de ubicaciones: todos los días a las 19:10.
+
+    La carga de ubicaciones esperadas se ejecuta exclusivamente de forma
+    manual desde el panel Perfil.
     """
 
     global scheduler_started
@@ -332,16 +249,6 @@ def iniciar_scheduler():
     )
 
     scheduler.add_job(
-        importar_ubicaciones_esperadas_job,
-        trigger="cron",
-        hour=18,
-        minute=45,
-        id="importar_ubicaciones_esperadas_diario",
-        replace_existing=True,
-        max_instances=1,
-    )
-    
-    scheduler.add_job(
         limpiar_historial_ubicacion_oracle_job,
         trigger="cron",
         hour=19,
@@ -356,7 +263,6 @@ def iniciar_scheduler():
 
     logger.info("Scheduler iniciado.")
     logger.info("Job estado Oracle: cada 30 minutos, minutos 5 y 35.")
-    logger.info("Job ubicaciones esperadas: todos los días a las 18:45.")
     logger.info("Job limpieza historial ubicaciones Oracle: todos los días a las 19:10.")
     registrar_log_importacion(
         origen="SCHEDULER",
@@ -364,6 +270,7 @@ def iniciar_scheduler():
         mensaje=(
             "Scheduler iniciado. "
             "Job estado Oracle programado cada 30 minutos. "
-            "Job ubicaciones esperadas programado todos los días a las 18:45."
+            "Job limpieza de historial de ubicaciones programado todos los "
+            "días a las 19:10."
         ),
     )
