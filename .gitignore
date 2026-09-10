@@ -33,6 +33,10 @@ local_settings.py
 # Base SQLite local y archivos auxiliares WAL/SHM/journal
 *.sqlite3
 *.sqlite3-*
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
 
 # Las migraciones Django NO se ignoran: forman parte del código.
 
@@ -51,8 +55,19 @@ local_settings.py
 *.pem
 *.p12
 *.pfx
+*.crt
+*.cer
+*.jks
 secrets/
 credentials/
+
+# Wallets y configuración sensible/local de Oracle
+oracle/wallet*/
+**/cwallet.sso
+**/*.sso
+**/tnsnames.ora
+**/sqlnet.ora
+**/oraaccess.xml
 
 # ============================================================
 # Archivos estáticos, medios y cargas generadas
@@ -109,6 +124,9 @@ build/
 *.bak
 *.swp
 *~
+.cache/
+tmp/
+temp/
 
 # ============================================================
 # Editores, notebooks y sistema operativo
