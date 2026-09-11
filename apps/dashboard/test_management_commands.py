@@ -4,6 +4,7 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import MagicMock, call, patch
 
+from django.core.management import get_commands
 from django.db import OperationalError
 from django.test import TestCase, override_settings
 
@@ -144,19 +145,15 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
                 self.assertIn(fragmento, stdout.getvalue())
                 self.assertEqual(stderr.getvalue(), "")
 
-    def test_importadores_antiguos_no_importan_por_modelos_retirados(self):
-        casos = (
-            ("importar_validadores_oracle", "EstadoValidadorRaw"),
-            ("importar_validadores_csv", "EstadoValidador"),
-        )
-        for nombre, modelo in casos:
-            with self.subTest(command=nombre), self.assertRaisesRegex(
-                ImportError,
-                f"cannot import name '{modelo}'",
-            ):
-                importlib.import_module(
-                    f"apps.dashboard.management.commands.{nombre}"
-                )
+    def test_importadores_obsoletos_ya_no_estan_disponibles(self):
+        comandos_disponibles = get_commands()
+
+        for nombre in (
+            "importar_validadores_oracle",
+            "importar_validadores_csv",
+        ):
+            with self.subTest(command=nombre):
+                self.assertNotIn(nombre, comandos_disponibles)
 
     def test_limpieza_historial_rechaza_retencion_invalida_sin_oracle(self):
         comando, stdout, stderr = self.comando(LimpiarHistorialOracleCommand)

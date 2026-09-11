@@ -329,8 +329,6 @@ apps/dashboard/management/commands/
 ├── actualizar_validadores.py
 ├── cargar_validadores_limpios.py
 ├── importar_ubicaciones_esperadas.py
-├── importar_validadores_csv.py
-├── importar_validadores_oracle.py
 ├── limpiar_historial_ubicacion_oracle.py
 ├── limpiar_registros_antiguos.py
 ├── limpiar_tablas_sqlite_antiguas.py
@@ -347,9 +345,12 @@ apps/dashboard/management/commands/
 | `limpiar_tablas_sqlite_antiguas.py` | Limpieza puntual de tablas antiguas en SQLite. | Uso puntual |
 | `actualizar_validadores.py` | Flujo antiguo o pendiente de revisión. | Revisar |
 | `cargar_validadores_limpios.py` | Flujo antiguo o pendiente de revisión. | Revisar |
-| `importar_validadores_csv.py` | Flujo antiguo o pendiente de revisión. | Revisar |
-| `importar_validadores_oracle.py` | Confirmar si sigue vigente o pertenece al flujo anterior. | Revisar |
 | `limpiar_registros_antiguos.py` | Confirmar si sigue vigente o pertenece al flujo anterior. | Revisar |
+
+Los comandos históricos `importar_validadores_csv` e
+`importar_validadores_oracle` fueron retirados en BKL-015. Dependían de los
+modelos SQLite eliminados y no formaban parte del flujo operativo vigente,
+que consulta los datos directamente en Oracle.
 
 ---
 
@@ -411,8 +412,6 @@ Deben estar incluidos en `.gitignore`.
 | `panel_alertas_mantencion.html` | Puede ser una versión antigua o temporal. Confirmar si se usa. |
 | `actualizar_validadores.py` | Posible flujo antiguo SQLite. |
 | `cargar_validadores_limpios.py` | Posible flujo antiguo SQLite. |
-| `importar_validadores_csv.py` | Posible flujo antiguo. |
-| `importar_validadores_oracle.py` | Confirmar si sigue vigente o si pertenece al flujo anterior. |
 | `limpiar_registros_antiguos.py` | Confirmar si sigue vigente. |
 | `panel_alertas.js` | Confirmar si todavía se usa en la versión actual del Panel Alertas. |
 | `views.py` | Archivo funcional, pero podría ordenarse por secciones o separarse más adelante. |

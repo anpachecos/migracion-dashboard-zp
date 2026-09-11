@@ -71,7 +71,10 @@ python manage.py runserver
 | `limpiar_historial_ubicacion_oracle` | Vigente | Aplica retención al historial. |
 | `limpiar_tablas_sqlite_antiguas` | Excepcional/destructivo | Requiere confirmación explícita. |
 | `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Deshabilitados | Flujo SQLite antiguo. |
-| `importar_validadores_csv`, `importar_validadores_oracle` | Históricos | No usar sin revisión. |
+
+Los comandos históricos `importar_validadores_csv` e
+`importar_validadores_oracle` fueron retirados en BKL-015 porque dependían de
+modelos SQLite eliminados y no pertenecían a la operación vigente.
 
 Use `python manage.py <comando> --help` antes de operaciones de escritura o eliminación.
 
