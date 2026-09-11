@@ -139,10 +139,15 @@ function inicializarMapaGps() {
 
     const mapa = L.map("mapa-gps").setView(centroInicial, zoomInicial);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(mapa);
+    L.tileLayer(
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            referrerPolicy: "strict-origin-when-cross-origin",
+            attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }
+    ).addTo(mapa);
 
     function moverMapaAUbicacion(ubicacion, zoom = 17) {
         if (!ubicacion || ubicacion.latitud === null || ubicacion.longitud === null) {
