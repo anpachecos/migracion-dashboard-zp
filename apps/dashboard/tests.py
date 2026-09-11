@@ -271,7 +271,7 @@ class AlertasServiceTests(SimpleTestCase):
             calcular_estado_estatus(None),
             {
                 "estado_estatus": "sin_estatus",
-                "texto_estatus": "Sin estatus",
+                "texto_estatus": "Sin estatus hoy",
                 "clase_estatus": "estatus-sin",
             },
         )
