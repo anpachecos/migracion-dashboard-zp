@@ -20,7 +20,7 @@ from apps.dashboard.services.alertas_service import (
     obtener_ubicaciones_alertas_disponibles,
     obtener_alertas_para_exportar,
 )
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import estado_dashboard_repository
 from apps.dashboard.services.exportaciones_service import (
     COLUMNAS_EXCEL_ALERTAS,
     crear_excel_alertas,
@@ -371,59 +371,11 @@ def obtener_registros_completos_oracle(amid, fecha_inicio, fecha_fin):
     fecha_inicio_texto = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
     fecha_fin_texto = fecha_fin.strftime("%Y-%m-%d %H:%M:%S")
 
-    query = """
-        SELECT
-            ID,
-            AMID,
-            FEC_DESCARGA,
-            FEC_ESTADO,
-            BUSID,
-            OP,
-            VERSION,
-            PATENTE,
-            TD01,
-            TD04,
-            TABLA,
-            VER_TABLA,
-            FECHA_HORA,
-            IS_CONTIENE_BATERIA,
-            IS_CONTIENE_GPS,
-            IS_CONTIENE_TIEMPO_VIDA,
-            IS_ERROR_OBTENER_BATERIA,
-            IS_ERROR_OBTENER_GPS,
-            IS_ERROR_OBTENER_TIEMPO_VIDA,
-            LATITUD,
-            LONGITUD,
-            PORCENTAJE_BATERIA,
-            TIEMPO_VIDA,
-            FECHA_REGISTRO
-        FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
-        WHERE AMID = :amid
-          AND FECHA_HORA >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
-          AND FECHA_HORA < TO_DATE(:fecha_fin, 'YYYY-MM-DD HH24:MI:SS')
-        ORDER BY FECHA_HORA
-    """
-
-    registros = []
-
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    "amid": int(amid),
-                    "fecha_inicio": fecha_inicio_texto,
-                    "fecha_fin": fecha_fin_texto,
-                },
-            )
-
-            columnas = [col[0].lower() for col in cursor.description]
-
-            for fila in cursor.fetchall():
-                datos = dict(zip(columnas, fila))
-                registros.append(datos)
-
-    return registros
+    return estado_dashboard_repository.obtener_registros_completos(
+        amid=amid,
+        fecha_inicio=fecha_inicio_texto,
+        fecha_fin=fecha_fin_texto,
+    )
 
 
 def crear_excel_completo_amid(amid, dias=14, hora_inicio="00:00", hora_fin="23:30"):

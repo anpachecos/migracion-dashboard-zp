@@ -3,7 +3,7 @@ import logging
 from django.core.cache import cache
 from django.utils import timezone
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import estado_dashboard_repository
 
 
 logger = logging.getLogger(__name__)
@@ -46,19 +46,10 @@ def obtener_ultima_carga_datos_oracle():
     if valor_cache is not CACHE_MISS:
         return valor_cache
 
-    query = """
-        SELECT MAX(FECHA_HORA_BLOQUE)
-        FROM USR_LAB.BATERIA_BLOQUE_30MIN
-        WHERE TIENE_DATO = 1
-    """
-
     ultima_carga = None
 
     try:
-        with obtener_conexion_oracle() as conexion:
-            with conexion.cursor() as cursor:
-                cursor.execute(query)
-                resultado = cursor.fetchone()
+        resultado = estado_dashboard_repository.obtener_ultima_carga_datos()
 
         if resultado and resultado[0]:
             ultima_carga = normalizar_fecha_oracle(resultado[0])
@@ -92,18 +83,10 @@ def obtener_ultima_version_zp_oracle():
     if valor_cache is not CACHE_MISS:
         return valor_cache
 
-    query = """
-        SELECT MAX(FECHA_CARGA)
-        FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
-    """
-
     ultima_version = None
 
     try:
-        with obtener_conexion_oracle() as conexion:
-            with conexion.cursor() as cursor:
-                cursor.execute(query)
-                resultado = cursor.fetchone()
+        resultado = estado_dashboard_repository.obtener_ultima_version_zp()
 
         if resultado and resultado[0]:
             ultima_version = normalizar_fecha_oracle(resultado[0])

@@ -9,7 +9,7 @@ Comando Django: probar_oracle.py
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import operacion_oracle_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
 
 
@@ -20,10 +20,7 @@ class Command(BaseCommand):
         fecha_inicio = timezone.now()
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    cursor.execute("SELECT SYSDATE FROM dual")
-                    resultado = cursor.fetchone()
+            resultado = operacion_oracle_repository.obtener_sysdate()
 
             fecha_fin = timezone.now()
 

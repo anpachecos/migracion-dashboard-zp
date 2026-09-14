@@ -55,18 +55,17 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
 
     def test_probar_oracle_registra_estado_ok_y_stdout(self):
         comando, stdout, stderr = self.comando(ProbarOracleCommand)
-        contexto, _, cursor = self.conexion_falsa()
-        cursor.fetchone.return_value = (self.AHORA,)
 
         with patch(
-            "apps.dashboard.management.commands.probar_oracle.obtener_conexion_oracle",
-            return_value=contexto,
-        ), patch(
+            "apps.dashboard.management.commands.probar_oracle."
+            "operacion_oracle_repository.obtener_sysdate",
+            return_value=(self.AHORA,),
+        ) as mock_sysdate, patch(
             "apps.dashboard.management.commands.probar_oracle.registrar_log_importacion"
         ) as mock_log:
             comando.handle()
 
-        cursor.execute.assert_called_once_with("SELECT SYSDATE FROM dual")
+        mock_sysdate.assert_called_once_with()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "OK")
         self.assertEqual(mock_log.call_args.kwargs["filas_obtenidas"], 1)
         self.assertIn("Conexión Oracle OK", stdout.getvalue())
@@ -75,7 +74,8 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
     def test_probar_oracle_registra_error_sin_propagar_excepcion(self):
         comando, stdout, stderr = self.comando(ProbarOracleCommand)
         with patch(
-            "apps.dashboard.management.commands.probar_oracle.obtener_conexion_oracle",
+            "apps.dashboard.management.commands.probar_oracle."
+            "operacion_oracle_repository.obtener_sysdate",
             side_effect=RuntimeError("Oracle sintético no disponible"),
         ), patch(
             "apps.dashboard.management.commands.probar_oracle.registrar_log_importacion"
@@ -90,22 +90,22 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
 
     def test_registrar_estado_oracle_resume_tres_fuentes_y_logs(self):
         comando, stdout, stderr = self.comando(RegistrarEstadoOracleCommand)
-        contexto, _, cursor = self.conexion_falsa()
-        cursor.fetchone.side_effect = [
+        filas = (
             (10, 8, self.AHORA, self.AHORA, self.AHORA),
             (5, self.AHORA),
             (4,),
-        ]
+        )
 
         with patch(
-            "apps.dashboard.management.commands.registrar_estado_oracle.obtener_conexion_oracle",
-            return_value=contexto,
-        ), patch(
+            "apps.dashboard.management.commands.registrar_estado_oracle."
+            "operacion_oracle_repository.obtener_resumenes_estado",
+            return_value=filas,
+        ) as mock_resumenes, patch(
             "apps.dashboard.management.commands.registrar_estado_oracle.registrar_log_importacion"
         ) as mock_log:
             comando.handle()
 
-        self.assertEqual(cursor.execute.call_count, 3)
+        mock_resumenes.assert_called_once_with()
         self.assertEqual(
             [llamada.kwargs["origen"] for llamada in mock_log.call_args_list],
             ["BATERIA_BLOQUES_ORACLE", "UBICACIONES_ORACLE", "ESTADO_ORACLE"],
@@ -118,7 +118,8 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
     def test_registrar_estado_oracle_captura_error_y_escribe_stderr(self):
         comando, stdout, stderr = self.comando(RegistrarEstadoOracleCommand)
         with patch(
-            "apps.dashboard.management.commands.registrar_estado_oracle.obtener_conexion_oracle",
+            "apps.dashboard.management.commands.registrar_estado_oracle."
+            "operacion_oracle_repository.obtener_resumenes_estado",
             side_effect=RuntimeError("fallo sintético"),
         ), patch(
             "apps.dashboard.management.commands.registrar_estado_oracle.registrar_log_importacion"

@@ -14,7 +14,7 @@ No modifica Oracle. Solo consulta y guarda logs internos.
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import operacion_oracle_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
 
 
@@ -25,11 +25,16 @@ class Command(BaseCommand):
         fecha_inicio = timezone.now()
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    resumen_bateria = self.obtener_resumen_bateria(cursor)
-                    resumen_ubicaciones = self.obtener_resumen_ubicaciones(cursor)
-                    resumen_historial = self.obtener_resumen_historial(cursor)
+            (
+                fila_bateria,
+                fila_ubicaciones,
+                fila_historial,
+            ) = operacion_oracle_repository.obtener_resumenes_estado()
+            resumen_bateria = self.obtener_resumen_bateria(fila_bateria)
+            resumen_ubicaciones = self.obtener_resumen_ubicaciones(
+                fila_ubicaciones
+            )
+            resumen_historial = self.obtener_resumen_historial(fila_historial)
 
             self.registrar_log_bateria(
                 fecha_inicio=fecha_inicio,
@@ -76,29 +81,7 @@ class Command(BaseCommand):
 
             self.stderr.write(self.style.ERROR(mensaje))
 
-    def obtener_resumen_bateria(self, cursor):
-        query = """
-            SELECT
-                COUNT(*) AS TOTAL_BLOQUES,
-                SUM(
-                    CASE
-                        WHEN TIENE_DATO = 1 THEN 1
-                        ELSE 0
-                    END
-                ) AS BLOQUES_CON_DATO,
-                MAX(FECHA_HORA_BLOQUE) AS ULTIMO_BLOQUE,
-                MAX(
-                    CASE
-                        WHEN TIENE_DATO = 1 THEN FECHA_HORA_BLOQUE
-                    END
-                ) AS ULTIMO_BLOQUE_CON_DATO,
-                MAX(FECHA_ACTUALIZACION) AS ULTIMA_ACTUALIZACION
-            FROM USR_LAB.BATERIA_BLOQUE_30MIN
-        """
-
-        cursor.execute(query)
-        fila = cursor.fetchone()
-
+    def obtener_resumen_bateria(self, fila):
         return {
             "total_bloques": int(fila[0] or 0),
             "bloques_con_dato": int(fila[1] or 0),
@@ -107,33 +90,13 @@ class Command(BaseCommand):
             "ultima_actualizacion": fila[4],
         }
 
-    def obtener_resumen_ubicaciones(self, cursor):
-        query = """
-            SELECT
-                COUNT(*) AS TOTAL_UBICACIONES,
-                MAX(FECHA_CARGA) AS ULTIMA_CARGA
-            FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
-        """
-
-        cursor.execute(query)
-        fila = cursor.fetchone()
-
+    def obtener_resumen_ubicaciones(self, fila):
         return {
             "total_ubicaciones": int(fila[0] or 0),
             "ultima_carga": fila[1],
         }
 
-    def obtener_resumen_historial(self, cursor):
-        query = """
-            SELECT
-                COUNT(*) AS HISTORIALES_VIGENTES
-            FROM USR_LAB.HISTORIAL_UBICACION_ESPERADA
-            WHERE FECHA_FIN_VIGENCIA IS NULL
-        """
-
-        cursor.execute(query)
-        fila = cursor.fetchone()
-
+    def obtener_resumen_historial(self, fila):
         return {
             "historiales_vigentes": int(fila[0] or 0),
         }
