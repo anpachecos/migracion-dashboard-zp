@@ -4,11 +4,11 @@ import math
 
 from django.utils import timezone
 
+from apps.dashboard.repositories import gps_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
     filtrar_registros_por_horario_zp,
 )
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 
 LATITUD_LABORATORIO_ZP = -33.437191
@@ -230,92 +230,45 @@ def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
     el equipo no transmitió un GPS nuevo y las coordenadas se normalizan a NULL.
     """
 
-    query_anterior = """
-        SELECT FECHA_HORA
-        FROM (
-            SELECT FECHA_HORA
-            FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
-            WHERE AMID = :amid
-              AND FECHA_REGISTRO < TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
-            ORDER BY FECHA_REGISTRO DESC, ID DESC
-        )
-        WHERE ROWNUM = 1
-    """
-
-    query = """
-        SELECT
-            ID,
-            AMID,
-            FEC_DESCARGA,
-            FEC_ESTADO,
-            FECHA_HORA,
-            FECHA_REGISTRO,
-            LATITUD,
-            LONGITUD,
-            PORCENTAJE_BATERIA,
-            IS_CONTIENE_GPS,
-            IS_ERROR_OBTENER_GPS
-        FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
-        WHERE AMID = :amid
-          AND FECHA_REGISTRO >= TO_DATE(:fecha_inicio, 'YYYY-MM-DD HH24:MI:SS')
-          AND FECHA_REGISTRO < TO_DATE(:fecha_fin, 'YYYY-MM-DD HH24:MI:SS')
-        ORDER BY FECHA_REGISTRO, ID
-    """
-
-    parametros = {
-        "amid": int(amid),
-        "fecha_inicio": fecha_a_texto_oracle(fecha_inicio),
-        "fecha_fin": fecha_a_texto_oracle(fecha_fin),
-    }
+    resultado = gps_repository.obtener_registros_gps(
+        amid=amid,
+        fecha_inicio=fecha_a_texto_oracle(fecha_inicio),
+        fecha_fin=fecha_a_texto_oracle(fecha_fin),
+    )
     registros = []
+    fecha_hora_anterior = normalizar_fecha_para_comparar(
+        resultado.get("fecha_hora_anterior")
+    )
 
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                query_anterior,
-                {
-                    "amid": parametros["amid"],
-                    "fecha_inicio": parametros["fecha_inicio"],
-                },
+    for datos in resultado["registros"]:
+        fecha_hora_validador = normalizar_fecha_para_comparar(
+            datos.get("fecha_hora")
+        )
+        transmitio_gps = (
+            fecha_hora_validador is not None
+            and fecha_hora_validador != fecha_hora_anterior
+        )
+
+        registros.append(
+            SimpleNamespace(
+                id=datos.get("id"),
+                amid=datos.get("amid"),
+                fec_descarga=normalizar_fecha_para_comparar(datos.get("fec_descarga")),
+                fec_estado=normalizar_fecha_para_comparar(datos.get("fec_estado")),
+                fecha_hora=fecha_hora_validador,
+                fecha_registro=normalizar_fecha_para_comparar(datos.get("fecha_registro")),
+                fecha_hora_anterior=fecha_hora_anterior,
+                transmitio_gps=transmitio_gps,
+                latitud=datos.get("latitud") if transmitio_gps else None,
+                longitud=datos.get("longitud") if transmitio_gps else None,
+                porcentaje_bateria=datos.get("porcentaje_bateria"),
+                is_contiene_gps=normalizar_booleano_oracle(datos.get("is_contiene_gps")),
+                is_error_obtener_gps=normalizar_booleano_oracle(datos.get("is_error_obtener_gps")),
             )
-            fila_anterior = cursor.fetchone()
-            fecha_hora_anterior = normalizar_fecha_para_comparar(
-                fila_anterior[0] if fila_anterior else None
-            )
+        )
 
-            cursor.execute(query, parametros)
-            columnas = [col[0].lower() for col in cursor.description]
-
-            for fila in cursor.fetchall():
-                datos = dict(zip(columnas, fila))
-                fecha_hora_validador = normalizar_fecha_para_comparar(
-                    datos.get("fecha_hora")
-                )
-                transmitio_gps = (
-                    fecha_hora_validador is not None
-                    and fecha_hora_validador != fecha_hora_anterior
-                )
-
-                registros.append(
-                    SimpleNamespace(
-                        id=datos.get("id"),
-                        amid=datos.get("amid"),
-                        fec_descarga=normalizar_fecha_para_comparar(datos.get("fec_descarga")),
-                        fec_estado=normalizar_fecha_para_comparar(datos.get("fec_estado")),
-                        fecha_hora=fecha_hora_validador,
-                        fecha_registro=normalizar_fecha_para_comparar(datos.get("fecha_registro")),
-                        fecha_hora_anterior=fecha_hora_anterior,
-                        transmitio_gps=transmitio_gps,
-                        latitud=datos.get("latitud") if transmitio_gps else None,
-                        longitud=datos.get("longitud") if transmitio_gps else None,
-                        porcentaje_bateria=datos.get("porcentaje_bateria"),
-                        is_contiene_gps=normalizar_booleano_oracle(datos.get("is_contiene_gps")),
-                        is_error_obtener_gps=normalizar_booleano_oracle(datos.get("is_error_obtener_gps")),
-                    )
-                )
-
-                if fecha_hora_validador is not None:
-                    fecha_hora_anterior = fecha_hora_validador
+        if fecha_hora_validador is not None:
+            fecha_hora_anterior = fecha_hora_validador
 
     return registros
 
@@ -407,135 +360,57 @@ def obtener_ultimo_registro_gps_valido_oracle(amid):
     Busca el último registro GPS útil del AMID, sin considerar coordenada 0,0.
     """
 
-    query = """
-        SELECT *
-        FROM (
-            SELECT
-                ID,
-                AMID,
-                FEC_DESCARGA,
-                FEC_ESTADO,
-                FECHA_HORA,
-                LATITUD,
-                LONGITUD,
-                PORCENTAJE_BATERIA,
-                IS_CONTIENE_GPS,
-                IS_ERROR_OBTENER_GPS
-            FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
-            WHERE AMID = :amid
-              AND FECHA_HORA IS NOT NULL
-              AND LATITUD IS NOT NULL
-              AND LONGITUD IS NOT NULL
-              AND NOT (LATITUD = 0 AND LONGITUD = 0)
-            ORDER BY FECHA_HORA DESC
-        )
-        WHERE ROWNUM = 1
+    datos = gps_repository.obtener_ultimo_registro_gps_valido(amid)
+    if not datos:
+        return None
+
+    return SimpleNamespace(
+        id=datos.get("id"),
+        amid=datos.get("amid"),
+        fec_descarga=normalizar_fecha_para_comparar(datos.get("fec_descarga")),
+        fec_estado=normalizar_fecha_para_comparar(datos.get("fec_estado")),
+        fecha_hora=normalizar_fecha_para_comparar(datos.get("fecha_hora")),
+        latitud=datos.get("latitud"),
+        longitud=datos.get("longitud"),
+        porcentaje_bateria=datos.get("porcentaje_bateria"),
+        is_contiene_gps=normalizar_booleano_oracle(datos.get("is_contiene_gps")),
+        is_error_obtener_gps=normalizar_booleano_oracle(datos.get("is_error_obtener_gps")),
+    )
+
+
+def normalizar_historial_ubicacion_amid(historial):
     """
-
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(query, {"amid": int(amid)})
-
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            datos = dict(zip(columnas, fila))
-
-            return SimpleNamespace(
-                id=datos.get("id"),
-                amid=datos.get("amid"),
-                fec_descarga=normalizar_fecha_para_comparar(datos.get("fec_descarga")),
-                fec_estado=normalizar_fecha_para_comparar(datos.get("fec_estado")),
-                fecha_hora=normalizar_fecha_para_comparar(datos.get("fecha_hora")),
-                latitud=datos.get("latitud"),
-                longitud=datos.get("longitud"),
-                porcentaje_bateria=datos.get("porcentaje_bateria"),
-                is_contiene_gps=normalizar_booleano_oracle(datos.get("is_contiene_gps")),
-                is_error_obtener_gps=normalizar_booleano_oracle(datos.get("is_error_obtener_gps")),
-            )
-
-
-def obtener_historial_ubicacion_amid(cursor, amid):
+    Normaliza las fechas del historial obtenido desde el repositorio.
     """
-    Trae una sola vez todo el historial del AMID.
-    Luego se resuelve en Python qué ubicación correspondía a cada fecha.
-    """
-
-    query = """
-        SELECT
-            AMID,
-            NOMBRE,
-            LATITUD_ESPERADA,
-            LONGITUD_ESPERADA,
-            RADIO_METROS,
-            OPERATIVA,
-            ORIGEN_UBICACION,
-            VERSION_ZP,
-            ARCHIVO_ORIGEN,
-            FECHA_INICIO_VIGENCIA,
-            FECHA_FIN_VIGENCIA
-        FROM USR_LAB.HISTORIAL_UBICACION_ESPERADA
-        WHERE AMID = :amid
-        ORDER BY FECHA_INICIO_VIGENCIA
-    """
-
-    cursor.execute(query, {"amid": str(amid).strip()})
-
-    columnas = [col[0] for col in cursor.description]
-    historial = []
-
-    for fila in cursor.fetchall():
-        datos = dict(zip(columnas, fila))
+    for datos in historial:
         datos["FECHA_INICIO_VIGENCIA"] = normalizar_fecha_para_comparar(
             datos.get("FECHA_INICIO_VIGENCIA")
         )
         datos["FECHA_FIN_VIGENCIA"] = normalizar_fecha_para_comparar(
             datos.get("FECHA_FIN_VIGENCIA")
         )
-        historial.append(datos)
 
     return historial
 
 
-def obtener_ubicacion_vigente_amid(cursor, amid):
+def normalizar_ubicacion_vigente_amid(datos):
     """
-    Trae la ubicación vigente del AMID desde Oracle.
+    Identifica como vigente la ubicación obtenida desde el repositorio.
     """
-
-    query = """
-        SELECT
-            AMID,
-            NOMBRE,
-            LATITUD_ESPERADA,
-            LONGITUD_ESPERADA,
-            RADIO_METROS,
-            OPERATIVA,
-            VERSION_ZP,
-            ARCHIVO_ORIGEN,
-            HORARIO,
-            HORARIO_LABORAL_PM,
-            HORARIO_SABADO,
-            HORARIO_DOMINGO,
-            FECHA_CARGA
-        FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
-        WHERE AMID = :amid
-    """
-
-    cursor.execute(query, {"amid": str(amid).strip()})
-
-    fila = cursor.fetchone()
-
-    if not fila:
+    if not datos:
         return None
 
-    columnas = [col[0] for col in cursor.description]
-    datos = dict(zip(columnas, fila))
     datos["ORIGEN_UBICACION"] = "vigente"
 
     return datos
+
+
+def obtener_datos_ubicacion_amid_oracle(amid):
+    """Obtiene y normaliza historial y ubicación vigente de un AMID."""
+    resultado = gps_repository.obtener_datos_ubicacion_amid(amid)
+    historial = normalizar_historial_ubicacion_amid(resultado["historial"])
+    vigente = normalizar_ubicacion_vigente_amid(resultado["vigente"])
+    return historial, vigente
 
 
 def obtener_referencia_desde_cache(fecha_consulta, historial_amid, vigente_amid):
@@ -593,10 +468,7 @@ def obtener_referencia_esperada(amid, fecha_consulta=None):
     En el panel GPS optimizado usamos obtener_referencia_desde_cache().
     """
 
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            historial = obtener_historial_ubicacion_amid(cursor, amid)
-            vigente = obtener_ubicacion_vigente_amid(cursor, amid)
+    historial, vigente = obtener_datos_ubicacion_amid_oracle(amid)
 
     return obtener_referencia_desde_cache(
         fecha_consulta=fecha_consulta,
@@ -831,10 +703,9 @@ def obtener_contexto_gps(request):
             registros_periodo_base = []
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    historial_amid = obtener_historial_ubicacion_amid(cursor, amid)
-                    vigente_amid = obtener_ubicacion_vigente_amid(cursor, amid)
+            historial_amid, vigente_amid = obtener_datos_ubicacion_amid_oracle(
+                amid
+            )
 
             horario_zp = crear_configuracion_horario_zp(
                 datos=vigente_amid,

@@ -61,9 +61,6 @@ class GpsServiceLogicaPuraTests(SimpleTestCase):
 
     def contexto(self, registros, historial=None, vigente=None, distancia=None):
         request = self.factory.get("/gps/", {"amid": "7500001"})
-        conexion = MagicMock()
-        contexto_conexion = MagicMock()
-        contexto_conexion.__enter__.return_value = conexion
 
         if vigente is None:
             vigente = self.ubicacion_vigente
@@ -83,20 +80,8 @@ class GpsServiceLogicaPuraTests(SimpleTestCase):
             )
             stack.enter_context(
                 patch(
-                    "apps.dashboard.services.gps_service.obtener_conexion_oracle",
-                    return_value=contexto_conexion,
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "apps.dashboard.services.gps_service.obtener_historial_ubicacion_amid",
-                    return_value=historial or [],
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "apps.dashboard.services.gps_service.obtener_ubicacion_vigente_amid",
-                    return_value=vigente,
+                    "apps.dashboard.services.gps_service.obtener_datos_ubicacion_amid_oracle",
+                    return_value=(historial or [], vigente),
                 )
             )
             if distancia is not None:
@@ -145,7 +130,7 @@ class GpsServiceLogicaPuraTests(SimpleTestCase):
         self.assertEqual(filtros["fecha_desde_input"], "2026-09-10")
         self.assertEqual(filtros["fecha_hasta_input"], "2026-09-10")
 
-    @patch("apps.dashboard.services.gps_service.obtener_conexion_oracle")
+    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
     def test_fecha_hora_repetida_anula_coordenadas_del_bloque(
         self,
         mock_conexion,
@@ -372,23 +357,13 @@ class GpsServiceContextoTests(SimpleTestCase):
         )
 
     def parches_auxiliares(self, stack, vigente=None):
-        contexto_conexion = MagicMock()
-        contexto_conexion.__enter__.return_value = MagicMock()
         stack.enter_context(patch(
             "apps.dashboard.services.gps_service.obtener_ahora_referencia",
             return_value=self.AHORA,
         ))
         stack.enter_context(patch(
-            "apps.dashboard.services.gps_service.obtener_conexion_oracle",
-            return_value=contexto_conexion,
-        ))
-        stack.enter_context(patch(
-            "apps.dashboard.services.gps_service.obtener_historial_ubicacion_amid",
-            return_value=[],
-        ))
-        stack.enter_context(patch(
-            "apps.dashboard.services.gps_service.obtener_ubicacion_vigente_amid",
-            return_value=self.vigente if vigente is None else vigente,
+            "apps.dashboard.services.gps_service.obtener_datos_ubicacion_amid_oracle",
+            return_value=([], self.vigente if vigente is None else vigente),
         ))
 
     def test_fallback_usa_ultimo_dia_reportado_solo_en_rango_predeterminado(self):
@@ -488,8 +463,6 @@ class GpsServiceContextoTests(SimpleTestCase):
     def test_fallo_ubicacion_esperada_no_elimina_registros_gps(self):
         request = self.factory.get("/gps/", {"amid": "7500001"})
         registro = self.registro(datetime(2026, 9, 10, 9, 0))
-        contexto_conexion = MagicMock()
-        contexto_conexion.__enter__.return_value = MagicMock()
         with patch(
             "apps.dashboard.services.gps_service.obtener_ahora_referencia",
             return_value=self.AHORA,
@@ -497,10 +470,7 @@ class GpsServiceContextoTests(SimpleTestCase):
             "apps.dashboard.services.gps_service.obtener_registros_gps_oracle",
             return_value=[registro],
         ), patch(
-            "apps.dashboard.services.gps_service.obtener_conexion_oracle",
-            return_value=contexto_conexion,
-        ), patch(
-            "apps.dashboard.services.gps_service.obtener_historial_ubicacion_amid",
+            "apps.dashboard.services.gps_service.obtener_datos_ubicacion_amid_oracle",
             side_effect=RuntimeError("ubicación sintética no disponible"),
         ):
             contexto = obtener_contexto_gps(request)
