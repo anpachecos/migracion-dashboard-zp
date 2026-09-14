@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 
 from django.core.cache import cache
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import alertas_repository
 
 ORDEN_ALERTAS_PREDETERMINADO = (
     ("prioridad", "asc"),
@@ -30,44 +30,6 @@ OPCIONES_ESTATUS_ALERTA = (
     ("sin_estatus", "SIN_ESTATUS", "Sin estatus hoy"),
 )
 ESTATUS_ALERTA_VALIDOS = frozenset(valor for _, valor, _ in OPCIONES_ESTATUS_ALERTA if valor)
-
-SQL_ORDEN_ALERTAS = {
-    "prioridad": """
-        CASE NIVEL_ALERTA_GLOBAL
-            WHEN 'CRITICA' THEN 1
-            WHEN 'ALTA' THEN 2
-            WHEN 'ADVERTENCIA' THEN 3
-            WHEN 'OK' THEN 4
-            ELSE 5
-        END
-    """.strip(),
-    "gps": """
-        CASE NIVEL_ALERTA_GPS
-            WHEN 'CRITICA' THEN 1
-            WHEN 'ALTA' THEN 2
-            WHEN 'ADVERTENCIA' THEN 3
-            WHEN 'OK' THEN 4
-            ELSE 5
-        END
-    """.strip(),
-    "bateria": """
-        CASE NIVEL_ALERTA_BATERIA
-            WHEN 'CRITICA' THEN 1
-            WHEN 'ALTA' THEN 2
-            WHEN 'ADVERTENCIA' THEN 3
-            WHEN 'OK' THEN 4
-            ELSE 5
-        END
-    """.strip(),
-    "estatus": """
-        CASE
-            WHEN ULTIMO_ESTATUS >= TRUNC(SYSDATE)
-             AND ULTIMO_ESTATUS >= SYSDATE - (1/24) THEN 1
-            WHEN ULTIMO_ESTATUS >= TRUNC(SYSDATE) THEN 2
-            ELSE 3
-        END
-    """.strip(),
-}
 
 ALERTAS_POR_PAGINA = 10
 CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v3"
@@ -177,64 +139,19 @@ def alternar_direccion_orden_alertas(orden, campo_objetivo):
 
 def construir_orden_alertas(orden):
     """Construye un ORDER BY seguro para ordenar antes de paginar."""
-
-    segmentos = []
-    for campo, direccion in normalizar_orden_alertas(orden):
-        direccion_sql = "ASC" if direccion == "asc" else "DESC"
-        segmentos.append(f"{SQL_ORDEN_ALERTAS[campo]} {direccion_sql}")
-
-        if campo == "estatus":
-            detalle_estatus = (
-                "ULTIMO_ESTATUS DESC NULLS LAST"
-                if direccion == "asc"
-                else "ULTIMO_ESTATUS ASC NULLS FIRST"
-            )
-            segmentos.append(detalle_estatus)
-
-    # Desempate estable para que un registro no cambie de página al recargar.
-    segmentos.append("AMID ASC")
-
-    return "ORDER BY\n                " + ",\n                ".join(segmentos)
+    return alertas_repository.construir_orden_alertas(
+        normalizar_orden_alertas(orden)
+    )
 
 
 def construir_condicion_problema(problema):
     """Convierte un filtro de problema a una condición SQL compatible con Oracle."""
-
-    if not problema:
-        return None
-
-    mapping = {
-        "gps_cero_hoy": "GPS_CERO_HOY > 0",
-        "gps_historico": "GPS_CERO_HIST > 0",
-        "gps_racha": "RACHA_MAX_GPS_CERO > 0",
-        "bateria_caida": "CAIDAS_HOY > 0 OR CAIDAS_HIST > 0",
-        "bateria_cero": "BATERIA_CERO_HOY > 0 OR BATERIA_CERO_HIST > 0",
-        "ambos": "NIVEL_ALERTA_GPS <> 'OK' AND NIVEL_ALERTA_BATERIA <> 'OK'",
-    }
-
-    return mapping.get(problema)
+    return alertas_repository.construir_condicion_problema(problema)
 
 
 def construir_condicion_estatus(estatus):
     """Convierte el filtro de último estatus a una condición SQL."""
-
-    if not estatus:
-        return None
-
-    estatus = estatus.upper()
-
-    mapping = {
-        # Tiene estatus de hoy y además fue recibido hace una hora o menos.
-        "CON_ESTATUS": "ULTIMO_ESTATUS >= TRUNC(SYSDATE) AND ULTIMO_ESTATUS >= SYSDATE - (1/24)",
-
-        # Tiene estatus de hoy, pero el último fue recibido hace más de una hora.
-        "ANTIGUO": "ULTIMO_ESTATUS >= TRUNC(SYSDATE) AND ULTIMO_ESTATUS < SYSDATE - (1/24)",
-
-        # No tiene estatus de hoy. Incluye NULL o último estatus de días anteriores.
-        "SIN_ESTATUS": "ULTIMO_ESTATUS IS NULL OR ULTIMO_ESTATUS < TRUNC(SYSDATE)",
-    }
-
-    return mapping.get(estatus)
+    return alertas_repository.construir_condicion_estatus(estatus)
 
 
 def calcular_estado_estatus(ultimo_estatus):
@@ -291,72 +208,20 @@ def _armar_filtros_alertas(
     amids_excluidos=None,
     ubicaciones_excluidas=None,
 ):
-    filtros = []
-    params = {}
-
-    if solo_con_alerta:
-        filtros.append("TIENE_ALERTA = 1")
-
-    if amid:
-        filtros.append("r.AMID = :amid")
-        params["amid"] = int(amid)
-
-    if ubicacion:
-        params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
-        params["ubicacion"] = f"%{str(ubicacion).strip().upper()}%"
-        filtros.append(
-            "UPPER(NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar)) "
-            "LIKE :ubicacion"
-        )
-
-    if nivel:
-        filtros.append("NIVEL_ALERTA_GLOBAL = :nivel")
-        params["nivel"] = nivel.upper()
-
-    if nivel_gps:
-        filtros.append("NIVEL_ALERTA_GPS = :nivel_gps")
-        params["nivel_gps"] = nivel_gps.upper()
-
-    if nivel_bateria:
-        filtros.append("NIVEL_ALERTA_BATERIA = :nivel_bateria")
-        params["nivel_bateria"] = nivel_bateria.upper()
-
-    if tipo_alerta == "GPS":
-        filtros.append("NIVEL_ALERTA_GPS <> 'OK'")
-    elif tipo_alerta == "BATERIA":
-        filtros.append("NIVEL_ALERTA_BATERIA <> 'OK'")
-
-    condicion_problema = construir_condicion_problema(problema)
-    if condicion_problema:
-        filtros.append(f"({condicion_problema})")
-
-    condicion_estatus = construir_condicion_estatus(estatus)
-    if condicion_estatus:
-        filtros.append(f"({condicion_estatus})")
-
-    binds_amids = []
-    for indice, amid_excluido in enumerate(amids_excluidos or []):
-        nombre_bind = f"amid_excluido_{indice}"
-        binds_amids.append(f":{nombre_bind}")
-        params[nombre_bind] = int(amid_excluido)
-
-    if binds_amids:
-        filtros.append(f"r.AMID NOT IN ({', '.join(binds_amids)})")
-
-    binds_ubicaciones = []
-    for indice, ubicacion in enumerate(ubicaciones_excluidas or []):
-        nombre_bind = f"ubicacion_excluida_{indice}"
-        binds_ubicaciones.append(f":{nombre_bind}")
-        params[nombre_bind] = str(ubicacion)
-
-    if binds_ubicaciones:
-        params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
-        filtros.append(
-            "NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) "
-            f"NOT IN ({', '.join(binds_ubicaciones)})"
-        )
-
-    return filtros, params
+    return alertas_repository.armar_filtros_alertas(
+        amid=amid,
+        ubicacion=ubicacion,
+        nivel=nivel,
+        nivel_gps=nivel_gps,
+        nivel_bateria=nivel_bateria,
+        tipo_alerta=tipo_alerta,
+        problema=problema,
+        estatus=estatus,
+        solo_con_alerta=solo_con_alerta,
+        amids_excluidos=amids_excluidos,
+        ubicaciones_excluidas=ubicaciones_excluidas,
+        ubicacion_sin_asignar=UBICACION_SIN_ASIGNAR,
+    )
 
 
 def contar_alertas_validadores(
@@ -372,7 +237,8 @@ def contar_alertas_validadores(
     amids_excluidos=None,
     ubicaciones_excluidas=None,
 ):
-    filtros, params = _armar_filtros_alertas(
+    total = alertas_repository.contar_alertas_validadores(
+        UBICACION_SIN_ASIGNAR,
         amid=amid,
         ubicacion=ubicacion,
         nivel=nivel,
@@ -385,25 +251,7 @@ def contar_alertas_validadores(
         amids_excluidos=amids_excluidos,
         ubicaciones_excluidas=ubicaciones_excluidas,
     )
-
-    where_sql = ""
-    if filtros:
-        where_sql = "WHERE " + " AND ".join(filtros)
-
-    query = f"""
-        SELECT COUNT(*)
-        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
-        LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
-          ON u.AMID = r.AMID
-        {where_sql}
-    """
-
-    with obtener_conexion_oracle() as connection:
-        cursor = connection.cursor()
-        cursor.execute(query, params)
-        row = cursor.fetchone()
-
-    return int(row[0]) if row and row[0] is not None else 0
+    return int(total) if total is not None else 0
 
 
 def obtener_alertas_validadores(
@@ -428,7 +276,12 @@ def obtener_alertas_validadores(
     No calcula reglas. Solo consulta la tabla resumen ya calculada por Oracle.
     """
 
-    filtros, params = _armar_filtros_alertas(
+    filas = alertas_repository.obtener_alertas_validadores(
+        UBICACION_SIN_ASIGNAR,
+        limite=limite,
+        offset=offset,
+        ordenar=ordenar,
+        orden=normalizar_orden_alertas(orden) if ordenar else None,
         amid=amid,
         ubicacion=ubicacion,
         nivel=nivel,
@@ -442,132 +295,51 @@ def obtener_alertas_validadores(
         ubicaciones_excluidas=ubicaciones_excluidas,
     )
 
-    where_sql = ""
-    if filtros:
-        where_sql = "WHERE " + " AND ".join(filtros)
-
-    order_sql = ""
-    if ordenar:
-        order_sql = construir_orden_alertas(orden)
-    else:
-        order_sql = "ORDER BY AMID ASC"
-
-    query = f"""
-        SELECT *
-        FROM (
-            SELECT
-                q.*,
-                ROW_NUMBER() OVER ({order_sql}) AS rn
-            FROM (
-                SELECT
-                    r.AMID,
-                    NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) AS UBICACION_ACTUAL,
-                    FECHA_HOY,
-                    FECHA_INI_HIST,
-                    FECHA_FIN_HIST,
-                    ULTIMO_ESTATUS,
-
-                    GPS_TOTAL_HOY,
-                    GPS_CERO_HOY,
-                    GPS_TOTAL_HIST,
-                    GPS_CERO_HIST,
-                    GPS_CERO_DIAS_HIST,
-                    GPS_CERO_PORC_HOY,
-                    GPS_CERO_PORC_HIST,
-                    ULTIMO_GPS_FECHA,
-                    ULTIMO_GPS_ES_CERO,
-                    ULTIMA_FECHA_GPS_CERO,
-                    RACHA_MAX_GPS_CERO,
-                    NIVEL_ALERTA_GPS,
-                    MOTIVO_ALERTA_GPS,
-
-                    BATERIA_ACTUAL,
-                    ULTIMA_FECHA_BATERIA,
-                    CAIDAS_HOY,
-                    CAIDAS_HIST,
-                    ULTIMA_FECHA_CAIDA,
-                    ULTIMA_CAIDA_DESDE,
-                    ULTIMA_CAIDA_HASTA,
-                    ULTIMA_CAIDA_DIF,
-                    CAIDA_MAX_HOY,
-                    CAIDA_MAX_HIST,
-                    BATERIA_CERO_HOY,
-                    BATERIA_CERO_HIST,
-                    ULTIMA_FECHA_BAT_CERO,
-                    ULT_BLOQUE_BAT_ES_CERO,
-                    NIVEL_ALERTA_BATERIA,
-                    MOTIVO_ALERTA_BATERIA,
-
-                    NIVEL_ALERTA_GLOBAL,
-                    MOTIVO_PRINCIPAL,
-                    ACCION_SUGERIDA,
-                    TIENE_ALERTA,
-                    FECHA_ACTUALIZACION
-                FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
-                LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
-                  ON u.AMID = r.AMID
-                {where_sql}
-            ) q
-        )
-        WHERE rn BETWEEN :offset + 1 AND :offset + :limite
-    """
-
-    params["offset"] = int(offset)
-    params["limite"] = int(limite)
-    params["ubicacion_sin_asignar"] = UBICACION_SIN_ASIGNAR
-
     alertas = []
 
-    with obtener_conexion_oracle() as connection:
-        cursor = connection.cursor()
-        cursor.execute(query, params)
+    for item in filas:
 
-        columnas = [col[0].lower() for col in cursor.description if col and col[0]]
+        item["amid"] = normalizar_numero(item.get("amid"))
+        item["ubicacion_actual"] = normalizar_texto(
+            item.get("ubicacion_actual"),
+            UBICACION_SIN_ASIGNAR,
+        )
+        item["nivel_alerta_global"] = normalizar_texto(item.get("nivel_alerta_global"), "OK")
+        item["nivel_alerta_gps"] = normalizar_texto(item.get("nivel_alerta_gps"), "OK")
+        item["nivel_alerta_bateria"] = normalizar_texto(item.get("nivel_alerta_bateria"), "OK")
+        item["motivo_principal"] = normalizar_texto(item.get("motivo_principal"), "Sin alertas")
+        item["accion_sugerida"] = normalizar_texto(item.get("accion_sugerida"), "")
 
-        for row in cursor.fetchall():
-            item = dict(zip(columnas, row))
+        item["motivo_alerta_gps"] = normalizar_texto(item.get("motivo_alerta_gps"), "")
+        item["motivo_alerta_bateria"] = normalizar_texto(item.get("motivo_alerta_bateria"), "")
 
-            item["amid"] = normalizar_numero(item.get("amid"))
-            item["ubicacion_actual"] = normalizar_texto(
-                item.get("ubicacion_actual"),
-                UBICACION_SIN_ASIGNAR,
-            )
-            item["nivel_alerta_global"] = normalizar_texto(item.get("nivel_alerta_global"), "OK")
-            item["nivel_alerta_gps"] = normalizar_texto(item.get("nivel_alerta_gps"), "OK")
-            item["nivel_alerta_bateria"] = normalizar_texto(item.get("nivel_alerta_bateria"), "OK")
-            item["motivo_principal"] = normalizar_texto(item.get("motivo_principal"), "Sin alertas")
-            item["accion_sugerida"] = normalizar_texto(item.get("accion_sugerida"), "")
+        item["gps_cero_hoy"] = normalizar_numero(item.get("gps_cero_hoy"))
+        item["gps_cero_hist"] = normalizar_numero(item.get("gps_cero_hist"))
+        item["gps_cero_porc_hoy"] = normalizar_numero(item.get("gps_cero_porc_hoy"))
+        item["gps_cero_porc_hist"] = normalizar_numero(item.get("gps_cero_porc_hist"))
+        item["ultimo_gps_es_cero"] = normalizar_numero(item.get("ultimo_gps_es_cero"))
+        item["racha_max_gps_cero"] = normalizar_numero(item.get("racha_max_gps_cero"))
 
-            item["motivo_alerta_gps"] = normalizar_texto(item.get("motivo_alerta_gps"), "")
-            item["motivo_alerta_bateria"] = normalizar_texto(item.get("motivo_alerta_bateria"), "")
+        item["bateria_actual"] = item.get("bateria_actual")
+        item["caidas_hoy"] = normalizar_numero(item.get("caidas_hoy"))
+        item["caidas_hist"] = normalizar_numero(item.get("caidas_hist"))
+        item["total_caidas"] = item["caidas_hist"]
+        item["caidas_anteriores"] = max(
+            item["caidas_hist"] - item["caidas_hoy"], 0
+        )
+        item["bateria_cero_hoy"] = normalizar_numero(item.get("bateria_cero_hoy"))
+        item["bateria_cero_hist"] = normalizar_numero(item.get("bateria_cero_hist"))
 
-            item["gps_cero_hoy"] = normalizar_numero(item.get("gps_cero_hoy"))
-            item["gps_cero_hist"] = normalizar_numero(item.get("gps_cero_hist"))
-            item["gps_cero_porc_hoy"] = normalizar_numero(item.get("gps_cero_porc_hoy"))
-            item["gps_cero_porc_hist"] = normalizar_numero(item.get("gps_cero_porc_hist"))
-            item["ultimo_gps_es_cero"] = normalizar_numero(item.get("ultimo_gps_es_cero"))
-            item["racha_max_gps_cero"] = normalizar_numero(item.get("racha_max_gps_cero"))
+        estado_estatus = calcular_estado_estatus(item.get("ultimo_estatus"))
+        item.update(estado_estatus)
+        ultimo_estatus = item.get("ultimo_estatus")
+        item["texto_fecha_estatus"] = (
+            ultimo_estatus.strftime("%d-%m-%Y %H:%M")
+            if ultimo_estatus is not None
+            else "Sin dato"
+        )
 
-            item["bateria_actual"] = item.get("bateria_actual")
-            item["caidas_hoy"] = normalizar_numero(item.get("caidas_hoy"))
-            item["caidas_hist"] = normalizar_numero(item.get("caidas_hist"))
-            item["total_caidas"] = item["caidas_hist"]
-            item["caidas_anteriores"] = max(
-                item["caidas_hist"] - item["caidas_hoy"], 0
-            )
-            item["bateria_cero_hoy"] = normalizar_numero(item.get("bateria_cero_hoy"))
-            item["bateria_cero_hist"] = normalizar_numero(item.get("bateria_cero_hist"))
-
-            estado_estatus = calcular_estado_estatus(item.get("ultimo_estatus"))
-            item.update(estado_estatus)
-            ultimo_estatus = item.get("ultimo_estatus")
-            item["texto_fecha_estatus"] = (
-                ultimo_estatus.strftime("%d-%m-%Y %H:%M")
-                if ultimo_estatus is not None
-                else "Sin dato"
-            )
-
-            alertas.append(item)
+        alertas.append(item)
 
     return alertas
 
@@ -600,22 +372,12 @@ def obtener_ubicaciones_alertas_disponibles():
     if ubicaciones_cache is not None:
         return ubicaciones_cache
 
-    query = """
-        SELECT ubicacion_actual
-        FROM (
-            SELECT DISTINCT
-                NVL(TRIM(u.NOMBRE), :ubicacion_sin_asignar) AS ubicacion_actual
-            FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
-            LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
-              ON u.AMID = r.AMID
+    ubicaciones = [
+        str(valor)
+        for valor in alertas_repository.obtener_ubicaciones_alertas_disponibles(
+            UBICACION_SIN_ASIGNAR
         )
-        ORDER BY ubicacion_actual
-    """
-
-    with obtener_conexion_oracle() as connection:
-        cursor = connection.cursor()
-        cursor.execute(query, {"ubicacion_sin_asignar": UBICACION_SIN_ASIGNAR})
-        ubicaciones = [str(row[0]) for row in cursor.fetchall() if row and row[0]]
+    ]
 
     cache.set(
         CACHE_KEY_UBICACIONES_ALERTAS,
@@ -633,31 +395,10 @@ def buscar_amids_alertas(termino, limite=LIMITE_SUGERENCIAS_ALERTAS):
         return []
 
     limite = max(1, min(int(limite), MAX_LIMITE_SUGERENCIAS_ALERTAS))
-    query = """
-        SELECT amid
-        FROM (
-            SELECT r.AMID AS amid
-            FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
-            WHERE TO_CHAR(r.AMID) LIKE :patron
-            ORDER BY r.AMID
-        )
-        WHERE ROWNUM <= :limite
-    """
-
-    with obtener_conexion_oracle() as connection:
-        cursor = connection.cursor()
-        cursor.execute(
-            query,
-            {
-                "patron": f"{termino}%",
-                "limite": limite,
-            },
-        )
-        return [
-            str(row[0])
-            for row in cursor.fetchall()
-            if row and row[0] is not None
-        ]
+    return [
+        str(valor)
+        for valor in alertas_repository.buscar_amids_alertas(termino, limite)
+    ]
 
 
 def _normalizar_termino_busqueda(valor):
@@ -700,35 +441,11 @@ def obtener_resumen_alertas(amids_excluidos=None, ubicaciones_excluidas=None):
         if resumen_cache is not None:
             return resumen_cache
 
-    filtros, params = _armar_filtros_alertas(
-        solo_con_alerta=False,
+    row = alertas_repository.obtener_resumen_alertas(
+        UBICACION_SIN_ASIGNAR,
         amids_excluidos=amids_excluidos,
         ubicaciones_excluidas=ubicaciones_excluidas,
     )
-    where_sql = "WHERE " + " AND ".join(filtros) if filtros else ""
-
-    query = f"""
-        SELECT
-            COUNT(*) AS total_validadores,
-            SUM(CASE WHEN TIENE_ALERTA = 1 THEN 1 ELSE 0 END) AS total_alertas,
-            SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'CRITICA' THEN 1 ELSE 0 END) AS total_criticas,
-            SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'ALTA' THEN 1 ELSE 0 END) AS total_altas,
-            SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'ADVERTENCIA' THEN 1 ELSE 0 END) AS total_advertencias,
-            SUM(CASE WHEN NIVEL_ALERTA_GLOBAL = 'OK' THEN 1 ELSE 0 END) AS total_ok,
-            SUM(CASE WHEN NIVEL_ALERTA_GPS <> 'OK' THEN 1 ELSE 0 END) AS total_gps,
-            SUM(CASE WHEN NIVEL_ALERTA_BATERIA <> 'OK' THEN 1 ELSE 0 END) AS total_bateria,
-            SUM(NVL(CAIDAS_HIST, 0)) AS total_caidas_bateria,
-            MAX(FECHA_ACTUALIZACION) AS ultima_actualizacion
-        FROM USR_LAB.VW_ALERTA_VALIDADOR_ACTIVA r
-        LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR u
-          ON u.AMID = r.AMID
-        {where_sql}
-    """
-
-    with obtener_conexion_oracle() as connection:
-        cursor = connection.cursor()
-        cursor.execute(query, params)
-        row = cursor.fetchone()
 
     if not row:
         resumen = {
