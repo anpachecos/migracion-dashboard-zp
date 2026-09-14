@@ -286,7 +286,7 @@ class BateriasServiceContextoTests(SimpleTestCase):
         self.assertFalse(contexto["detalle_alertas_completo"])
         self.assertTrue(contexto["alertas_periodo"])
 
-    @patch("apps.dashboard.services.baterias_service.obtener_conexion_oracle")
+    @patch("apps.dashboard.repositories.baterias_repository.obtener_conexion_oracle")
     def test_ultimo_registro_selecciona_el_mas_reciente(self, mock_conexion):
         cursor = mock_conexion.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
         fecha = datetime(2026, 9, 10, 11, 30)

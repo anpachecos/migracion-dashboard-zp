@@ -3,12 +3,12 @@ from types import SimpleNamespace
 
 from django.utils import timezone
 
+from apps.dashboard.repositories import baterias_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
     obtener_columnas_media_hora_para_hoy,
     obtener_datos_horario_zp_oracle,
 )
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 """
 REGLAS DE NEGOCIO ACTUALES
@@ -177,41 +177,9 @@ def obtener_ultimo_registro_bateria_oracle(amid):
     - Identificación
     - Sensor batería
     """
-    query = """
-        SELECT *
-        FROM (
-            SELECT
-                ID,
-                AMID,
-                FEC_DESCARGA,
-                FEC_ESTADO,
-                BUSID,
-                OP,
-                VERSION,
-                PATENTE,
-                TD01,
-                TD04,
-                FECHA_HORA,
-                PORCENTAJE_BATERIA,
-                IS_CONTIENE_BATERIA,
-                IS_ERROR_OBTENER_BATERIA
-            FROM USR_LAB.VW_ESTATUS_ZP_DJANGO
-            WHERE AMID = :amid
-            ORDER BY FECHA_HORA DESC
-        )
-        WHERE ROWNUM = 1
-    """
-
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            datos = dict(zip(columnas, fila))
+    datos = baterias_repository.obtener_ultimo_registro(amid)
+    if not datos:
+        return None
 
     return SimpleNamespace(
         id=datos.get("id"),
@@ -255,68 +223,39 @@ def obtener_bloques_bateria_oracle(amid, fecha_inicio, fecha_fin):
     fecha_inicio = normalizar_fecha_para_comparar(fecha_inicio)
     fecha_fin = normalizar_fecha_para_comparar(fecha_fin)
 
-    query = """
-        SELECT
-            AMID,
-            FECHA_HORA_BLOQUE,
-            FECHA_BLOQUE,
-            HORA_BLOQUE,
-            PORCENTAJE_BATERIA,
-            FECHA_HORA_ORIGINAL,
-            ID_ORACLE,
-            DIFERENCIA_MINUTOS,
-            TIENE_DATO
-        FROM USR_LAB.BATERIA_BLOQUE_30MIN
-        WHERE AMID = :amid
-          AND FECHA_HORA_BLOQUE >= :fecha_inicio
-          AND FECHA_HORA_BLOQUE < :fecha_fin
-        ORDER BY FECHA_HORA_BLOQUE
-    """
-
     bloques = []
 
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(
-                query,
-                {
-                    "amid": int(amid),
-                    "fecha_inicio": fecha_inicio,
-                    "fecha_fin": fecha_fin,
-                },
+    for datos in baterias_repository.obtener_bloques_bateria(
+        amid,
+        fecha_inicio,
+        fecha_fin,
+    ):
+        fecha_hora_bloque = normalizar_fecha_para_comparar(
+            datos.get("fecha_hora_bloque")
+        )
+
+        fecha_hora_original = normalizar_fecha_para_comparar(
+            datos.get("fecha_hora_original")
+        )
+
+        bloques.append(
+            SimpleNamespace(
+                amid=datos.get("amid"),
+                fecha_hora=fecha_hora_bloque,
+                fecha_hora_bloque=fecha_hora_bloque,
+                fecha_bloque=normalizar_fecha_para_comparar(
+                    datos.get("fecha_bloque")
+                ),
+                hora_bloque=datos.get("hora_bloque"),
+                porcentaje_bateria=formatear_bateria_entera(
+                    datos.get("porcentaje_bateria")
+                ),
+                fecha_hora_original=fecha_hora_original,
+                id_oracle=datos.get("id_oracle"),
+                diferencia_minutos=datos.get("diferencia_minutos"),
+                tiene_dato=datos.get("tiene_dato") == 1,
             )
-
-            columnas = [col[0].lower() for col in cursor.description]
-
-            for fila in cursor.fetchall():
-                datos = dict(zip(columnas, fila))
-
-                fecha_hora_bloque = normalizar_fecha_para_comparar(
-                    datos.get("fecha_hora_bloque")
-                )
-
-                fecha_hora_original = normalizar_fecha_para_comparar(
-                    datos.get("fecha_hora_original")
-                )
-
-                bloques.append(
-                    SimpleNamespace(
-                        amid=datos.get("amid"),
-                        fecha_hora=fecha_hora_bloque,
-                        fecha_hora_bloque=fecha_hora_bloque,
-                        fecha_bloque=normalizar_fecha_para_comparar(
-                            datos.get("fecha_bloque")
-                        ),
-                        hora_bloque=datos.get("hora_bloque"),
-                        porcentaje_bateria=formatear_bateria_entera(
-                            datos.get("porcentaje_bateria")
-                        ),
-                        fecha_hora_original=fecha_hora_original,
-                        id_oracle=datos.get("id_oracle"),
-                        diferencia_minutos=datos.get("diferencia_minutos"),
-                        tiene_dato=datos.get("tiene_dato") == 1,
-                    )
-                )
+        )
 
     return bloques
 
@@ -335,59 +274,40 @@ def formatear_duracion_caida(diferencia):
 
 def obtener_detalle_caidas_bateria_oracle(amid, dias=14):
     """Lee los eventos ya detectados por Oracle; no aplica reglas en Django."""
-    query = """
-        SELECT
-            AMID,
-            FECHA_CAIDA_DESDE,
-            FECHA_CAIDA,
-            BATERIA_DESDE,
-            BATERIA_HASTA,
-            CAIDA_DIF,
-            FECHA_CALCULO
-        FROM USR_LAB.ALERTA_BATERIA_CAIDA_EVENTO
-        WHERE AMID = :amid
-        ORDER BY FECHA_CAIDA DESC
-    """
     alertas = []
     fecha_calculo = None
 
-    with obtener_conexion_oracle() as conexion:
-        with conexion.cursor() as cursor:
-            cursor.execute(query, {"amid": int(amid)})
-            columnas = [col[0].lower() for col in cursor.description]
+    for datos in baterias_repository.obtener_detalle_caidas_bateria(amid):
+        fecha_anterior = normalizar_fecha_para_comparar(
+            datos.get("fecha_caida_desde")
+        )
+        fecha_hora = normalizar_fecha_para_comparar(
+            datos.get("fecha_caida")
+        )
+        fecha_calculo = normalizar_fecha_para_comparar(
+            datos.get("fecha_calculo")
+        )
+        bateria_anterior = formatear_bateria_entera(
+            datos.get("bateria_desde")
+        )
+        bateria_actual = formatear_bateria_entera(
+            datos.get("bateria_hasta")
+        )
+        caida = formatear_bateria_entera(datos.get("caida_dif"))
+        diferencia = fecha_hora - fecha_anterior
+        duracion = formatear_duracion_caida(diferencia)
 
-            for fila in cursor.fetchall():
-                datos = dict(zip(columnas, fila))
-                fecha_anterior = normalizar_fecha_para_comparar(
-                    datos.get("fecha_caida_desde")
-                )
-                fecha_hora = normalizar_fecha_para_comparar(
-                    datos.get("fecha_caida")
-                )
-                fecha_calculo = normalizar_fecha_para_comparar(
-                    datos.get("fecha_calculo")
-                )
-                bateria_anterior = formatear_bateria_entera(
-                    datos.get("bateria_desde")
-                )
-                bateria_actual = formatear_bateria_entera(
-                    datos.get("bateria_hasta")
-                )
-                caida = formatear_bateria_entera(datos.get("caida_dif"))
-                diferencia = fecha_hora - fecha_anterior
-                duracion = formatear_duracion_caida(diferencia)
-
-                alertas.append(
-                    {
-                        "fecha_anterior": fecha_anterior,
-                        "fecha_hora": fecha_hora,
-                        "bateria_anterior": bateria_anterior,
-                        "bateria_actual": bateria_actual,
-                        "caida": caida,
-                        "tiempo_transcurrido": duracion,
-                        "motivo": f"Caída confirmada por Oracle: {caida} puntos",
-                    }
-                )
+        alertas.append(
+            {
+                "fecha_anterior": fecha_anterior,
+                "fecha_hora": fecha_hora,
+                "bateria_anterior": bateria_anterior,
+                "bateria_actual": bateria_actual,
+                "caida": caida,
+                "tiempo_transcurrido": duracion,
+                "motivo": f"Caída confirmada por Oracle: {caida} puntos",
+            }
+        )
 
     return {
         "amid": int(amid),
@@ -405,43 +325,12 @@ def obtener_resumen_alerta_bateria_oracle(amid):
     Esta función permite que el Panel Baterías use la misma fuente de alertas
     que el Panel Alertas.
     """
-    query = """
-        SELECT
-            AMID,
-            CAIDAS_HOY,
-            CAIDAS_HIST,
-            ULTIMA_FECHA_CAIDA,
-            ULTIMA_CAIDA_DESDE,
-            ULTIMA_CAIDA_HASTA,
-            ULTIMA_CAIDA_DIF,
-            CAIDA_MAX_HOY,
-            CAIDA_MAX_HIST,
-            BATERIA_CERO_HOY,
-            BATERIA_CERO_HIST,
-            ULTIMA_FECHA_BAT_CERO,
-            ULT_BLOQUE_BAT_ES_CERO,
-            BATERIA_ACTUAL,
-            ULTIMA_FECHA_BATERIA,
-            NIVEL_ALERTA_BATERIA,
-            MOTIVO_ALERTA_BATERIA,
-            FECHA_ACTUALIZACION
-        FROM USR_LAB.ALERTA_VALIDADOR_RESUMEN
-        WHERE AMID = :amid
-    """
-
     try:
-        with obtener_conexion_oracle() as conexion:
-            with conexion.cursor() as cursor:
-                cursor.execute(query, {"amid": int(amid)})
-                fila = cursor.fetchone()
-
-                if not fila:
-                    return None
-
-                columnas = [col[0].lower() for col in cursor.description]
-                datos = dict(zip(columnas, fila))
-
+        datos = baterias_repository.obtener_resumen_alerta_bateria(amid)
     except Exception:
+        return None
+
+    if not datos:
         return None
 
     caidas_hoy = convertir_entero(datos.get("caidas_hoy"))
