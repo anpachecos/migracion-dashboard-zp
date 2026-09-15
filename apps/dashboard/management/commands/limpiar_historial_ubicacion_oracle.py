@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 
 class Command(BaseCommand):
@@ -35,19 +35,9 @@ class Command(BaseCommand):
             return
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    filas_eliminadas_var = cursor.var(int)
-
-                    cursor.callproc(
-                        "USR_LAB.PRC_LIMPIAR_HIST_UBICACION",
-                        [
-                            dias_retencion,
-                            filas_eliminadas_var,
-                        ],
-                    )
-
-                    filas_eliminadas = filas_eliminadas_var.getvalue() or 0
+            filas_eliminadas = ubicaciones_repository.limpiar_historial(
+                dias_retencion
+            )
 
             mensaje = (
                 "Limpieza de historial de ubicaciones Oracle ejecutada correctamente. "

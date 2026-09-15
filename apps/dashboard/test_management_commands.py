@@ -159,13 +159,14 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
     def test_limpieza_historial_rechaza_retencion_invalida_sin_oracle(self):
         comando, stdout, stderr = self.comando(LimpiarHistorialOracleCommand)
         with patch(
-            "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.obtener_conexion_oracle"
-        ) as mock_conexion, patch(
+            "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle."
+            "ubicaciones_repository.limpiar_historial"
+        ) as mock_limpieza, patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"
         ) as mock_log:
             comando.handle(dias_retencion=0)
 
-        mock_conexion.assert_not_called()
+        mock_limpieza.assert_not_called()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("Los días de retención deben ser mayores o iguales a 1", stderr.getvalue())
         self.assertEqual(stdout.getvalue(), "")
@@ -178,7 +179,8 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         cursor.var.return_value = variable_salida
 
         with patch(
-            "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.obtener_conexion_oracle",
+            "apps.dashboard.repositories.ubicaciones_repository."
+            "obtener_conexion_oracle",
             return_value=contexto,
         ), patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"

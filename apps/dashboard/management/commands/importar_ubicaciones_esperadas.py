@@ -20,103 +20,13 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
 
 LATITUD_LABORATORIO_ZP = -33.437191
 LONGITUD_LABORATORIO_ZP = -70.656102
 RADIO_LABORATORIO_ZP = 150
 NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
-
-
-COLUMNAS_ORACLE = [
-    "AMID",
-    "CODIGO_ZP_TS",
-    "COD_PARADA1",
-    "COD_PARADA2",
-    "NOMBRE",
-    "COMUNA",
-    "UNIDAD",
-    "OPERADOR",
-    "UN",
-    "UN_SECUNDARIA_1",
-    "UN_SECUNDARIA_2",
-    "UN_SECUNDARIA_3",
-    "PST",
-    "SERVICIOS",
-    "TOTAL_VAL_VIGENTES_ZP",
-    "HORARIO",
-    "HORARIO_LABORAL_PM",
-    "HORARIO_SABADO",
-    "HORARIO_DOMINGO",
-    "INICIO_OPERACION",
-    "FIN_OPERACION",
-    "PATENTE",
-    "OP_ID",
-    "BUS_ID",
-    "SERIE_VALIDADOR",
-    "IDDS",
-    "NUM_VAL",
-    "LATITUD_ESPERADA",
-    "LONGITUD_ESPERADA",
-    "X",
-    "Y",
-    "OPERATIVA",
-    "CONTINGENCIA",
-    "MIXTA",
-    "RADIO_METROS",
-    "TIPO",
-    "RENOVADA",
-    "VERSION_ZP",
-    "ARCHIVO_ORIGEN",
-    "FECHA_CARGA",
-]
-
-COLUMNAS_HISTORIAL = [
-    "AMID",
-    "CODIGO_ZP_TS",
-    "COD_PARADA1",
-    "COD_PARADA2",
-    "NOMBRE",
-    "COMUNA",
-    "UNIDAD",
-    "OPERADOR",
-    "UN",
-    "UN_SECUNDARIA_1",
-    "UN_SECUNDARIA_2",
-    "UN_SECUNDARIA_3",
-    "PST",
-    "SERVICIOS",
-    "TOTAL_VAL_VIGENTES_ZP",
-    "HORARIO",
-    "HORARIO_LABORAL_PM",
-    "HORARIO_SABADO",
-    "HORARIO_DOMINGO",
-    "INICIO_OPERACION",
-    "FIN_OPERACION",
-    "PATENTE",
-    "OP_ID",
-    "BUS_ID",
-    "SERIE_VALIDADOR",
-    "IDDS",
-    "NUM_VAL",
-    "LATITUD_ESPERADA",
-    "LONGITUD_ESPERADA",
-    "X",
-    "Y",
-    "OPERATIVA",
-    "CONTINGENCIA",
-    "MIXTA",
-    "RADIO_METROS",
-    "TIPO",
-    "RENOVADA",
-    "ORIGEN_UBICACION",
-    "VERSION_ZP",
-    "ARCHIVO_ORIGEN",
-    "FECHA_INICIO_VIGENCIA",
-    "FECHA_FIN_VIGENCIA",
-    "FECHA_CARGA",
-]
 
 
 MAPEO_COLUMNAS_EXCEL = {
@@ -279,67 +189,48 @@ class Command(BaseCommand):
             )
             return
 
-        amids_excel = set()
+        estadisticas = {
+            "creados_vigente": creados_vigente,
+            "actualizados_vigente": actualizados_vigente,
+            "omitidos": omitidos,
+            "nuevos_historial": nuevos_historial,
+            "cerrados_historial": cerrados_historial,
+            "sin_cambios_historial": sin_cambios_historial,
+            "movidos_laboratorio": movidos_laboratorio,
+        }
+
+        filas_normalizadas = (
+            self.normalizar_fila(
+                fila=fila,
+                fecha_carga=fecha_carga,
+                archivo_origen=archivo_origen,
+                version_zp=version_zp,
+            )
+            for _, fila in df.iterrows()
+        )
+
+        referencia_laboratorio = {
+            "NOMBRE": NOMBRE_LABORATORIO_ZP,
+            "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
+            "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,
+            "RADIO_METROS": RADIO_LABORATORIO_ZP,
+            "OPERATIVA": 0,
+            "ORIGEN_UBICACION": "laboratorio_default",
+        }
 
         try:
-            with obtener_conexion_oracle() as conexion:
-                with conexion.cursor() as cursor:
-                    for _, fila in df.iterrows():
-                        datos = self.normalizar_fila(
-                            fila=fila,
-                            fecha_carga=fecha_carga,
-                            archivo_origen=archivo_origen,
-                            version_zp=version_zp,
-                        )
-
-                        if datos is None:
-                            omitidos += 1
-                            continue
-
-                        amid = datos["AMID"]
-                        amids_excel.add(amid)
-
-                        existe_vigente = self.existe_vigente(cursor, amid)
-
-                        self.upsert_vigente(cursor, datos)
-
-                        if existe_vigente:
-                            actualizados_vigente += 1
-                        else:
-                            creados_vigente += 1
-
-                        resultado_historial = self.actualizar_historial(
-                            cursor=cursor,
-                            datos=datos,
-                            fecha_carga=fecha_carga,
-                        )
-
-                        if resultado_historial == "nuevo":
-                            nuevos_historial += 1
-                        elif resultado_historial == "cerrado_y_nuevo":
-                            cerrados_historial += 1
-                            nuevos_historial += 1
-                        elif resultado_historial == "sin_cambios":
-                            sin_cambios_historial += 1
-
-                    (
-                        movidos_laboratorio,
-                        cerrados_por_ausencia,
-                        historicos_por_ausencia,
-                    ) = self.mover_ausentes_a_laboratorio(
-                        cursor=cursor,
-                        amids_excel=amids_excel,
-                        fecha_carga=fecha_carga,
-                        archivo_origen=archivo_origen,
-                        version_zp=version_zp,
-                    )
-
-                    cerrados_historial += cerrados_por_ausencia
-                    nuevos_historial += historicos_por_ausencia
-
-                conexion.commit()
+            ubicaciones_repository.persistir_importacion(
+                filas_normalizadas=filas_normalizadas,
+                fecha_carga=fecha_carga,
+                archivo_origen=archivo_origen,
+                version_zp=version_zp,
+                referencia_laboratorio=referencia_laboratorio,
+                estadisticas=estadisticas,
+            )
 
         except Exception as error:
+            creados_vigente = estadisticas["creados_vigente"]
+            movidos_laboratorio = estadisticas["movidos_laboratorio"]
             mensaje = f"Error importando ubicaciones a Oracle: {error}"
 
             registrar_log_importacion(
@@ -357,6 +248,14 @@ class Command(BaseCommand):
                 self.style.ERROR(mensaje)
             )
             return
+
+        creados_vigente = estadisticas["creados_vigente"]
+        actualizados_vigente = estadisticas["actualizados_vigente"]
+        omitidos = estadisticas["omitidos"]
+        nuevos_historial = estadisticas["nuevos_historial"]
+        cerrados_historial = estadisticas["cerrados_historial"]
+        sin_cambios_historial = estadisticas["sin_cambios_historial"]
+        movidos_laboratorio = estadisticas["movidos_laboratorio"]
 
         mensaje = (
             f"Importación completada en Oracle. "
@@ -432,7 +331,7 @@ class Command(BaseCommand):
         df = df.rename(columns=nuevas_columnas)
 
         columnas_a_conservar = [
-            columna for columna in COLUMNAS_ORACLE
+            columna for columna in ubicaciones_repository.COLUMNAS_ORACLE
             if columna not in ["AMID", "VERSION_ZP", "ARCHIVO_ORIGEN", "FECHA_CARGA"]
         ]
 
@@ -516,239 +415,6 @@ class Command(BaseCommand):
 
         return datos
 
-    def existe_vigente(self, cursor, amid):
-        cursor.execute(
-            """
-            SELECT COUNT(*)
-            FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
-            WHERE AMID = :amid
-            """,
-            {"amid": amid}
-        )
-
-        return cursor.fetchone()[0] > 0
-
-    def upsert_vigente(self, cursor, datos):
-        columnas_update = [
-            columna for columna in COLUMNAS_ORACLE
-            if columna != "AMID"
-        ]
-
-        set_sql = ", ".join([
-            f"{columna} = :{columna}"
-            for columna in columnas_update
-        ])
-
-        columnas_insert = ", ".join(COLUMNAS_ORACLE)
-        valores_insert = ", ".join([f":{columna}" for columna in COLUMNAS_ORACLE])
-
-        sql = f"""
-            MERGE INTO USR_LAB.UBICACION_ESPERADA_VALIDADOR destino
-            USING (
-                SELECT :AMID AS AMID FROM DUAL
-            ) origen
-            ON (destino.AMID = origen.AMID)
-            WHEN MATCHED THEN
-                UPDATE SET {set_sql}
-            WHEN NOT MATCHED THEN
-                INSERT ({columnas_insert})
-                VALUES ({valores_insert})
-        """
-
-        parametros = {
-            columna: datos.get(columna)
-            for columna in COLUMNAS_ORACLE
-        }
-
-        cursor.execute(sql, parametros)
-
-    def actualizar_historial(self, cursor, datos, fecha_carga):
-        historial_vigente = self.obtener_historial_vigente(cursor, datos["AMID"])
-
-        if historial_vigente is None:
-            self.crear_historial(cursor, datos, fecha_carga)
-            return "nuevo"
-
-        if self.historial_es_igual(historial_vigente, datos):
-            return "sin_cambios"
-
-        cursor.execute(
-            """
-            UPDATE USR_LAB.HISTORIAL_UBICACION_ESPERADA
-            SET FECHA_FIN_VIGENCIA = :fecha_carga
-            WHERE ID = :id
-            """,
-            {
-                "fecha_carga": fecha_carga,
-                "id": historial_vigente["ID"],
-            }
-        )
-
-        self.crear_historial(cursor, datos, fecha_carga)
-
-        return "cerrado_y_nuevo"
-
-    def obtener_historial_vigente(self, cursor, amid):
-        cursor.execute(
-            """
-            SELECT
-                ID,
-                AMID,
-                NOMBRE,
-                SERIE_VALIDADOR,
-                LATITUD_ESPERADA,
-                LONGITUD_ESPERADA,
-                RADIO_METROS,
-                OPERATIVA,
-                ORIGEN_UBICACION,
-                VERSION_ZP
-            FROM USR_LAB.HISTORIAL_UBICACION_ESPERADA
-            WHERE AMID = :amid
-              AND FECHA_FIN_VIGENCIA IS NULL
-            ORDER BY FECHA_INICIO_VIGENCIA DESC
-            """,
-            {"amid": amid}
-        )
-
-        fila = cursor.fetchone()
-
-        if not fila:
-            return None
-
-        columnas = [col[0] for col in cursor.description]
-        return dict(zip(columnas, fila))
-
-    def crear_historial(self, cursor, datos, fecha_carga):
-        datos_historial = {
-            columna: datos.get(columna)
-            for columna in COLUMNAS_HISTORIAL
-        }
-
-        datos_historial["FECHA_INICIO_VIGENCIA"] = fecha_carga
-        datos_historial["FECHA_FIN_VIGENCIA"] = None
-
-        columnas_insert = ", ".join(COLUMNAS_HISTORIAL)
-        valores_insert = ", ".join([f":{columna}" for columna in COLUMNAS_HISTORIAL])
-
-        cursor.execute(
-            f"""
-            INSERT INTO USR_LAB.HISTORIAL_UBICACION_ESPERADA (
-                {columnas_insert}
-            )
-            VALUES (
-                {valores_insert}
-            )
-            """,
-            datos_historial
-        )
-
-    def historial_es_igual(self, historial, datos):
-        return (
-            self.texto(historial.get("NOMBRE")) == self.texto(datos.get("NOMBRE"))
-            and self.texto(historial.get("SERIE_VALIDADOR")) == self.texto(datos.get("SERIE_VALIDADOR"))
-            and self.numero_igual(historial.get("LATITUD_ESPERADA"), datos.get("LATITUD_ESPERADA"))
-            and self.numero_igual(historial.get("LONGITUD_ESPERADA"), datos.get("LONGITUD_ESPERADA"))
-            and self.numero_igual(historial.get("RADIO_METROS"), datos.get("RADIO_METROS"))
-            and self.valor_entero(historial.get("OPERATIVA")) == self.valor_entero(datos.get("OPERATIVA"))
-            and self.texto(historial.get("ORIGEN_UBICACION")) == self.texto(datos.get("ORIGEN_UBICACION"))
-            and self.texto(historial.get("VERSION_ZP")) == self.texto(datos.get("VERSION_ZP"))
-        )
-
-    def mover_ausentes_a_laboratorio(self, cursor, amids_excel, fecha_carga, archivo_origen, version_zp):
-        movidos = 0
-        cerrados_historial = 0
-        nuevos_historial = 0
-
-        # El Excel ya fue procesado antes de llegar a este punto. El maestro
-        # activo es el universo oficial para detectar validadores ausentes y
-        # evita que un AMID nuevo quede fuera por no existir aun en la tabla
-        # vigente. Los AMID ajenos al maestro activo no se modifican aqui.
-        cursor.execute(
-            """
-            SELECT
-                maestro.AMID,
-                vigente.SERIE_VALIDADOR
-            FROM (
-                SELECT DISTINCT
-                    TRIM(CAST(AMID AS VARCHAR2(20))) AS AMID
-                FROM USR_LAB.AMID_MAESTRO_ALERTAS
-                WHERE ACTIVO = 1
-            ) maestro
-            LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR vigente
-              ON vigente.AMID = maestro.AMID
-            ORDER BY maestro.AMID
-            """
-        )
-
-        filas_maestro = cursor.fetchall()
-        columnas = [col[0] for col in cursor.description]
-
-        for fila in filas_maestro:
-            registro_maestro = dict(zip(columnas, fila))
-            amid = str(registro_maestro["AMID"]).strip()
-
-            if amid in amids_excel:
-                continue
-
-            datos_laboratorio = {
-                columna: None
-                for columna in COLUMNAS_ORACLE
-            }
-
-            datos_laboratorio.update({
-                "AMID": amid,
-                "NOMBRE": NOMBRE_LABORATORIO_ZP,
-                "SERIE_VALIDADOR": registro_maestro.get("SERIE_VALIDADOR"),
-                "IDDS": amid,
-                "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
-                "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,
-                "RADIO_METROS": RADIO_LABORATORIO_ZP,
-                "OPERATIVA": 0,
-                "VERSION_ZP": version_zp,
-                "ARCHIVO_ORIGEN": archivo_origen,
-                "FECHA_CARGA": fecha_carga,
-                "ORIGEN_UBICACION": "laboratorio_default",
-            })
-
-            historial_vigente = self.obtener_historial_vigente(cursor, amid)
-
-            ya_esta_en_laboratorio = (
-                historial_vigente
-                and self.texto(historial_vigente.get("NOMBRE")) == self.texto(NOMBRE_LABORATORIO_ZP)
-                and self.numero_igual(historial_vigente.get("LATITUD_ESPERADA"), LATITUD_LABORATORIO_ZP)
-                and self.numero_igual(historial_vigente.get("LONGITUD_ESPERADA"), LONGITUD_LABORATORIO_ZP)
-                and self.numero_igual(historial_vigente.get("RADIO_METROS"), RADIO_LABORATORIO_ZP)
-                and self.valor_entero(historial_vigente.get("OPERATIVA")) == 0
-            )
-
-            if ya_esta_en_laboratorio:
-                continue
-
-            self.upsert_vigente(cursor, datos_laboratorio)
-            movidos += 1
-
-            if historial_vigente:
-                cursor.execute(
-                    """
-                    UPDATE USR_LAB.HISTORIAL_UBICACION_ESPERADA
-                    SET FECHA_FIN_VIGENCIA = :fecha_carga
-                    WHERE ID = :id
-                    """,
-                    {
-                        "fecha_carga": fecha_carga,
-                        "id": historial_vigente["ID"],
-                    }
-                )
-                cerrados_historial += 1
-
-            datos_historial = dict(datos_laboratorio)
-            datos_historial["ORIGEN_UBICACION"] = "laboratorio_default"
-
-            self.crear_historial(cursor, datos_historial, fecha_carga)
-            nuevos_historial += 1
-
-        return movidos, cerrados_historial, nuevos_historial
-
     def texto(self, valor):
         if valor is None:
             return ""
@@ -790,15 +456,6 @@ class Command(BaseCommand):
             except (ValueError, TypeError):
                 return None
 
-    def valor_entero(self, valor):
-        if valor is None or pd.isna(valor):
-            return None
-
-        try:
-            return int(float(valor))
-        except (ValueError, TypeError):
-            return None
-
     def valor_fecha(self, valor):
         if valor is None or pd.isna(valor):
             return None
@@ -814,15 +471,3 @@ class Command(BaseCommand):
             fecha_python = timezone.make_naive(fecha_python)
 
         return fecha_python
-
-    def numero_igual(self, valor_1, valor_2):
-        if valor_1 is None and valor_2 is None:
-            return True
-
-        if valor_1 is None or valor_2 is None:
-            return False
-
-        try:
-            return round(float(valor_1), 7) == round(float(valor_2), 7)
-        except (ValueError, TypeError):
-            return False

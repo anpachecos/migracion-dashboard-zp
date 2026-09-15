@@ -6,10 +6,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 from django.test import RequestFactory, SimpleTestCase
 
-from apps.dashboard.management.commands.importar_ubicaciones_esperadas import (
-    Command as ImportarUbicacionesCommand,
-)
 from apps.dashboard.context_processors import datos_actualizacion_dashboard
+from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services import scheduler as scheduler_service
 from apps.dashboard.services.alertas_service import (
     _armar_filtros_alertas,
@@ -133,7 +131,6 @@ class ContextProcessorTests(SimpleTestCase):
 
 class ImportarUbicacionesEsperadasTests(SimpleTestCase):
     def test_ausentes_usan_maestro_activo_y_respetan_amids_del_excel(self):
-        comando = ImportarUbicacionesCommand()
         cursor = MagicMock()
         cursor.description = [("AMID",), ("SERIE_VALIDADOR",)]
         cursor.fetchall.return_value = [
@@ -141,17 +138,33 @@ class ImportarUbicacionesEsperadasTests(SimpleTestCase):
             ("750002", None),
         ]
 
-        comando.obtener_historial_vigente = Mock(return_value=None)
-        comando.upsert_vigente = Mock()
-        comando.crear_historial = Mock()
-
-        resultado = comando.mover_ausentes_a_laboratorio(
-            cursor=cursor,
-            amids_excel={"750001"},
-            fecha_carga=datetime(2026, 8, 27, 12, 0),
-            archivo_origen="ZONA PAGA V755.xlsx",
-            version_zp="V755",
-        )
+        referencia_laboratorio = {
+            "NOMBRE": "Laboratorio Zonas Pagas",
+            "LATITUD_ESPERADA": -33.437191,
+            "LONGITUD_ESPERADA": -70.656102,
+            "RADIO_METROS": 150,
+            "OPERATIVA": 0,
+            "ORIGEN_UBICACION": "laboratorio_default",
+        }
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=None,
+        ), patch.object(
+            ubicaciones_repository,
+            "upsert_vigente",
+        ) as mock_upsert, patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.mover_ausentes_a_laboratorio(
+                cursor=cursor,
+                amids_excel={"750001"},
+                fecha_carga=datetime(2026, 8, 27, 12, 0),
+                archivo_origen="ZONA PAGA V755.xlsx",
+                version_zp="V755",
+                referencia_laboratorio=referencia_laboratorio,
+            )
 
         consulta_maestro = cursor.execute.call_args.args[0]
         self.assertIn("AMID_MAESTRO_ALERTAS", consulta_maestro)
@@ -161,8 +174,8 @@ class ImportarUbicacionesEsperadasTests(SimpleTestCase):
             consulta_maestro,
         )
 
-        comando.upsert_vigente.assert_called_once()
-        datos_laboratorio = comando.upsert_vigente.call_args.args[1]
+        mock_upsert.assert_called_once()
+        datos_laboratorio = mock_upsert.call_args.args[1]
         self.assertEqual(datos_laboratorio["AMID"], "750002")
         self.assertEqual(datos_laboratorio["NOMBRE"], "Laboratorio Zonas Pagas")
         self.assertEqual(datos_laboratorio["OPERATIVA"], 0)
@@ -171,8 +184,8 @@ class ImportarUbicacionesEsperadasTests(SimpleTestCase):
         self.assertIsNone(datos_laboratorio["HORARIO_SABADO"])
         self.assertIsNone(datos_laboratorio["HORARIO_DOMINGO"])
 
-        comando.crear_historial.assert_called_once()
-        datos_historial = comando.crear_historial.call_args.args[1]
+        mock_crear.assert_called_once()
+        datos_historial = mock_crear.call_args.args[1]
         self.assertEqual(
             datos_historial["ORIGEN_UBICACION"],
             "laboratorio_default",

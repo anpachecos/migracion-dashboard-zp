@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pandas as pd
 from django.test import SimpleTestCase
 
+from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.management.commands.importar_ubicaciones_esperadas import (
     LATITUD_LABORATORIO_ZP,
     LONGITUD_LABORATORIO_ZP,
@@ -50,29 +51,49 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         contexto.__enter__.return_value = conexion
         return contexto, conexion, cursor
 
+    def referencia_laboratorio(self):
+        return {
+            "NOMBRE": NOMBRE_LABORATORIO_ZP,
+            "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
+            "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,
+            "RADIO_METROS": RADIO_LABORATORIO_ZP,
+            "OPERATIVA": 0,
+            "ORIGEN_UBICACION": "laboratorio_default",
+        }
+
     def ejecutar_importacion_controlada(self, ruta, error_upsert=None):
         contexto, conexion, cursor = self.conexion_falsa()
-        self.comando.existe_vigente = Mock(return_value=False)
-        self.comando.upsert_vigente = Mock(side_effect=error_upsert)
-        self.comando.actualizar_historial = Mock(return_value="nuevo")
-        self.comando.mover_ausentes_a_laboratorio = Mock(return_value=(0, 0, 0))
 
         with patch(
-            "apps.dashboard.management.commands.importar_ubicaciones_esperadas.obtener_conexion_oracle",
+            "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle",
             return_value=contexto,
         ) as mock_obtener_conexion, patch(
+            "apps.dashboard.repositories.ubicaciones_repository.existe_vigente",
+            return_value=False,
+        ), patch(
+            "apps.dashboard.repositories.ubicaciones_repository.upsert_vigente",
+            side_effect=error_upsert,
+        ) as mock_upsert, patch(
+            "apps.dashboard.repositories.ubicaciones_repository.actualizar_historial",
+            return_value="nuevo",
+        ), patch(
+            "apps.dashboard.repositories.ubicaciones_repository."
+            "mover_ausentes_a_laboratorio",
+            return_value=(0, 0, 0),
+        ), patch(
             "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
         ) as mock_log, patch.object(
             self.comando, "ahora_oracle", return_value=self.FECHA_CARGA
         ):
             self.comando.handle(ruta_excel=str(ruta))
 
+        self.mock_upsert = mock_upsert
         return mock_obtener_conexion, mock_log, conexion, cursor
 
     def test_archivo_inexistente_registra_error_y_no_conecta_oracle(self):
         ruta = Path("archivo-sintetico-inexistente-V755.xlsx")
         with patch(
-            "apps.dashboard.management.commands.importar_ubicaciones_esperadas.obtener_conexion_oracle"
+            "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle"
         ) as mock_conexion, patch(
             "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
         ) as mock_log:
@@ -86,7 +107,7 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio, [self.fila_valida()], hoja="OtraHoja")
             with patch(
-                "apps.dashboard.management.commands.importar_ubicaciones_esperadas.obtener_conexion_oracle"
+                "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle"
             ) as mock_conexion, patch(
                 "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
             ) as mock_log:
@@ -102,7 +123,7 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
             mock_conexion, mock_log, conexion, _ = self.ejecutar_importacion_controlada(ruta)
 
         mock_conexion.assert_called_once()
-        self.comando.upsert_vigente.assert_not_called()
+        self.mock_upsert.assert_not_called()
         conexion.commit.assert_called_once()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "OK")
         self.assertIn("Omitidos: 1", mock_log.call_args.kwargs["mensaje"])
@@ -194,14 +215,24 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
 
     def test_amid_nuevo_crea_historial(self):
         cursor = MagicMock()
-        self.comando.obtener_historial_vigente = Mock(return_value=None)
-        self.comando.crear_historial = Mock()
         datos = {"AMID": "7500001"}
 
-        resultado = self.comando.actualizar_historial(cursor, datos, self.FECHA_CARGA)
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=None,
+        ), patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.actualizar_historial(
+                cursor,
+                datos,
+                self.FECHA_CARGA,
+            )
 
         self.assertEqual(resultado, "nuevo")
-        self.comando.crear_historial.assert_called_once_with(cursor, datos, self.FECHA_CARGA)
+        mock_crear.assert_called_once_with(cursor, datos, self.FECHA_CARGA)
 
     def test_historial_igual_no_genera_otro_registro(self):
         datos = {
@@ -212,13 +243,22 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         }
         historial = dict(datos, ID=9)
         cursor = MagicMock()
-        self.comando.obtener_historial_vigente = Mock(return_value=historial)
-        self.comando.crear_historial = Mock()
-
-        resultado = self.comando.actualizar_historial(cursor, datos, self.FECHA_CARGA)
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=historial,
+        ), patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.actualizar_historial(
+                cursor,
+                datos,
+                self.FECHA_CARGA,
+            )
 
         self.assertEqual(resultado, "sin_cambios")
-        self.comando.crear_historial.assert_not_called()
+        mock_crear.assert_not_called()
         self.assertFalse(any("UPDATE" in call.args[0] for call in cursor.execute.call_args_list))
 
     def test_cambio_relevante_cierra_vigencia_y_crea_nueva(self):
@@ -230,33 +270,54 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         }
         historial = dict(datos, ID=9, NOMBRE="Zona anterior")
         cursor = MagicMock()
-        self.comando.obtener_historial_vigente = Mock(return_value=historial)
-        self.comando.crear_historial = Mock()
-
-        resultado = self.comando.actualizar_historial(cursor, datos, self.FECHA_CARGA)
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=historial,
+        ), patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.actualizar_historial(
+                cursor,
+                datos,
+                self.FECHA_CARGA,
+            )
 
         self.assertEqual(resultado, "cerrado_y_nuevo")
         self.assertIn("UPDATE USR_LAB.HISTORIAL_UBICACION_ESPERADA", cursor.execute.call_args.args[0])
         self.assertEqual(cursor.execute.call_args.args[1]["id"], 9)
-        self.comando.crear_historial.assert_called_once_with(cursor, datos, self.FECHA_CARGA)
+        mock_crear.assert_called_once_with(cursor, datos, self.FECHA_CARGA)
 
     def test_comparacion_numerica_redondea_a_siete_decimales(self):
-        self.assertTrue(self.comando.numero_igual(1.123456741, 1.123456749))
-        self.assertFalse(self.comando.numero_igual(1.12345674, 1.12345686))
+        self.assertTrue(ubicaciones_repository.numero_igual(1.123456741, 1.123456749))
+        self.assertFalse(ubicaciones_repository.numero_igual(1.12345674, 1.12345686))
 
     def test_amid_activo_ausente_se_mueve_a_laboratorio(self):
         cursor = MagicMock()
         cursor.description = [("AMID",), ("SERIE_VALIDADOR",)]
         cursor.fetchall.return_value = [("7500002", "SERIE-2")]
-        self.comando.obtener_historial_vigente = Mock(return_value=None)
-        self.comando.upsert_vigente = Mock()
-        self.comando.crear_historial = Mock()
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=None,
+        ), patch.object(
+            ubicaciones_repository,
+            "upsert_vigente",
+        ) as mock_upsert, patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ):
+            resultado = ubicaciones_repository.mover_ausentes_a_laboratorio(
+                cursor,
+                {"7500001"},
+                self.FECHA_CARGA,
+                "archivo.xlsx",
+                "V755",
+                self.referencia_laboratorio(),
+            )
 
-        resultado = self.comando.mover_ausentes_a_laboratorio(
-            cursor, {"7500001"}, self.FECHA_CARGA, "archivo.xlsx", "V755"
-        )
-
-        datos = self.comando.upsert_vigente.call_args.args[1]
+        datos = mock_upsert.call_args.args[1]
         self.assertEqual(datos["AMID"], "7500002")
         self.assertEqual(datos["NOMBRE"], NOMBRE_LABORATORIO_ZP)
         self.assertEqual(resultado, (1, 0, 1))
@@ -265,24 +326,36 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         cursor = MagicMock()
         cursor.description = [("AMID",), ("SERIE_VALIDADOR",)]
         cursor.fetchall.return_value = [("7500002", "SERIE-2")]
-        self.comando.obtener_historial_vigente = Mock(return_value={
-            "ID": 5,
-            "NOMBRE": NOMBRE_LABORATORIO_ZP,
-            "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
-            "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,
-            "RADIO_METROS": RADIO_LABORATORIO_ZP,
-            "OPERATIVA": 0,
-        })
-        self.comando.upsert_vigente = Mock()
-        self.comando.crear_historial = Mock()
-
-        resultado = self.comando.mover_ausentes_a_laboratorio(
-            cursor, set(), self.FECHA_CARGA, "archivo.xlsx", "V755"
-        )
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value={
+                "ID": 5,
+                "NOMBRE": NOMBRE_LABORATORIO_ZP,
+                "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
+                "LONGITUD_ESPERADA": LONGITUD_LABORATORIO_ZP,
+                "RADIO_METROS": RADIO_LABORATORIO_ZP,
+                "OPERATIVA": 0,
+            },
+        ), patch.object(
+            ubicaciones_repository,
+            "upsert_vigente",
+        ) as mock_upsert, patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.mover_ausentes_a_laboratorio(
+                cursor,
+                set(),
+                self.FECHA_CARGA,
+                "archivo.xlsx",
+                "V755",
+                self.referencia_laboratorio(),
+            )
 
         self.assertEqual(resultado, (0, 0, 0))
-        self.comando.upsert_vigente.assert_not_called()
-        self.comando.crear_historial.assert_not_called()
+        mock_upsert.assert_not_called()
+        mock_crear.assert_not_called()
 
     def test_importacion_exitosa_ejecuta_commit_y_log_ok(self):
         with TemporaryDirectory() as directorio:
