@@ -9,11 +9,11 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.dashboard.repositories import reglas_alertas_repository
 from apps.dashboard.services.catalogo_reglas_alertas import (
     construir_editor_reglas_alertas,
     validar_catalogo_reglas,
 )
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
 CLAVES_PERMITIDAS = {
     "GPS": [
@@ -50,6 +50,7 @@ CLAVES_PERMITIDAS = {
 }
 
 CLAVES_PERMITIDAS_TODO = set(CLAVES_PERMITIDAS["GPS"]) | set(CLAVES_PERMITIDAS["BATERIA"])
+TIPOS_REGLA_VALIDOS = frozenset({"DETECCION", "CLASIFICACION"})
 validar_catalogo_reglas(CLAVES_PERMITIDAS_TODO)
 
 CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
@@ -60,12 +61,6 @@ LOG_RECALCULO_LINEAS_VISIBLES = 100
 _recalculo_lock = threading.Lock()
 _log_recalculo_lock = threading.Lock()
 
-PROCEDIMIENTOS_RECALCULO = {
-    "rapido": "USR_LAB.PRC_RECLASIFICAR_ALERTAS",
-    "completo": "USR_LAB.PRC_RECALCULAR_ALERTAS_SEGURO",
-}
-
-
 def usuario_puede_editar_reglas(user):
     return user.is_superuser or user.groups.filter(name="Admin").exists()
 
@@ -73,26 +68,10 @@ def usuario_puede_editar_reglas(user):
 def obtener_reglas_alertas():
     try:
         claves_ordenadas = sorted(CLAVES_PERMITIDAS_TODO)
-        placeholders = ", ".join(f":clave_{i}" for i in range(1, len(claves_ordenadas) + 1))
-        query = f"""
-            SELECT CLAVE, VALOR_NUMERO, DESCRIPCION, ACTIVO,
-                   FECHA_ACTUALIZACION, TIPO_REGLA
-            FROM USR_LAB.ALERTA_REGLA_PARAM
-            WHERE CLAVE IN ({placeholders})
-            ORDER BY CLAVE
-        """
-
-        parametros = {f"clave_{i}": clave for i, clave in enumerate(claves_ordenadas, start=1)}
-
-        with obtener_conexion_oracle() as conexion:
-            with conexion.cursor() as cursor:
-                cursor.execute(query, parametros)
-                columnas = [col[0].lower() for col in cursor.description]
-                filas = cursor.fetchall()
+        filas = reglas_alertas_repository.obtener_reglas(claves_ordenadas)
 
         reglas = []
-        for fila in filas:
-            datos = dict(zip(columnas, fila))
+        for datos in filas:
             valor_numero = datos.get("valor_numero")
             if valor_numero is None:
                 valor_numero = datos.get("valor")
@@ -172,80 +151,10 @@ def actualizar_reglas_alertas(reglas_form):
     if not actualizaciones:
         raise ValueError("No se encontraron reglas válidas en el formulario.")
 
-    claves = [clave for clave, _valor in actualizaciones]
-    placeholders = ", ".join(f":clave_{i}" for i in range(1, len(claves) + 1))
-    parametros_claves = {
-        f"clave_{i}": clave
-        for i, clave in enumerate(claves, start=1)
-    }
-
-    query_actuales = f"""
-        SELECT CLAVE, VALOR_NUMERO, TIPO_REGLA
-        FROM USR_LAB.ALERTA_REGLA_PARAM
-        WHERE CLAVE IN ({placeholders})
-        FOR UPDATE
-    """
-
-    query_actualizar = """
-        UPDATE USR_LAB.ALERTA_REGLA_PARAM
-        SET VALOR_NUMERO = :valor_numero,
-            FECHA_ACTUALIZACION = SYSDATE
-        WHERE CLAVE = :clave
-    """
-
-    with obtener_conexion_oracle() as conexion:
-        try:
-            with conexion.cursor() as cursor:
-                cursor.execute(query_actuales, parametros_claves)
-                reglas_actuales = {
-                    fila[0]: {
-                        "valor": _normalizar_valor_numero(fila[1]),
-                        "tipo": str(fila[2]).upper(),
-                    }
-                    for fila in cursor.fetchall()
-                }
-
-                claves_faltantes = sorted(set(claves) - set(reglas_actuales))
-                if claves_faltantes:
-                    raise RuntimeError(
-                        "No existen en Oracle las reglas: " + ", ".join(claves_faltantes)
-                    )
-
-                cambios = [
-                    (clave, valor_numero, reglas_actuales[clave]["tipo"])
-                    for clave, valor_numero in actualizaciones
-                    if reglas_actuales[clave]["valor"] != valor_numero
-                ]
-
-                tipos_invalidos = sorted(
-                    {
-                        tipo
-                        for _clave, _valor, tipo in cambios
-                        if tipo not in {"DETECCION", "CLASIFICACION"}
-                    }
-                )
-                if tipos_invalidos:
-                    raise RuntimeError(
-                        "Hay reglas con un tipo no reconocido: " + ", ".join(tipos_invalidos)
-                    )
-
-                for clave, valor_numero, _tipo in cambios:
-                    cursor.execute(
-                        query_actualizar,
-                        {"valor_numero": valor_numero, "clave": clave},
-                    )
-                    if cursor.rowcount != 1:
-                        raise RuntimeError(f"No se pudo actualizar la regla {clave}.")
-
-                if cambios:
-                    # Se valida dentro de la misma transacción: si la combinación
-                    # de umbrales es incoherente, Oracle falla y todo se revierte.
-                    cursor.execute("BEGIN USR_LAB.PRC_VALIDAR_REGLAS_ALERTA; END;")
-
-            conexion.commit()
-        except Exception:
-            conexion.rollback()
-            raise
+    cambios = reglas_alertas_repository.actualizar_reglas(
+        actualizaciones,
+        tipos_permitidos=TIPOS_REGLA_VALIDOS,
+    )
 
     modo_recalculo = None
     if cambios:
@@ -303,26 +212,20 @@ def recalculo_en_curso():
 
 
 def _obtener_procedimiento_recalculo(modo_recalculo):
-    try:
-        return PROCEDIMIENTOS_RECALCULO[modo_recalculo]
-    except KeyError as exc:
-        raise ValueError(f"Modo de recálculo no permitido: {modo_recalculo}") from exc
+    return reglas_alertas_repository.obtener_procedimiento_recalculo(
+        modo_recalculo
+    )
 
 
 def recalcular_alertas(modo_recalculo="completo", log_path=None, log_callback=None):
-    procedimiento = _obtener_procedimiento_recalculo(modo_recalculo)
+    _obtener_procedimiento_recalculo(modo_recalculo)
     inicio = time.perf_counter()
 
     if log_callback:
         log_callback(f"Se inicia el recálculo {modo_recalculo} de alertas en Oracle.")
 
     try:
-        with obtener_conexion_oracle() as conexion:
-            with conexion.cursor() as cursor:
-                # El wrapper rápido solo reclasifica métricas existentes. El
-                # completo relee los datos cuando cambió una regla de detección.
-                cursor.execute(f"BEGIN {procedimiento}; END;")
-            conexion.commit()
+        reglas_alertas_repository.recalcular_alertas(modo_recalculo)
 
         # La siguiente visita debe leer los totales recién recalculados.
         cache.delete(CACHE_KEY_RESUMEN_ALERTAS)
