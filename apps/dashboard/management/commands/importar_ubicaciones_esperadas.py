@@ -26,6 +26,12 @@ from apps.dashboard.config.version_zp import (
 )
 from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
+from apps.dashboard.services.ubicaciones_dataset_validation import (
+    CAMPO_FILA_ORIGEN,
+    formatear_reporte_validacion,
+    resumir_incidencias,
+    validar_dataset_ubicaciones,
+)
 from apps.dashboard.services.version_zp_validation import (
     VersionZPValidationError,
     validar_archivo_version_zp,
@@ -141,16 +147,6 @@ class Command(BaseCommand):
             "movidos_laboratorio": movidos_laboratorio,
         }
 
-        filas_normalizadas = (
-            self.normalizar_fila(
-                fila=fila,
-                fecha_carga=fecha_carga,
-                archivo_origen=archivo_origen,
-                version_zp=version_zp,
-            )
-            for _, fila in df.iterrows()
-        )
-
         referencia_laboratorio = {
             "NOMBRE": NOMBRE_LABORATORIO_ZP,
             "LATITUD_ESPERADA": LATITUD_LABORATORIO_ZP,
@@ -160,9 +156,51 @@ class Command(BaseCommand):
             "ORIGEN_UBICACION": "laboratorio_default",
         }
 
+        filas_neutrales = [
+            self.adaptar_fila_dataframe(
+                fila=fila,
+                fila_excel=numero_fila,
+                fecha_carga=fecha_carga,
+                archivo_origen=archivo_origen,
+                version_zp=version_zp,
+            )
+            for numero_fila, (_, fila) in enumerate(df.iterrows(), start=2)
+        ]
+        resultado_validacion = validar_dataset_ubicaciones(
+            filas_neutrales,
+            referencia_laboratorio,
+        )
+
+        if not resultado_validacion.es_valido:
+            reporte = formatear_reporte_validacion(resultado_validacion)
+            registrar_log_importacion(
+                origen="UBICACIONES_ORACLE",
+                estado="ERROR",
+                fecha_inicio=fecha_inicio_log,
+                fecha_fin=timezone.now(),
+                filas_obtenidas=filas_excel,
+                mensaje=(
+                    f"Archivo: {archivo_origen}. "
+                    f"Filas con error: {resultado_validacion.total_filas_con_error}. "
+                    f"Incidencias: {len(resultado_validacion.incidencias)}.\n{reporte}"
+                ),
+            )
+            self.stderr.write(self.style.ERROR(reporte))
+            error_comando = CommandError(
+                "No se importó Version_DB: "
+                f"{resumir_incidencias(resultado_validacion)}. "
+                "Oracle no fue modificado."
+            )
+            error_comando.detalle_usuario = reporte
+            raise error_comando
+
+        filas_normalizadas = list(resultado_validacion.registros)
+        amids_presentes = set(resultado_validacion.amids_presentes)
+
         try:
             ubicaciones_repository.persistir_importacion(
                 filas_normalizadas=filas_normalizadas,
+                amids_presentes=amids_presentes,
                 fecha_carga=fecha_carga,
                 archivo_origen=archivo_origen,
                 version_zp=version_zp,
@@ -277,23 +315,20 @@ class Command(BaseCommand):
 
         return df
 
-    def normalizar_fila(self, fila, fecha_carga, archivo_origen, version_zp):
-        amid = self.valor_amid(fila.get("IDDS"))
-
-        if not amid:
-            return None
-
-        operativa_texto = self.texto(fila.get("OPERATIVA")).upper()
-
-        if operativa_texto not in ["SI", "SÍ", "NO"]:
-            return None
-
+    def adaptar_fila_dataframe(
+        self,
+        fila,
+        fila_excel,
+        fecha_carga,
+        archivo_origen,
+        version_zp,
+    ):
         datos = {
-            "AMID": amid,
+            CAMPO_FILA_ORIGEN: fila_excel,
             "CODIGO_ZP_TS": self.texto_o_none(fila.get("CODIGO_ZP_TS")),
             "COD_PARADA1": self.texto_o_none(fila.get("COD_PARADA1")),
             "COD_PARADA2": self.texto_o_none(fila.get("COD_PARADA2")),
-            "NOMBRE": self.texto_o_none(fila.get("NOMBRE")),
+            "NOMBRE": self.valor_python(fila.get("NOMBRE")),
             "COMUNA": self.texto_o_none(fila.get("COMUNA")),
             "UNIDAD": self.texto_o_none(fila.get("UNIDAD")),
             "OPERADOR": self.texto_o_none(fila.get("OPERADOR")),
@@ -313,43 +348,33 @@ class Command(BaseCommand):
             "PATENTE": self.texto_o_none(fila.get("PATENTE")),
             "OP_ID": self.valor_numero(fila.get("OP_ID")),
             "BUS_ID": self.valor_numero(fila.get("BUS_ID")),
-            "SERIE_VALIDADOR": self.texto_o_none(fila.get("SERIE_VALIDADOR")),
-            "IDDS": amid,
+            "SERIE_VALIDADOR": self.valor_python(fila.get("SERIE_VALIDADOR")),
+            "IDDS": self.valor_python(fila.get("IDDS")),
             "NUM_VAL": self.texto_o_none(fila.get("NUM_VAL")),
             "X": self.valor_numero(fila.get("X")),
             "Y": self.valor_numero(fila.get("Y")),
+            "LATITUD_ESPERADA": self.valor_python(fila.get("LATITUD_ESPERADA")),
+            "LONGITUD_ESPERADA": self.valor_python(fila.get("LONGITUD_ESPERADA")),
+            "OPERATIVA": self.valor_python(fila.get("OPERATIVA")),
             "CONTINGENCIA": self.texto_o_none(fila.get("CONTINGENCIA")),
             "MIXTA": self.texto_o_none(fila.get("MIXTA")),
+            "RADIO_METROS": self.valor_python(fila.get("RADIO_METROS")),
             "TIPO": self.texto_o_none(fila.get("TIPO")),
             "RENOVADA": self.texto_o_none(fila.get("RENOVADA")),
             "VERSION_ZP": version_zp,
             "ARCHIVO_ORIGEN": archivo_origen,
             "FECHA_CARGA": fecha_carga,
         }
-
-        if operativa_texto in ["SI", "SÍ"]:
-            latitud = self.valor_numero(fila.get("LATITUD_ESPERADA"))
-            longitud = self.valor_numero(fila.get("LONGITUD_ESPERADA"))
-            radio = self.valor_numero(fila.get("RADIO_METROS"))
-
-            if latitud is None or longitud is None or radio is None:
-                return None
-
-            datos["LATITUD_ESPERADA"] = latitud
-            datos["LONGITUD_ESPERADA"] = longitud
-            datos["RADIO_METROS"] = radio
-            datos["OPERATIVA"] = 1
-            datos["ORIGEN_UBICACION"] = "excel"
-
-        else:
-            datos["NOMBRE"] = NOMBRE_LABORATORIO_ZP
-            datos["LATITUD_ESPERADA"] = LATITUD_LABORATORIO_ZP
-            datos["LONGITUD_ESPERADA"] = LONGITUD_LABORATORIO_ZP
-            datos["RADIO_METROS"] = RADIO_LABORATORIO_ZP
-            datos["OPERATIVA"] = 0
-            datos["ORIGEN_UBICACION"] = "laboratorio"
-
         return datos
+
+    def valor_python(self, valor):
+        if valor is None or pd.isna(valor):
+            return None
+        if hasattr(valor, "item"):
+            valor = valor.item()
+        if hasattr(valor, "to_pydatetime"):
+            valor = valor.to_pydatetime()
+        return valor
 
     def texto(self, valor):
         if valor is None:
@@ -367,16 +392,6 @@ class Command(BaseCommand):
             return None
 
         return texto
-
-    def valor_amid(self, valor):
-        if valor is None or pd.isna(valor):
-            return None
-
-        try:
-            return str(int(float(valor))).strip()
-        except (ValueError, TypeError):
-            texto = self.texto(valor)
-            return texto if texto else None
 
     def valor_numero(self, valor):
         if valor is None or pd.isna(valor):

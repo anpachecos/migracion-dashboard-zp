@@ -95,23 +95,17 @@ COLUMNAS_HISTORIAL = [
 
 def persistir_importacion(
     filas_normalizadas,
+    amids_presentes,
     fecha_carga,
     archivo_origen,
     version_zp,
     referencia_laboratorio,
     estadisticas,
 ):
-    amids_excel = set()
-
     with obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             for datos in filas_normalizadas:
-                if datos is None:
-                    estadisticas["omitidos"] += 1
-                    continue
-
                 amid = datos["AMID"]
-                amids_excel.add(amid)
 
                 existe = existe_vigente(cursor, amid)
                 upsert_vigente(cursor, datos)
@@ -141,7 +135,7 @@ def persistir_importacion(
                 historicos_por_ausencia,
             ) = mover_ausentes_a_laboratorio(
                 cursor=cursor,
-                amids_excel=amids_excel,
+                amids_excel=amids_presentes,
                 fecha_carga=fecha_carga,
                 archivo_origen=archivo_origen,
                 version_zp=version_zp,

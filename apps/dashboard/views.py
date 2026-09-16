@@ -146,6 +146,12 @@ def ejecutar_comando_admin(request):
         messages.success(request, "Proceso ejecutado correctamente.")
 
     except Exception as error:
+        detalle_usuario = getattr(error, "detalle_usuario", None)
+        if detalle_usuario:
+            request.resultado_comando_admin = detalle_usuario
+            messages.error(request, f"Error ejecutando proceso: {error}")
+            return panel_perfil(request)
+
         request.session["resultado_comando_admin"] = salida.getvalue()
         messages.error(request, f"Error ejecutando proceso: {error}")
 
@@ -509,7 +515,16 @@ def panel_perfil(request):
         usuarios_inactivos = usuarios.filter(is_active=False).count()
         total_admins = usuarios.filter(is_superuser=True).count()
         ultimos_logs = LogImportacion.objects.all().order_by("-fecha_inicio")[:8]
-        resultado_comando_admin = request.session.pop("resultado_comando_admin", None)
+        resultado_comando_admin = getattr(
+            request,
+            "resultado_comando_admin",
+            None,
+        )
+        if resultado_comando_admin is None:
+            resultado_comando_admin = request.session.pop(
+                "resultado_comando_admin",
+                None,
+            )
         grupos = Group.objects.all().order_by("name")
 
         resumen_roles = []
