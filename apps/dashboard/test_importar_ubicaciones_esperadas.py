@@ -16,6 +16,9 @@ from apps.dashboard.management.commands.importar_ubicaciones_esperadas import (
     RADIO_LABORATORIO_ZP,
     Command,
 )
+from apps.dashboard.services.ubicaciones_dataset_validation import (
+    validar_dataset_ubicaciones,
+)
 
 
 class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
@@ -61,6 +64,20 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
             "OPERATIVA": 0,
             "ORIGEN_UBICACION": "laboratorio_default",
         }
+
+    def validar_dataframe(self, dataframe):
+        normalizado = self.comando.normalizar_dataframe(dataframe)
+        filas = [
+            self.comando.adaptar_fila_dataframe(
+                fila,
+                numero,
+                self.FECHA_CARGA,
+                "ZONA PAGA V755.xlsx",
+                "V755",
+            )
+            for numero, (_, fila) in enumerate(normalizado.iterrows(), start=2)
+        ]
+        return validar_dataset_ubicaciones(filas, self.referencia_laboratorio())
 
     def ejecutar_importacion_controlada(
         self,
@@ -197,14 +214,11 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
     def test_operativa_si_y_si_con_tilde_conservan_datos_excel(self):
         for operativa in ("SI", "SÍ"):
             with self.subTest(operativa=operativa):
-                datos = self.comando.normalizar_fila(
-                    pd.Series(self.comando.normalizar_dataframe(
-                        pd.DataFrame([self.fila_valida(operativa)])
-                    ).iloc[0]),
-                    self.FECHA_CARGA,
-                    "ZONA PAGA V755.xlsx",
-                    "V755",
+                resultado = self.validar_dataframe(
+                    pd.DataFrame([self.fila_valida(operativa)])
                 )
+                self.assertTrue(resultado.es_valido)
+                datos = resultado.registros[0]
                 self.assertEqual(datos["NOMBRE"], "Zona sintética")
                 self.assertEqual(datos["LATITUD_ESPERADA"], -33.45)
                 self.assertEqual(datos["LONGITUD_ESPERADA"], -70.66)
@@ -213,17 +227,16 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
                 self.assertEqual(datos["ORIGEN_UBICACION"], "excel")
 
     def test_operativa_no_usa_referencia_laboratorio(self):
-        fila = self.comando.normalizar_dataframe(pd.DataFrame([
+        resultado = self.validar_dataframe(pd.DataFrame([
             self.fila_valida(
                 "NO",
                 Latitud=None,
                 Longitud=None,
                 Radio=None,
             )
-        ])).iloc[0]
-        datos = self.comando.normalizar_fila(
-            fila, self.FECHA_CARGA, "ZONA PAGA V755.xlsx", "V755"
-        )
+        ]))
+        self.assertTrue(resultado.es_valido)
+        datos = resultado.registros[0]
 
         self.assertEqual(datos["NOMBRE"], NOMBRE_LABORATORIO_ZP)
         self.assertEqual(datos["LATITUD_ESPERADA"], LATITUD_LABORATORIO_ZP)
@@ -232,31 +245,27 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         self.assertEqual(datos["OPERATIVA"], 0)
         self.assertEqual(datos["ORIGEN_UBICACION"], "laboratorio")
 
-    def test_operatividad_invalida_omite_fila(self):
-        fila = self.comando.normalizar_dataframe(pd.DataFrame([
+    def test_operatividad_invalida_rechaza_dataset(self):
+        resultado = self.validar_dataframe(pd.DataFrame([
             self.fila_valida("QUIZÁS")
-        ])).iloc[0]
-        self.assertIsNone(self.comando.normalizar_fila(
-            fila, self.FECHA_CARGA, "archivo.xlsx", None
-        ))
+        ]))
+        self.assertFalse(resultado.es_valido)
+        self.assertEqual(resultado.incidencias[0].campo, "OPERATIVA")
 
-    def test_fila_sin_amid_se_omite(self):
-        fila = self.comando.normalizar_dataframe(pd.DataFrame([
+    def test_fila_sin_amid_rechaza_dataset(self):
+        resultado = self.validar_dataframe(pd.DataFrame([
             self.fila_valida(IDDS=None)
-        ])).iloc[0]
-        self.assertIsNone(self.comando.normalizar_fila(
-            fila, self.FECHA_CARGA, "archivo.xlsx", None
-        ))
+        ]))
+        self.assertFalse(resultado.es_valido)
+        self.assertEqual(resultado.incidencias[0].campo, "IDDS")
 
-    def test_operativa_si_sin_coordenadas_o_radio_validos_se_omite(self):
+    def test_operativa_si_sin_coordenadas_o_radio_validos_rechaza_dataset(self):
         for campo in ("Latitud", "Longitud", "Radio"):
             with self.subTest(campo=campo):
-                fila = self.comando.normalizar_dataframe(pd.DataFrame([
+                resultado = self.validar_dataframe(pd.DataFrame([
                     self.fila_valida(**{campo: "inválido"})
-                ])).iloc[0]
-                self.assertIsNone(self.comando.normalizar_fila(
-                    fila, self.FECHA_CARGA, "archivo.xlsx", None
-                ))
+                ]))
+                self.assertFalse(resultado.es_valido)
 
     def test_amid_nuevo_crea_historial(self):
         cursor = MagicMock()
@@ -426,3 +435,79 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("Error importando ubicaciones a Oracle", self.stderr.getvalue())
         self.assertIn("fallo Oracle sintético", self.stderr.getvalue())
+
+    def test_error_semantico_no_llama_repository_ni_abre_oracle(self):
+        with TemporaryDirectory() as directorio:
+            ruta = self.crear_excel(directorio, [self.fila_valida(IDDS=None)])
+            with patch.object(
+                ubicaciones_repository, "persistir_importacion"
+            ) as mock_persistir, patch.object(
+                ubicaciones_repository, "obtener_conexion_oracle"
+            ) as mock_conexion, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ) as mock_log:
+                with self.assertRaisesRegex(CommandError, "Oracle no fue modificado"):
+                    self.comando.handle(ruta_excel=str(ruta))
+
+        mock_persistir.assert_not_called()
+        mock_conexion.assert_not_called()
+        self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
+        self.assertIn("Fila 2", self.stderr.getvalue())
+        self.assertIn("IDDS", self.stderr.getvalue())
+
+    def test_muchos_errores_se_agregan_antes_del_repository(self):
+        filas = [
+            self.fila_valida(IDDS=None, Nombre="", Operativa="S"),
+            self.fila_valida(IDDS=7500002, Latitud=999),
+        ]
+        with TemporaryDirectory() as directorio:
+            ruta = self.crear_excel(directorio, filas)
+            with patch.object(
+                ubicaciones_repository, "persistir_importacion"
+            ) as mock_persistir, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ) as mock_log:
+                with self.assertRaises(CommandError):
+                    self.comando.handle(ruta_excel=str(ruta))
+
+        mock_persistir.assert_not_called()
+        self.assertIn("4 errores en 2 filas", self.stderr.getvalue())
+        self.assertIn("Fila 2", self.stderr.getvalue())
+        self.assertIn("Fila 3", self.stderr.getvalue())
+        self.assertIn("Incidencias: 4", mock_log.call_args.kwargs["mensaje"])
+
+    def test_dataset_valido_llega_completo_y_materializado_al_repository(self):
+        filas = [self.fila_valida(), self.fila_valida(IDDS=7500002)]
+        with TemporaryDirectory() as directorio:
+            ruta = self.crear_excel(directorio, filas)
+            with patch.object(
+                ubicaciones_repository, "persistir_importacion"
+            ) as mock_persistir, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ):
+                self.comando.handle(ruta_excel=str(ruta))
+
+        argumentos = mock_persistir.call_args.kwargs
+        self.assertIsInstance(argumentos["filas_normalizadas"], list)
+        self.assertEqual(len(argumentos["filas_normalizadas"]), 2)
+        self.assertEqual(argumentos["amids_presentes"], {"7500001", "7500002"})
+
+    def test_fila_invalida_presente_no_puede_convertirse_en_falso_ausente(self):
+        with TemporaryDirectory() as directorio:
+            ruta = self.crear_excel(directorio, [self.fila_valida(Operativa="S")])
+            with patch.object(
+                ubicaciones_repository, "persistir_importacion"
+            ) as mock_persistir, patch.object(
+                ubicaciones_repository, "mover_ausentes_a_laboratorio"
+            ) as mock_ausentes, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ):
+                with self.assertRaises(CommandError):
+                    self.comando.handle(ruta_excel=str(ruta))
+
+        mock_persistir.assert_not_called()
+        mock_ausentes.assert_not_called()

@@ -1,4 +1,5 @@
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -44,6 +45,17 @@ class DashboardViewsCaracterizacionTests(TestCase):
 
     def autenticar(self, admin=False):
         self.client.force_login(self.admin if admin else self.usuario)
+
+    def xlsx_version_db(self, fila):
+        libro = Workbook()
+        hoja = libro.active
+        hoja.title = "Version_DB"
+        encabezados = ["IDDS", "Nombre", "Operativa", "Latitud", "Longitud", "Radio"]
+        hoja.append(encabezados)
+        hoja.append([fila.get(encabezado) for encabezado in encabezados])
+        contenido = BytesIO()
+        libro.save(contenido)
+        return contenido.getvalue()
 
     def mensajes(self, response):
         return [str(mensaje) for mensaje in get_messages(response.wsgi_request)]
@@ -439,6 +451,43 @@ class DashboardViewsCaracterizacionTests(TestCase):
 
         mock_comando.assert_called_once()
         self.assertIn("Proceso ejecutado correctamente.", self.mensajes(response))
+
+    def test_perfil_muestra_error_semantico_controlado_y_detalle_accionable(self):
+        self.autenticar(admin=True)
+        archivo = SimpleUploadedFile(
+            "ZONA PAGA V755.xlsx",
+            self.xlsx_version_db({
+                "IDDS": 7500001,
+                "Nombre": "Zona sintética",
+                "Operativa": "S",
+                "Latitud": -33.45,
+                "Longitud": -70.66,
+                "Radio": 150,
+            }),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+        )
+        with patch(
+            "apps.dashboard.repositories.ubicaciones_repository.persistir_importacion"
+        ) as mock_persistir, patch(
+            "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+            "registrar_log_importacion"
+        ):
+            response = self.client.post(
+                reverse("dashboard:ejecutar_comando_admin"),
+                {"accion": "importar_ubicaciones", "archivo_version_zp": archivo},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain, [])
+        self.assertContains(response, "No se importó Version_DB")
+        self.assertContains(response, "Fila 2 | IDDS 7500001 | OPERATIVA")
+        self.assertContains(response, "Oracle no fue modificado")
+        self.assertNotContains(response, "Proceso ejecutado correctamente.")
+        self.assertNotIn("resultado_comando_admin", self.client.session)
+        mock_persistir.assert_not_called()
 
     def test_admin_autorizado_ejecuta_accion_mediante_command_mock(self):
         self.autenticar(admin=True)

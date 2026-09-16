@@ -208,7 +208,8 @@ class UbicacionesRepositoryTests(SimpleTestCase):
             return_value=(0, 0, 0),
         ) as mock_ausentes:
             resultado = ubicaciones_repository.persistir_importacion(
-                filas_normalizadas=iter([datos]),
+                filas_normalizadas=[datos],
+                amids_presentes={"7500900"},
                 fecha_carga=self.FECHA_CARGA,
                 archivo_origen="ZONA PAGA V900.xlsx",
                 version_zp="V900",
@@ -267,7 +268,8 @@ class UbicacionesRepositoryTests(SimpleTestCase):
             return_value=(0, 0, 0),
         ):
             resultado = ubicaciones_repository.persistir_importacion(
-                filas_normalizadas=iter([{"AMID": "7500900"}]),
+                filas_normalizadas=[{"AMID": "7500900"}],
+                amids_presentes={"7500900"},
                 fecha_carga=self.FECHA_CARGA,
                 archivo_origen="ZONA PAGA V900.xlsx",
                 version_zp="V900",
