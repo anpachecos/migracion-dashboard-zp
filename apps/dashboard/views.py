@@ -42,6 +42,10 @@ from apps.dashboard.services.reglas_alertas_service import (
 from apps.dashboard.services.ubicaciones_service import (
     sincronizar_amids_ubicaciones_oracle,
 )
+from apps.dashboard.services.version_zp_validation import (
+    VersionZPValidationError,
+    validar_upload_basico,
+)
 
 from .models import LogImportacion
 from .services.baterias_service import (
@@ -98,6 +102,12 @@ def ejecutar_comando_admin(request):
 
             if not archivo:
                 messages.error(request, "Debes seleccionar un archivo Excel.")
+                return redirect("dashboard:panel_perfil")
+
+            try:
+                validar_upload_basico(archivo.name, archivo.size)
+            except VersionZPValidationError as error:
+                messages.error(request, f"Error ejecutando proceso: {error}")
                 return redirect("dashboard:panel_perfil")
 
             carpeta_tmp = os.path.join(settings.BASE_DIR, "temp_uploads")

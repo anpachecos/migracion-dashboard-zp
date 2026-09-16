@@ -12,7 +12,6 @@ Comando Django: importar_ubicaciones_esperadas.py
 from pathlib import Path
 from datetime import datetime
 import re
-import unicodedata
 
 import pandas as pd
 
@@ -20,53 +19,22 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from apps.dashboard.config.version_zp import (
+    VERSION_ZP_SHEET_NAME,
+    nombre_columna_oracle,
+    normalizar_nombre_columna,
+)
 from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
+from apps.dashboard.services.version_zp_validation import (
+    VersionZPValidationError,
+    validar_archivo_version_zp,
+)
 
 LATITUD_LABORATORIO_ZP = -33.437191
 LONGITUD_LABORATORIO_ZP = -70.656102
 RADIO_LABORATORIO_ZP = 150
 NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
-
-
-MAPEO_COLUMNAS_EXCEL = {
-    "codigo zp ts": "CODIGO_ZP_TS",
-    "cod parada1": "COD_PARADA1",
-    "cod parada2": "COD_PARADA2",
-    "nombre": "NOMBRE",
-    "comuna": "COMUNA",
-    "unidad": "UNIDAD",
-    "operador": "OPERADOR",
-    "un": "UN",
-    "u n secundaria 1": "UN_SECUNDARIA_1",
-    "u n secundaria 2": "UN_SECUNDARIA_2",
-    "u n secundaria 3": "UN_SECUNDARIA_3",
-    "pst": "PST",
-    "servicios": "SERVICIOS",
-    "total val vigentes por zp": "TOTAL_VAL_VIGENTES_ZP",
-    "horario": "HORARIO",
-    "horario laboral pm": "HORARIO_LABORAL_PM",
-    "horario sabado": "HORARIO_SABADO",
-    "horario domingo": "HORARIO_DOMINGO",
-    "inicio operacion": "INICIO_OPERACION",
-    "fin operacion": "FIN_OPERACION",
-    "patente": "PATENTE",
-    "op id": "OP_ID",
-    "bus id": "BUS_ID",
-    "serie val": "SERIE_VALIDADOR",
-    "idds": "IDDS",
-    "n val": "NUM_VAL",
-    "latitud": "LATITUD_ESPERADA",
-    "longitud": "LONGITUD_ESPERADA",
-    "x": "X",
-    "y": "Y",
-    "operativa": "OPERATIVA",
-    "contingencia": "CONTINGENCIA",
-    "mixta": "MIXTA",
-    "radio": "RADIO_METROS",
-    "tipo": "TIPO",
-    "renovada": "RENOVADA",
-}
 
 
 class Command(BaseCommand):
@@ -120,13 +88,13 @@ class Command(BaseCommand):
         version_zp = self.extraer_version_desde_nombre(archivo_origen)
 
         self.stdout.write(f"Leyendo archivo: {ruta_excel}")
-        self.stdout.write("Hoja utilizada: Version_DB")
+        self.stdout.write(f"Hoja utilizada: {VERSION_ZP_SHEET_NAME}")
         self.stdout.write(f"Versión detectada: {version_zp or 'Sin versión'}")
 
         try:
-            df = pd.read_excel(ruta_excel, sheet_name="Version_DB")
-        except ValueError as error:
-            mensaje = "No se encontró la hoja Version_DB en el Excel."
+            validar_archivo_version_zp(ruta_excel)
+        except VersionZPValidationError as error:
+            mensaje = str(error)
 
             registrar_log_importacion(
                 origen="UBICACIONES_ORACLE",
@@ -140,6 +108,9 @@ class Command(BaseCommand):
                 self.style.ERROR(mensaje)
             )
             raise CommandError(mensaje) from error
+
+        try:
+            df = pd.read_excel(ruta_excel, sheet_name=VERSION_ZP_SHEET_NAME)
         except Exception as error:
             mensaje = f"Error leyendo Excel de ubicaciones: {error}"
 
@@ -159,35 +130,6 @@ class Command(BaseCommand):
         filas_excel = len(df)
 
         df = self.normalizar_dataframe(df)
-
-        columnas_requeridas = [
-            "IDDS",
-            "NOMBRE",
-            "SERIE_VALIDADOR",
-            "LATITUD_ESPERADA",
-            "LONGITUD_ESPERADA",
-            "OPERATIVA",
-            "RADIO_METROS",
-        ]
-
-        faltantes = [col for col in columnas_requeridas if col not in df.columns]
-
-        if faltantes:
-            mensaje = f"Faltan columnas requeridas en el Excel: {faltantes}"
-
-            registrar_log_importacion(
-                origen="UBICACIONES_ORACLE",
-                estado="ERROR",
-                fecha_inicio=fecha_inicio_log,
-                fecha_fin=timezone.now(),
-                filas_obtenidas=filas_excel,
-                mensaje=f"{mensaje}. Archivo: {archivo_origen}",
-            )
-
-            self.stderr.write(
-                self.style.ERROR(mensaje)
-            )
-            raise CommandError(mensaje)
 
         estadisticas = {
             "creados_vigente": creados_vigente,
@@ -311,19 +253,13 @@ class Command(BaseCommand):
         return None
 
     def normalizar_nombre_columna(self, valor):
-        texto = str(valor).strip().lower()
-        texto = unicodedata.normalize("NFKD", texto)
-        texto = "".join(c for c in texto if not unicodedata.combining(c))
-        texto = re.sub(r"[^a-z0-9]+", " ", texto)
-        texto = re.sub(r"\s+", " ", texto).strip()
-        return texto
+        return normalizar_nombre_columna(valor)
 
     def normalizar_dataframe(self, df):
         nuevas_columnas = {}
 
         for columna in df.columns:
-            clave = self.normalizar_nombre_columna(columna)
-            columna_oracle = MAPEO_COLUMNAS_EXCEL.get(clave)
+            columna_oracle = nombre_columna_oracle(columna)
 
             if columna_oracle:
                 nuevas_columnas[columna] = columna_oracle

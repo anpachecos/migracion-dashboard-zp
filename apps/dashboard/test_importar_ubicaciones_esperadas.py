@@ -114,6 +114,26 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("No se encontró el archivo", self.stderr.getvalue())
 
+    def test_cli_rechaza_extension_antes_de_pandas_y_repository(self):
+        with TemporaryDirectory() as directorio:
+            ruta = Path(directorio) / "ZONA PAGA V755.xls"
+            ruta.write_bytes(b"contenido sintetico")
+            with patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "pd.read_excel"
+            ) as mock_read_excel, patch.object(
+                ubicaciones_repository,
+                "persistir_importacion",
+            ) as mock_persistir, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ):
+                with self.assertRaisesRegex(CommandError, "Formato no soportado"):
+                    self.comando.handle(ruta_excel=str(ruta))
+
+        mock_read_excel.assert_not_called()
+        mock_persistir.assert_not_called()
+
     def test_excel_sin_hoja_version_db_se_rechaza_sin_oracle(self):
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio, [self.fila_valida()], hoja="OtraHoja")
@@ -132,16 +152,21 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("No se encontró la hoja Version_DB", self.stderr.getvalue())
 
-    def test_excel_sin_columnas_requeridas_llega_a_fake_oracle_y_omite_fila(self):
+    def test_excel_sin_columnas_requeridas_no_llega_al_repository(self):
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio, [{"Columna ajena": "dato"}])
-            mock_conexion, mock_log, conexion, _ = self.ejecutar_importacion_controlada(ruta)
+            with patch.object(
+                ubicaciones_repository,
+                "persistir_importacion",
+            ) as mock_persistir, patch(
+                "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
+                "registrar_log_importacion"
+            ) as mock_log:
+                with self.assertRaisesRegex(CommandError, "Faltan columnas requeridas"):
+                    self.comando.handle(ruta_excel=str(ruta))
 
-        mock_conexion.assert_called_once()
-        self.mock_upsert.assert_not_called()
-        conexion.commit.assert_called_once()
-        self.assertEqual(mock_log.call_args.kwargs["estado"], "OK")
-        self.assertIn("Omitidos: 1", mock_log.call_args.kwargs["mensaje"])
+        mock_persistir.assert_not_called()
+        self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
 
     def test_version_se_extrae_desde_nombre_archivo(self):
         casos = {
@@ -189,7 +214,12 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
 
     def test_operativa_no_usa_referencia_laboratorio(self):
         fila = self.comando.normalizar_dataframe(pd.DataFrame([
-            self.fila_valida("NO")
+            self.fila_valida(
+                "NO",
+                Latitud=None,
+                Longitud=None,
+                Radio=None,
+            )
         ])).iloc[0]
         datos = self.comando.normalizar_fila(
             fila, self.FECHA_CARGA, "ZONA PAGA V755.xlsx", "V755"

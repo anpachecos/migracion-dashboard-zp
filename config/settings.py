@@ -193,6 +193,19 @@ CACHES = {
 
 
 # =========================
+# Validación Version_DB
+# =========================
+# Límites operativos versionados. Se expresan en bytes o cantidades y pueden
+# ajustarse por entorno de prueba con override_settings() al crecer el volumen.
+
+VERSION_ZP_MAX_FILE_BYTES = 5 * 1024 * 1024
+VERSION_ZP_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+VERSION_ZP_MAX_ROWS = 5000
+VERSION_ZP_MAX_COLUMNS = 100
+VERSION_ZP_MAX_COMPRESSION_RATIO = 100
+
+
+# =========================
 # Scheduler interno
 # =========================
 # Desactivado por defecto.

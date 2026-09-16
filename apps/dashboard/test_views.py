@@ -373,6 +373,73 @@ class DashboardViewsCaracterizacionTests(TestCase):
         self.assertIn("Debes seleccionar un archivo Excel.", self.mensajes(response))
         mock_comando.assert_not_called()
 
+    def test_perfil_anuncia_solo_archivos_xlsx(self):
+        self.autenticar(admin=True)
+        response = self.client.get(reverse("dashboard:panel_perfil"))
+
+        self.assertContains(response, 'accept=".xlsx"')
+        self.assertNotContains(response, 'accept=".xlsx,.xls"')
+
+    def test_importacion_admin_rechaza_extension_antes_de_guardar(self):
+        self.autenticar(admin=True)
+        archivo = SimpleUploadedFile(
+            "ubicaciones.xls",
+            b"contenido sintetico",
+            content_type="application/vnd.ms-excel",
+        )
+        with patch("apps.dashboard.views.call_command") as mock_comando:
+            response = self.client.post(
+                reverse("dashboard:ejecutar_comando_admin"),
+                {"accion": "importar_ubicaciones", "archivo_version_zp": archivo},
+            )
+
+        mock_comando.assert_not_called()
+        self.assertIn(
+            "Formato no soportado",
+            " ".join(self.mensajes(response)),
+        )
+
+    @override_settings(VERSION_ZP_MAX_FILE_BYTES=3)
+    def test_importacion_admin_rechaza_tamano_antes_de_guardar(self):
+        self.autenticar(admin=True)
+        archivo = SimpleUploadedFile(
+            "ubicaciones.xlsx",
+            b"cuatro",
+            content_type="application/octet-stream",
+        )
+        with patch("apps.dashboard.views.call_command") as mock_comando:
+            response = self.client.post(
+                reverse("dashboard:ejecutar_comando_admin"),
+                {"accion": "importar_ubicaciones", "archivo_version_zp": archivo},
+            )
+
+        mock_comando.assert_not_called()
+        self.assertIn(
+            "tamaño máximo comprimido",
+            " ".join(self.mensajes(response)),
+        )
+
+    def test_importacion_admin_xlsx_llega_al_command_y_elimina_temporal(self):
+        self.autenticar(admin=True)
+        archivo = SimpleUploadedFile(
+            "ubicaciones.xlsx",
+            b"contenido sintetico",
+            content_type="application/octet-stream",
+        )
+        with TemporaryDirectory() as directorio, override_settings(
+            BASE_DIR=Path(directorio)
+        ), patch("apps.dashboard.views.call_command") as mock_comando:
+            response = self.client.post(
+                reverse("dashboard:ejecutar_comando_admin"),
+                {"accion": "importar_ubicaciones", "archivo_version_zp": archivo},
+            )
+
+            carpeta = Path(directorio) / "temp_uploads"
+            self.assertEqual(list(carpeta.iterdir()), [])
+
+        mock_comando.assert_called_once()
+        self.assertIn("Proceso ejecutado correctamente.", self.mensajes(response))
+
     def test_admin_autorizado_ejecuta_accion_mediante_command_mock(self):
         self.autenticar(admin=True)
         with patch("apps.dashboard.views.call_command") as mock_comando:
