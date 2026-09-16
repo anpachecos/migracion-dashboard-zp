@@ -6,6 +6,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from openpyxl import Workbook
@@ -393,7 +394,7 @@ class DashboardViewsCaracterizacionTests(TestCase):
         with TemporaryDirectory() as directorio, override_settings(BASE_DIR=Path(directorio)):
             with patch(
                 "apps.dashboard.views.call_command",
-                side_effect=RuntimeError("fallo sintético del command"),
+                side_effect=CommandError("fallo sintético del command"),
             ):
                 response = self.client.post(
                     reverse("dashboard:ejecutar_comando_admin"),

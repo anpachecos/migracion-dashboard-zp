@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.dashboard.repositories import ubicaciones_repository
@@ -32,7 +32,7 @@ class Command(BaseCommand):
             )
 
             self.stderr.write(self.style.ERROR(mensaje))
-            return
+            raise CommandError(mensaje)
 
         try:
             filas_eliminadas = ubicaciones_repository.limpiar_historial(
@@ -70,3 +70,4 @@ class Command(BaseCommand):
             )
 
             self.stderr.write(self.style.ERROR(mensaje))
+            raise CommandError(mensaje) from error

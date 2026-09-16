@@ -2,9 +2,12 @@ import importlib
 import os
 from datetime import datetime
 from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
 
-from django.core.management import get_commands
+from django.core.management import call_command, get_commands
+from django.core.management.base import CommandError
 from django.db import OperationalError
 from django.test import TestCase, override_settings
 
@@ -20,6 +23,9 @@ from apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle impor
 )
 from apps.dashboard.management.commands.limpiar_registros_antiguos import (
     Command as LimpiarRegistrosAntiguosCommand,
+)
+from apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas import (
+    Command as LimpiarTablasSqliteCommand,
 )
 from apps.dashboard.management.commands.probar_oracle import Command as ProbarOracleCommand
 from apps.dashboard.management.commands.registrar_estado_oracle import (
@@ -71,7 +77,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertIn("Conexión Oracle OK", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
 
-    def test_probar_oracle_registra_error_sin_propagar_excepcion(self):
+    def test_probar_oracle_registra_error_y_propaga_command_error(self):
         comando, stdout, stderr = self.comando(ProbarOracleCommand)
         with patch(
             "apps.dashboard.management.commands.probar_oracle."
@@ -80,9 +86,12 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         ), patch(
             "apps.dashboard.management.commands.probar_oracle.registrar_log_importacion"
         ) as mock_log:
-            resultado = comando.handle()
+            with self.assertRaisesRegex(
+                CommandError,
+                "Error conectando a Oracle: Oracle sintético no disponible",
+            ):
+                comando.handle()
 
-        self.assertIsNone(resultado)
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertEqual(mock_log.call_args.kwargs["filas_obtenidas"], 0)
         self.assertIn("Error conectando a Oracle: Oracle sintético no disponible", stderr.getvalue())
@@ -115,7 +124,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertIn("Historial vigente: 4", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
 
-    def test_registrar_estado_oracle_captura_error_y_escribe_stderr(self):
+    def test_registrar_estado_oracle_registra_error_y_propaga_command_error(self):
         comando, stdout, stderr = self.comando(RegistrarEstadoOracleCommand)
         with patch(
             "apps.dashboard.management.commands.registrar_estado_oracle."
@@ -124,9 +133,12 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         ), patch(
             "apps.dashboard.management.commands.registrar_estado_oracle.registrar_log_importacion"
         ) as mock_log:
-            resultado = comando.handle()
+            with self.assertRaisesRegex(
+                CommandError,
+                "Error registrando estado Oracle: fallo sintético",
+            ):
+                comando.handle()
 
-        self.assertIsNone(resultado)
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("Error registrando estado Oracle: fallo sintético", stderr.getvalue())
         self.assertEqual(stdout.getvalue(), "")
@@ -164,7 +176,11 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         ) as mock_limpieza, patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"
         ) as mock_log:
-            comando.handle(dias_retencion=0)
+            with self.assertRaisesRegex(
+                CommandError,
+                "Los días de retención deben ser mayores o iguales a 1",
+            ):
+                comando.handle(dias_retencion=0)
 
         mock_limpieza.assert_not_called()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
@@ -193,6 +209,72 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertEqual(mock_log.call_args.kwargs["filas_eliminadas"], 7)
         self.assertIn("Filas eliminadas: 7", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
+
+    def test_limpieza_historial_propaga_error_operacional_como_command_error(self):
+        comando, stdout, stderr = self.comando(LimpiarHistorialOracleCommand)
+        with patch(
+            "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle."
+            "ubicaciones_repository.limpiar_historial",
+            side_effect=RuntimeError("fallo sintético de limpieza"),
+        ), patch(
+            "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle."
+            "registrar_log_importacion"
+        ) as mock_log:
+            with self.assertRaisesRegex(
+                CommandError,
+                "Error limpiando historial de ubicaciones Oracle",
+            ):
+                comando.handle(dias_retencion=16)
+
+        self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
+        self.assertIn("fallo sintético de limpieza", stderr.getvalue())
+        self.assertEqual(stdout.getvalue(), "")
+
+    def test_limpiar_tablas_sqlite_falla_si_la_base_no_existe(self):
+        comando, stdout, stderr = self.comando(LimpiarTablasSqliteCommand)
+        with TemporaryDirectory() as directorio:
+            ruta_inexistente = os.path.join(directorio, "inexistente.sqlite3")
+            with patch(
+                "apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas."
+                "settings.DATABASES",
+                {"default": {"NAME": ruta_inexistente}},
+            ):
+                with self.assertRaisesRegex(CommandError, "No existe la base SQLite"):
+                    comando.handle(confirmar=False)
+
+        self.assertIn("No existe la base SQLite", stderr.getvalue())
+        self.assertEqual(stdout.getvalue(), "")
+
+    def test_limpiar_tablas_sqlite_sin_tablas_antiguas_es_exito(self):
+        comando, stdout, stderr = self.comando(LimpiarTablasSqliteCommand)
+        with TemporaryDirectory() as directorio:
+            ruta_db = os.path.join(directorio, "vacia.sqlite3")
+            Path(ruta_db).touch()
+            with patch(
+                "apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas."
+                "settings.DATABASES",
+                {"default": {"NAME": ruta_db}},
+            ), patch.object(comando, "obtener_tablas", return_value=[]):
+                comando.handle(confirmar=False)
+
+        self.assertIn("No se encontraron tablas antiguas para borrar.", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_call_command_expone_fallo_controlado_de_probar_oracle(self):
+        stdout = StringIO()
+        stderr = StringIO()
+        with patch(
+            "apps.dashboard.management.commands.probar_oracle."
+            "operacion_oracle_repository.obtener_sysdate",
+            side_effect=RuntimeError("Oracle sintético no disponible"),
+        ), patch(
+            "apps.dashboard.management.commands.probar_oracle.registrar_log_importacion"
+        ):
+            with self.assertRaisesRegex(CommandError, "Error conectando a Oracle"):
+                call_command("probar_oracle", stdout=stdout, stderr=stderr)
+
+        self.assertIn("Oracle sintético no disponible", stderr.getvalue())
+        self.assertEqual(stdout.getvalue(), "")
 
     def test_scheduler_reintenta_database_locked_sin_sleep_real(self):
         with patch.object(
@@ -318,7 +400,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         with patch.object(
             scheduler_service,
             "ejecutar_comando_con_reintentos",
-            side_effect=RuntimeError("fallo sintético"),
+            side_effect=CommandError("fallo sintético"),
         ), patch.object(
             scheduler_service, "registrar_log_importacion"
         ) as mock_log:

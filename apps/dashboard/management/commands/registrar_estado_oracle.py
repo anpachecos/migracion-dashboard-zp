@@ -11,7 +11,7 @@ Actualmente revisa:
 No modifica Oracle. Solo consulta y guarda logs internos.
 """
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.dashboard.repositories import operacion_oracle_repository
@@ -80,6 +80,7 @@ class Command(BaseCommand):
             )
 
             self.stderr.write(self.style.ERROR(mensaje))
+            raise CommandError(mensaje) from error
 
     def obtener_resumen_bateria(self, fila):
         return {

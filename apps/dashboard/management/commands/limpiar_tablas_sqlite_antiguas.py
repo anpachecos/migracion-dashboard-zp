@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
@@ -54,8 +54,9 @@ class Command(BaseCommand):
         ruta_db = settings.DATABASES["default"]["NAME"]
 
         if not os.path.exists(ruta_db):
-            self.stderr.write(self.style.ERROR(f"No existe la base SQLite: {ruta_db}"))
-            return
+            mensaje = f"No existe la base SQLite: {ruta_db}"
+            self.stderr.write(self.style.ERROR(mensaje))
+            raise CommandError(mensaje)
 
         tablas_existentes = self.obtener_tablas(ruta_db)
         tablas_a_borrar = self.obtener_tablas_a_borrar(tablas_existentes)

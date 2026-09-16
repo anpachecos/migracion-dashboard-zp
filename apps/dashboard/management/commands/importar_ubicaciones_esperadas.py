@@ -17,7 +17,7 @@ import unicodedata
 import pandas as pd
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.dashboard.repositories import ubicaciones_repository
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             self.stderr.write(
                 self.style.ERROR(mensaje)
             )
-            return
+            raise CommandError(mensaje)
 
         archivo_origen = ruta_excel.name
         version_zp = self.extraer_version_desde_nombre(archivo_origen)
@@ -125,7 +125,7 @@ class Command(BaseCommand):
 
         try:
             df = pd.read_excel(ruta_excel, sheet_name="Version_DB")
-        except ValueError:
+        except ValueError as error:
             mensaje = "No se encontró la hoja Version_DB en el Excel."
 
             registrar_log_importacion(
@@ -139,7 +139,7 @@ class Command(BaseCommand):
             self.stderr.write(
                 self.style.ERROR(mensaje)
             )
-            return
+            raise CommandError(mensaje) from error
         except Exception as error:
             mensaje = f"Error leyendo Excel de ubicaciones: {error}"
 
@@ -154,7 +154,7 @@ class Command(BaseCommand):
             self.stderr.write(
                 self.style.ERROR(mensaje)
             )
-            return
+            raise CommandError(mensaje) from error
 
         filas_excel = len(df)
 
@@ -187,7 +187,7 @@ class Command(BaseCommand):
             self.stderr.write(
                 self.style.ERROR(mensaje)
             )
-            return
+            raise CommandError(mensaje)
 
         estadisticas = {
             "creados_vigente": creados_vigente,
@@ -247,7 +247,7 @@ class Command(BaseCommand):
             self.stderr.write(
                 self.style.ERROR(mensaje)
             )
-            return
+            raise CommandError(mensaje) from error
 
         creados_vigente = estadisticas["creados_vigente"]
         actualizados_vigente = estadisticas["actualizados_vigente"]

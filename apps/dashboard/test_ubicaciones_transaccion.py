@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+from django.core.management.base import CommandError
 from django.test import SimpleTestCase
 
 from apps.dashboard.management.commands.importar_ubicaciones_esperadas import (
@@ -46,7 +47,7 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
         contexto.__enter__.return_value = conexion
         return contexto, conexion, cursor
 
-    def ejecutar(self, ruta, contexto):
+    def ejecutar(self, ruta, contexto, esperar_error=False):
         stdout = StringIO()
         stderr = StringIO()
         comando = ImportarUbicacionesCommand(stdout=stdout, stderr=stderr)
@@ -62,7 +63,11 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
             "ahora_oracle",
             return_value=self.FECHA_CARGA,
         ):
-            comando.handle(ruta_excel=str(ruta))
+            if esperar_error:
+                with self.assertRaises(CommandError):
+                    comando.handle(ruta_excel=str(ruta))
+            else:
+                comando.handle(ruta_excel=str(ruta))
         return stdout, stderr, mock_log
 
     def test_orden_transaccional_fila_nueva_ausentes_y_commit(self):
@@ -124,7 +129,11 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
 
                 cursor.execute.side_effect = ejecutar
                 ruta = self.crear_excel(directorio)
-                _stdout, stderr, mock_log = self.ejecutar(ruta, contexto)
+                _stdout, stderr, mock_log = self.ejecutar(
+                    ruta,
+                    contexto,
+                    esperar_error=True,
+                )
 
                 conexion.commit.assert_not_called()
                 conexion.rollback.assert_not_called()
@@ -168,7 +177,11 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
 
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio)
-            _stdout, stderr, mock_log = self.ejecutar(ruta, contexto)
+            _stdout, stderr, mock_log = self.ejecutar(
+                ruta,
+                contexto,
+                esperar_error=True,
+            )
 
         conexion.commit.assert_not_called()
         conexion.rollback.assert_not_called()
@@ -183,7 +196,11 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
 
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio)
-            _stdout, stderr, mock_log = self.ejecutar(ruta, contexto)
+            _stdout, stderr, mock_log = self.ejecutar(
+                ruta,
+                contexto,
+                esperar_error=True,
+            )
 
         conexion.commit.assert_called_once_with()
         conexion.rollback.assert_not_called()
@@ -230,7 +247,11 @@ class OperacionesUbicacionesCaracterizacionTests(SimpleTestCase):
         cursor = conexion.cursor.return_value.__enter__.return_value
         cursor.callproc.side_effect = RuntimeError("fallo sintético limpieza")
 
-        comando.handle(dias_retencion=16)
+        with self.assertRaisesRegex(
+            CommandError,
+            "Error limpiando historial de ubicaciones Oracle",
+        ):
+            comando.handle(dias_retencion=16)
 
         conexion.commit.assert_not_called()
         conexion.rollback.assert_not_called()

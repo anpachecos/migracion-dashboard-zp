@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, Mock, patch
 
 import pandas as pd
+from django.core.management.base import CommandError
 from django.test import SimpleTestCase
 
 from apps.dashboard.repositories import ubicaciones_repository
@@ -61,7 +62,12 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
             "ORIGEN_UBICACION": "laboratorio_default",
         }
 
-    def ejecutar_importacion_controlada(self, ruta, error_upsert=None):
+    def ejecutar_importacion_controlada(
+        self,
+        ruta,
+        error_upsert=None,
+        esperar_error=False,
+    ):
         contexto, conexion, cursor = self.conexion_falsa()
 
         with patch(
@@ -85,7 +91,11 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         ) as mock_log, patch.object(
             self.comando, "ahora_oracle", return_value=self.FECHA_CARGA
         ):
-            self.comando.handle(ruta_excel=str(ruta))
+            if esperar_error:
+                with self.assertRaises(CommandError):
+                    self.comando.handle(ruta_excel=str(ruta))
+            else:
+                self.comando.handle(ruta_excel=str(ruta))
 
         self.mock_upsert = mock_upsert
         return mock_obtener_conexion, mock_log, conexion, cursor
@@ -97,7 +107,8 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         ) as mock_conexion, patch(
             "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
         ) as mock_log:
-            self.comando.handle(ruta_excel=str(ruta))
+            with self.assertRaisesRegex(CommandError, "No se encontró el archivo"):
+                self.comando.handle(ruta_excel=str(ruta))
 
         mock_conexion.assert_not_called()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
@@ -111,7 +122,11 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
             ) as mock_conexion, patch(
                 "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
             ) as mock_log:
-                self.comando.handle(ruta_excel=str(ruta))
+                with self.assertRaisesRegex(
+                    CommandError,
+                    "No se encontró la hoja Version_DB",
+                ):
+                    self.comando.handle(ruta_excel=str(ruta))
 
         mock_conexion.assert_not_called()
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
@@ -371,7 +386,9 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio, [self.fila_valida()])
             _, mock_log, conexion, _ = self.ejecutar_importacion_controlada(
-                ruta, error_upsert=RuntimeError("fallo Oracle sintético")
+                ruta,
+                error_upsert=RuntimeError("fallo Oracle sintético"),
+                esperar_error=True,
             )
 
         conexion.commit.assert_not_called()
