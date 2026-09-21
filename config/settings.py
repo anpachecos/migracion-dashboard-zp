@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 
 # =========================
@@ -17,8 +18,35 @@ load_dotenv(BASE_DIR / ".env")
 # Seguridad / entorno
 # =========================
 
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-dev-key")
-DEBUG = os.getenv("DEBUG", "True") == "True"
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY or not SECRET_KEY.strip():
+    raise ImproperlyConfigured(
+        "SECRET_KEY debe estar definida en las variables de entorno."
+    )
+
+
+def obtener_debug_desde_entorno():
+    valor = os.getenv("DEBUG")
+
+    if valor is None:
+        return False
+
+    valor_normalizado = valor.strip().lower()
+
+    if valor_normalizado in {"true", "1", "yes", "on"}:
+        return True
+
+    if valor_normalizado in {"false", "0", "no", "off"}:
+        return False
+
+    raise ImproperlyConfigured(
+        "DEBUG debe usar uno de estos valores: "
+        "true, 1, yes, on, false, 0, no u off."
+    )
+
+
+DEBUG = obtener_debug_desde_entorno()
 
 ALLOWED_HOSTS = [
     host.strip()

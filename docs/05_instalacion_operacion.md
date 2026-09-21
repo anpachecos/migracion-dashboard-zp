@@ -20,12 +20,23 @@ Copy-Item .env.example .env
 
 Complete `.env` sin versionarlo.
 
+Genere una `SECRET_KEY` diferente para cada entorno con:
+
+```powershell
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Copie el resultado únicamente al `.env` privado del entorno correspondiente.
+No suba ese archivo ni reutilice la misma clave entre desarrollo, PRE y
+producción. Si `SECRET_KEY` falta, está vacía o contiene solo espacios, Django
+no inicia.
+
 ## Configuración
 
 | Variable | Uso |
 |---|---|
-| `SECRET_KEY` | Obligatoria y única en producción. |
-| `DEBUG` | Debe ser `False` en producción. |
+| `SECRET_KEY` | Obligatoria y distinta en cada entorno. |
+| `DEBUG` | `False` en producción; desarrollo/PRE puede habilitarlo solo explícitamente. |
 | `ALLOWED_HOSTS` | Hosts separados por coma. |
 | `ORACLE_USER`, `ORACLE_PASSWORD` | Credenciales Oracle. |
 | `ORACLE_HOST`, `ORACLE_PORT` | Listener; puerto por defecto 1521. |
@@ -34,6 +45,9 @@ Complete `.env` sin versionarlo.
 | `DASHBOARD_SCHEDULER_ENABLED` | `False` por defecto; requiere instancia única. |
 
 `.env.example` debe listar estas claves con valores vacíos o seguros.
+`DEBUG` acepta `true`, `1`, `yes`, `on`, `false`, `0`, `no` y `off`, sin
+distinguir mayúsculas/minúsculas y tolerando espacios externos. Si falta,
+queda en `False`; cualquier otro valor impide el arranque.
 
 ## Inicialización
 
