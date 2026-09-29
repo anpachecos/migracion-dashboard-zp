@@ -285,6 +285,7 @@ def panel_alertas(request):
             ),
         }
     )
+    contexto["active_page"] = "alertas"
     return render(request, "dashboard/panel_alertas.html", contexto)
 
 

@@ -153,6 +153,31 @@ class DashboardViewsCaracterizacionTests(TestCase):
         self.assertEqual(request.GET["amid"], "7500001")
         self.assertEqual(request.GET["rango_manual"], "1")
 
+    def test_panel_alertas_marca_active_page_para_el_sidebar(self):
+        """Sin este valor el enlace de Alertas nunca se marca activo.
+
+        El sidebar compara contra `active_page` para resaltar el enlace y para
+        abrir el grupo que contiene la página actual. La vista lo fixeaba solo
+        en Baterías, GPS y Perfil.
+        """
+        self.autenticar()
+        preferencias = {
+            "amids_excluidos": [],
+            "ubicaciones_excluidas": [],
+        }
+        with patch(
+            "apps.dashboard.views.obtener_preferencias_alertas_usuario",
+            return_value=preferencias,
+        ), patch(
+            "apps.dashboard.views.obtener_contexto_alertas",
+            return_value={"amids_disponibles": []},
+        ):
+            response = self.client.get(reverse("dashboard:panel_alertas"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "dashboard/panel_alertas.html")
+        self.assertEqual(response.context["active_page"], "alertas")
+
     def test_panel_gps_muestra_mensaje_sin_datos_del_servicio(self):
         self.autenticar()
         mensaje = "No se encontraron coordenadas GPS para el AMID ingresado en el rango seleccionado."
@@ -557,3 +582,94 @@ class DashboardViewsCaracterizacionTests(TestCase):
         self.assertEqual(
             response.context["reglas_alertas_error"], "Oracle sintético no disponible"
         )
+
+
+class SidebarGruposTests(TestCase):
+    """La navegación se agrupa en bloques colapsables.
+
+    Cada grupo es un `<details>` nativo, así que funciona sin JavaScript. El
+    JS solo añade persistencia del estado colapsado entre páginas.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        usuarios = get_user_model()
+        cls.usuario = usuarios.objects.create_user(
+            username="usuario_grupos",
+            password="clave-test",
+        )
+
+    def setUp(self):
+        parche_carga = patch(
+            "apps.dashboard.context_processors.obtener_ultima_carga_datos_oracle",
+            return_value=None,
+        )
+        parche_version = patch(
+            "apps.dashboard.context_processors.obtener_ultima_version_zp_oracle",
+            return_value=None,
+        )
+        parche_carga.start()
+        parche_version.start()
+        self.addCleanup(parche_carga.stop)
+        self.addCleanup(parche_version.stop)
+        self.client.force_login(self.usuario)
+
+    def contenido(self, url="dashboard:inicio"):
+        response = self.client.get(reverse(url))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def contenido_normalizado(self, url="dashboard:inicio"):
+        """Django conserva los saltos de línea del template, así que se
+        colapsan para poder comparar atributos que en el HTML quedan partidos."""
+
+        return " ".join(self.contenido(url).split())
+
+    def test_los_tres_grupos_tienen_rotulo(self):
+        contenido = self.contenido()
+
+        self.assertIn("Operación", contenido)
+        self.assertIn("Administración", contenido)
+
+    def test_operacion_agrupa_sus_tres_paneles(self):
+        contenido = self.contenido("dashboard:panel_baterias")
+
+        for nombre in ("baterias", "gps", "alertas"):
+            with self.subTest(panel=nombre):
+                self.assertIn(reverse(f"dashboard:panel_{nombre}"), contenido)
+
+    def test_cada_grupo_es_un_details_con_data_grupo(self):
+        contenido = self.contenido_normalizado()
+
+        self.assertIn('data-grupo="operacion"', contenido)
+        self.assertIn('data-grupo="administracion"', contenido)
+
+    def test_los_grupos_nacen_abiertos(self):
+        """Por defecto se ve todo; el JS solo recuerda si el usuario los colapsa."""
+
+        contenido = self.contenido_normalizado("dashboard:panel_baterias")
+
+        self.assertIn('data-grupo="operacion" open', contenido)
+        self.assertIn('data-grupo="administracion" open', contenido)
+
+    def test_el_grupo_activo_se_marca_con_data_activo(self):
+        contenido = self.contenido_normalizado("dashboard:panel_baterias")
+
+        self.assertIn('data-grupo="operacion" open data-activo="1"', contenido)
+
+    def test_el_grupo_de_la_pagina_activa_es_el_esperado(self):
+        contenido = self.contenido_normalizado("dashboard:panel_perfil")
+
+        self.assertIn('data-grupo="administracion" open data-activo="1"', contenido)
+
+    def test_alertas_abre_su_grupo_por_el_active_page_de_la_vista(self):
+        """Regresión: la vista no fijaba `active_page` y el grupo no se abría."""
+
+        contenido = self.contenido_normalizado("dashboard:panel_alertas")
+
+        self.assertIn('data-grupo="operacion" open data-activo="1"', contenido)
+
+    def test_el_enlace_activo_lleva_aria_current(self):
+        contenido = self.contenido("dashboard:panel_baterias")
+
+        self.assertIn('aria-current="page"', contenido)

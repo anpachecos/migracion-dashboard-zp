@@ -425,3 +425,54 @@ class SidebarTests(TestCase):
         self.assertContains(respuesta, reverse("dashboard:panel_baterias"))
         self.assertContains(respuesta, reverse("dashboard:panel_alertas"))
         self.assertContains(respuesta, reverse("dashboard:panel_perfil"))
+
+
+class SidebarGrupoReportesTests(TestCase):
+    """El grupo Reportes se oculta entero, no solo el enlace.
+
+    El sidebar agrupa la navegación en `<details>`. Si el `{% if %}` envolviera
+    solo el enlace, quien no puede entrar vería el rótulo "Reportes" con un
+    grupo vacío, que es peor que no ver nada.
+    """
+
+    def setUp(self):
+        parche_carga = mock.patch(
+            "apps.dashboard.context_processors.obtener_ultima_carga_datos_oracle",
+            return_value=None,
+        )
+        parche_version = mock.patch(
+            "apps.dashboard.context_processors.obtener_ultima_version_zp_oracle",
+            return_value=None,
+        )
+        parche_carga.start()
+        parche_version.start()
+        self.addCleanup(parche_carga.stop)
+        self.addCleanup(parche_version.stop)
+
+        self.enlace = reverse("transacciones:informe_interno")
+
+    def test_autorizado_ve_el_grupo_completo(self):
+        self.client.force_login(crear_sonda("sonda_grupo"))
+
+        respuesta = self.client.get(reverse("dashboard:inicio"))
+
+        self.assertContains(respuesta, "Reportes", count=1)
+        self.assertContains(respuesta, self.enlace, count=1)
+
+    def test_sin_acceso_no_ve_el_rotulo_del_grupo(self):
+        """El rótulo es la parte que se olvida al condicionar."""
+
+        self.client.force_login(crear_usuario_plano("sin_grupo"))
+
+        respuesta = self.client.get(reverse("dashboard:inicio"))
+
+        self.assertNotContains(respuesta, "Reportes")
+        self.assertNotContains(respuesta, self.enlace)
+
+    def test_sin_acceso_los_otros_grupos_siguen_intactos(self):
+        self.client.force_login(crear_usuario_plano("sin_grupo_resto"))
+
+        respuesta = self.client.get(reverse("dashboard:inicio"))
+
+        self.assertContains(respuesta, "Operación")
+        self.assertContains(respuesta, "Administración")

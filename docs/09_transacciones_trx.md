@@ -203,12 +203,16 @@ variable cargada. Los grupos y sus miembros se administran en `/admin/` en
 
 ### Visibilidad en el menú
 
-El enlace del sidebar se oculta con el tag
+El grupo del sidebar se oculta con el tag
 `{% puede_ver_transacciones user %}` en
-`dashboard/base_dashboard.html`. Es una comodidad visual, **no** la garantía:
-la garantía es el `403` de las vistas. Se prefirió un template tag y no un
-context processor porque el sidebar se renderiza en todas las páginas y un
-context processor añadiría una consulta a cada request del sistema.
+`dashboard/base_dashboard.html`. La navegación está agrupada en bloques
+colapsables, así que el `{% if %}` envuelve el `<details>` completo del grupo
+`Reportes` y no solo el enlace: si se condicionara únicamente el enlace, quien
+no puede entrar vería el rótulo "Reportes" con un grupo vacío. Es una comodidad
+visual, **no** la garantía: la garantía es el `403` de las vistas. Se prefirió
+un template tag y no un context processor porque el sidebar se renderiza en
+todas las páginas y un context processor añadiría una consulta a cada request
+del sistema.
 
 ## Filtros
 
