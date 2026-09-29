@@ -153,3 +153,7 @@ como activar.txt
 # Resultados locales de diagnósticos Oracle (pueden contener metadatos reales)
 oracle/diagnostics/resultados_*.sql
 oracle/diagnostics/output/
+
+# Archivos locales de trabajo
+/Queries_TRX_C2D_guia_Antonia_V2.sql
+/docs/BKL-017_Diagnostico_Pruebas_Caracterizacion.docx

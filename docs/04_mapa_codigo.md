@@ -194,7 +194,7 @@ apps/transacciones/
 | `services/rezagadas_service.py` | Salida de rezagadas. Incluye matriz día TRX x día llegada, días de rezago, tendencia diaria y análisis por AMID. | Vigente |
 | `services/exportaciones_service.py` | Interfaz reservada. Las tres funciones lanzan `NotImplementedError` a propósito para que no se consuman por error. | Pendiente |
 | `templates/transacciones/base_transacciones.html` | Extiende `dashboard/base_dashboard.html`. Centraliza encabezado, pestañas, KPIs y zonas comunes. | Vigente |
-| `templatetags/trx_permisos.py` | Tag `{% puede_ver_transacciones user %}` que oculta el enlace del sidebar. Es comodidad visual; la garantía es el `403` de las vistas. | Vigente |
+| `templatetags/trx_permisos.py` | Tag `{% puede_ver_transacciones user %}` que oculta el grupo `Reportes` del sidebar. Es comodidad visual; la garantía es el `403` de las vistas. | Vigente |
 | `static/transacciones/css/transacciones.css` | Estilos propios del módulo. Reutiliza la paleta de `base_dashboard.css`. | Vigente |
 | `static/transacciones/js/transacciones.js` | Mínimo a propósito: el hito 1 es GET puro, sin gráficos ni paginación de cliente. | Vigente |
 
@@ -280,7 +280,7 @@ apps/dashboard/templates/dashboard/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. El enlace a Transacciones se oculta con `{% puede_ver_transacciones user %}`. | Vigente |
+| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. El sidebar agrupa la navegación en tres bloques colapsables (`Operación`, `Reportes`, `Administración`) construidos con `<details>` nativos. El bloque `Reportes` completo se oculta con `{% puede_ver_transacciones user %}`. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
 | `panel_baterias.html` | Muestra búsqueda por AMID, horarios vigentes, filtro Horario Zona Paga, tarjetas, eventos oficiales, bloques y gráficos. | Vigente |
 | `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |
@@ -348,7 +348,8 @@ apps/dashboard/static/dashboard/js/
 ├── panel_baterias.js
 ├── panel_gps.js
 ├── panel_perfil.js
-└── scroll_explorar.js
+├── scroll_explorar.js
+└── sidebar.js
 ```
 
 | Archivo | Descripción | Estado |
@@ -358,6 +359,7 @@ apps/dashboard/static/dashboard/js/
 | `panel_alertas.js` | Maneja detalle de caídas y autocompletados de exclusiones con debounce, cancelación, caché local y chips removibles. | Vigente |
 | `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
 | `scroll_explorar.js` | Control global accesible: muestra una ayuda flotante solo si queda contenido bajo la pantalla, avanza la vista y se oculta al llegar al final. | Vigente |
+| `sidebar.js` | Recuerda en `localStorage` qué grupos del sidebar dejó colapsados el usuario. El agrupamiento en sí no depende de este archivo: los `<details>` son nativos y funcionan sin JavaScript. | Vigente |
 
 ---
 

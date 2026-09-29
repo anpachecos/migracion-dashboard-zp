@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}Dashboard Zonas Pagas{% endblock %}</title>
 
-    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=16">
+    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=17">
 
     {% block extra_css %}{% endblock %}
     <link rel="icon" type="image/png" href="{% static 'dashboard/img/zp3.png' %}">
@@ -28,29 +28,76 @@
             <p>Validadores MK 2.0</p>
         </div>
 
-        <nav class="sidebar-nav">
-            <a href="{% url 'dashboard:panel_baterias' %}" class="sidebar-link {% if active_page == 'baterias' %}active{% endif %}">
-                Baterías
-            </a>
+        <nav class="sidebar-nav" aria-label="Secciones del dashboard">
 
-            <a href="{% url 'dashboard:panel_gps' %}" class="sidebar-link {% if active_page == 'gps' %}active{% endif %}">
-                Ubicación GPS
-            </a>
-
-            <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}">
-                Alertas
-            </a>
+            <details class="sidebar-group" data-grupo="operacion" open
+                     {% if active_page == 'baterias' or active_page == 'gps' or active_page == 'alertas' %}data-activo="1"{% endif %}>
+                <summary class="sidebar-group-title">
+                    <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                        <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Operación
+                </summary>
+                <ul class="sidebar-group-items">
+                    <li>
+                        <a href="{% url 'dashboard:panel_baterias' %}" class="sidebar-link {% if active_page == 'baterias' %}active{% endif %}"
+                           {% if active_page == 'baterias' %}aria-current="page"{% endif %}>
+                            Baterías
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'dashboard:panel_gps' %}" class="sidebar-link {% if active_page == 'gps' %}active{% endif %}"
+                           {% if active_page == 'gps' %}aria-current="page"{% endif %}>
+                            Ubicación GPS
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}"
+                           {% if active_page == 'alertas' %}aria-current="page"{% endif %}>
+                            Alertas
+                        </a>
+                    </li>
+                </ul>
+            </details>
 
             {% puede_ver_transacciones user as puede_ver_trx %}
             {% if puede_ver_trx %}
-                <a href="{% url 'transacciones:informe_interno' %}" class="sidebar-link {% if active_page == 'transacciones' %}active{% endif %}">
-                    Transacciones
-                </a>
+                <details class="sidebar-group" data-grupo="reportes" open
+                         {% if active_page == 'transacciones' %}data-activo="1"{% endif %}>
+                    <summary class="sidebar-group-title">
+                        <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                            <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Reportes
+                    </summary>
+                    <ul class="sidebar-group-items">
+                        <li>
+                            <a href="{% url 'transacciones:informe_interno' %}" class="sidebar-link {% if active_page == 'transacciones' %}active{% endif %}"
+                               {% if active_page == 'transacciones' %}aria-current="page"{% endif %}>
+                                Transacciones
+                            </a>
+                        </li>
+                    </ul>
+                </details>
             {% endif %}
 
-            <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}">
-                Perfil
-            </a>
+            <details class="sidebar-group" data-grupo="administracion" open
+                     {% if active_page == 'perfil' %}data-activo="1"{% endif %}>
+                <summary class="sidebar-group-title">
+                    <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                        <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Administración
+                </summary>
+                <ul class="sidebar-group-items">
+                    <li>
+                        <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}"
+                           {% if active_page == 'perfil' %}aria-current="page"{% endif %}>
+                            Perfil
+                        </a>
+                    </li>
+                </ul>
+            </details>
         </nav>
 
         <section class="sidebar-status-section">
@@ -136,6 +183,7 @@
 
 {% block extra_js %}{% endblock %}
 <script src="{% static 'dashboard/js/scroll_explorar.js' %}?v=1"></script>
+<script src="{% static 'dashboard/js/sidebar.js' %}?v=1"></script>
 
 </body>
 </html>

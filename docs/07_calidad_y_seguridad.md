@@ -46,6 +46,7 @@ estados GPS y cumplimiento.
 - Usar `DEBUG=False`, clave aleatoria y hosts restrictivos.
 - Aplicar mínimos privilegios Oracle, CSRF y autorización del lado servidor.
 - Ocultar un enlace no autoriza: el control real de Transacciones es el `403` de sus vistas, comprobado en `test_transacciones_views.py`. El tag del sidebar es solo comodidad visual.
+- El sidebar se agrupa con `<details>` nativos, no con JavaScript: el colapsado funciona sin scripting y `sidebar.js` solo añade la persistencia en `localStorage`. El grupo que contiene la página actual se abre siempre, aunque el usuario lo hubiera colapsado antes, para no aterrizar en una página cuyo propio enlace de navegación está oculto.
 - Validar tamaño, extensión y contenido de Excel.
 - Usar parámetros SQL enlazados y allowlists.
 - Tratar exportaciones como telemetría protegida.
