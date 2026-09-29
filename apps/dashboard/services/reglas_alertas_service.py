@@ -247,8 +247,28 @@ def recalcular_alertas(modo_recalculo="completo", log_path=None, log_callback=No
         raise RuntimeError(mensaje_error) from exc
 
 
-def iniciar_recalculo_en_segundo_plano(modo_recalculo="completo", log_path=None):
+def obtener_estado_solicitud_recalculo(solicitud_id):
+    return reglas_alertas_repository.obtener_estado_solicitud_recalculo(
+        solicitud_id
+    )
+
+
+def iniciar_recalculo_en_segundo_plano(
+    modo_recalculo="completo",
+    log_path=None,
+    usuario_solicitante=None,
+):
     _obtener_procedimiento_recalculo(modo_recalculo)
+
+    if getattr(settings, "ALERTAS_RECALCULO_DURABLE_ENABLED", False):
+        solicitud = reglas_alertas_repository.crear_solicitud_recalculo(
+            modo_recalculo=modo_recalculo,
+            usuario_solicitante=usuario_solicitante,
+        )
+        return {
+            "tipo": "durable",
+            **solicitud,
+        }
 
     if not _recalculo_lock.acquire(blocking=False):
         return None
