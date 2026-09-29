@@ -23,7 +23,9 @@ oracle/
     ├── 01_auditoria_rendimiento_etapa3.sql
     ├── V009_VALIDAR__detalle_caidas_bateria.sql
     ├── V010_VALIDAR__indice_gps_fecha_registro.sql
-    └── V011_VALIDAR__sincronizar_amids_ubicaciones.sql
+    ├── V011_VALIDAR__sincronizar_amids_ubicaciones.sql
+└── notas/
+    └── Queries_TRX_C2D_*.sql  # guias personales; no se publican
 ```
 
 ## Uso correcto
@@ -35,6 +37,8 @@ oracle/
 - `pending/` contiene cambios preparados que todavía deben ejecutarse y
   validarse en Oracle.
 - `diagnostics/` contiene consultas de inspección sin modificaciones.
+- `notas/` contiene guías y consultas de trabajo personal. Son material de
+  consulta, no scripts de despliegue: no se publican.
 - Los archivos `resultados_*.sql` son exportaciones locales y no se publican.
 
 El baseline presupone que ya existen los objetos heredados, entre ellos

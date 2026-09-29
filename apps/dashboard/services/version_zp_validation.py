@@ -7,7 +7,7 @@ from zipfile import BadZipFile, ZipFile, is_zipfile
 from django.conf import settings
 from openpyxl import load_workbook
 
-from apps.dashboard.config.version_zp import (
+from apps.dashboard.services.version_zp import (
     COLUMNAS_ESTRUCTURALES_REQUERIDAS,
     VERSION_ZP_EXTENSION,
     VERSION_ZP_SHEET_NAME,
