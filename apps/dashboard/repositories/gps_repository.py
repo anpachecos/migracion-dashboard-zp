@@ -1,4 +1,4 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 def obtener_registros_gps(amid, fecha_inicio, fecha_fin):
@@ -40,7 +40,7 @@ def obtener_registros_gps(amid, fecha_inicio, fecha_fin):
         "fecha_fin": fecha_fin,
     }
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
                 query_anterior,
@@ -90,7 +90,7 @@ def obtener_ultimo_registro_gps_valido(amid):
         WHERE ROWNUM = 1
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
             fila = cursor.fetchone()
@@ -142,7 +142,7 @@ def obtener_datos_ubicacion_amid(amid):
 
     parametros = {"amid": str(amid).strip()}
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query_historial, parametros)
             columnas_historial = [col[0] for col in cursor.description]

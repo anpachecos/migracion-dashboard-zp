@@ -81,7 +81,7 @@ class ReglasAlertasServiceTests(SimpleTestCase):
         )
 
         with patch(
-            "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ):
             resultado = actualizar_reglas_alertas(
@@ -102,7 +102,7 @@ class ReglasAlertasServiceTests(SimpleTestCase):
         )
 
         with patch(
-            "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ):
             resultado = actualizar_reglas_alertas(
@@ -124,7 +124,7 @@ class ReglasAlertasServiceTests(SimpleTestCase):
         )
 
         with patch(
-            "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ):
             resultado = actualizar_reglas_alertas(
@@ -137,7 +137,7 @@ class ReglasAlertasServiceTests(SimpleTestCase):
         contexto, _conexion, cursor = self._preparar_oracle([])
 
         with patch(
-            "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ):
             recalcular_alertas(modo_recalculo="rapido")

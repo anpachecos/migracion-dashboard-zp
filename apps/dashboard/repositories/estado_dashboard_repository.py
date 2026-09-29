@@ -1,4 +1,4 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 def obtener_ultima_carga_datos():
@@ -8,7 +8,7 @@ def obtener_ultima_carga_datos():
         WHERE TIENE_DATO = 1
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query)
             return cursor.fetchone()
@@ -20,7 +20,7 @@ def obtener_ultima_version_zp():
         FROM USR_LAB.UBICACION_ESPERADA_VALIDADOR
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query)
             return cursor.fetchone()
@@ -60,7 +60,7 @@ def obtener_registros_completos(amid, fecha_inicio, fecha_fin):
         ORDER BY FECHA_HORA
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
                 query,

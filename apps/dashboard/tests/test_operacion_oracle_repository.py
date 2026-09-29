@@ -14,8 +14,7 @@ class OperacionOracleRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.repositories.operacion_oracle_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_resumenes_conservan_tres_queries_una_conexion_y_filas(
         self,
@@ -43,8 +42,7 @@ class OperacionOracleRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, filas)
 
     @patch(
-        "apps.dashboard.repositories.operacion_oracle_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_resumenes_conservan_filas_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
@@ -55,8 +53,7 @@ class OperacionOracleRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, (None, None, None))
 
     @patch(
-        "apps.dashboard.repositories.operacion_oracle_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_sysdate_conserva_sql_exacto_y_fila(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)

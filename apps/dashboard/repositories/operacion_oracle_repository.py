@@ -1,4 +1,4 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 def obtener_resumenes_estado():
@@ -33,7 +33,7 @@ def obtener_resumenes_estado():
             WHERE FECHA_FIN_VIGENCIA IS NULL
         """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query_bateria)
             fila_bateria = cursor.fetchone()
@@ -48,7 +48,7 @@ def obtener_resumenes_estado():
 
 
 def obtener_sysdate():
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute("SELECT SYSDATE FROM dual")
             return cursor.fetchone()

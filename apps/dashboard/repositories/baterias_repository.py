@@ -1,4 +1,4 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 def obtener_ultimo_registro(amid):
@@ -27,7 +27,7 @@ def obtener_ultimo_registro(amid):
         WHERE ROWNUM = 1
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
             fila = cursor.fetchone()
@@ -58,7 +58,7 @@ def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
         ORDER BY FECHA_HORA_BLOQUE
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
                 query,
@@ -88,7 +88,7 @@ def obtener_detalle_caidas_bateria(amid):
         ORDER BY FECHA_CAIDA DESC
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
             columnas = [col[0].lower() for col in cursor.description]
@@ -120,7 +120,7 @@ def obtener_resumen_alerta_bateria(amid):
         WHERE AMID = :amid
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
             fila = cursor.fetchone()

@@ -15,8 +15,7 @@ class EstadoDashboardRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.repositories.estado_dashboard_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_ultima_carga_conserva_sql_sin_parametros_y_fila(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
@@ -33,8 +32,7 @@ class EstadoDashboardRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, fila)
 
     @patch(
-        "apps.dashboard.repositories.estado_dashboard_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_ultima_version_conserva_sql_sin_parametros_y_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
@@ -49,8 +47,7 @@ class EstadoDashboardRepositoryTests(SimpleTestCase):
         self.assertIsNone(resultado)
 
     @patch(
-        "apps.dashboard.repositories.estado_dashboard_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_registros_conservan_sql_parametros_orden_y_diccionarios(
         self,
@@ -86,8 +83,7 @@ class EstadoDashboardRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.repositories.estado_dashboard_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_registros_sin_filas_retorna_lista_vacia(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)

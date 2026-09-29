@@ -1,6 +1,6 @@
 import pandas as pd
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 COLUMNAS_ORACLE = [
@@ -102,7 +102,7 @@ def persistir_importacion(
     referencia_laboratorio,
     estadisticas,
 ):
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             for datos in filas_normalizadas:
                 amid = datos["AMID"]
@@ -419,7 +419,7 @@ def mover_ausentes_a_laboratorio(
 
 
 def sincronizar_amids_ubicaciones():
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             ubicaciones_creadas_var = cursor.var(int)
             historiales_creados_var = cursor.var(int)
@@ -477,7 +477,7 @@ def sincronizar_amids_ubicaciones():
 
 
 def limpiar_historial(dias_retencion):
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             filas_eliminadas_var = cursor.var(int)
 

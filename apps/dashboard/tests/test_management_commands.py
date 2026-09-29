@@ -195,8 +195,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         cursor.var.return_value = variable_salida
 
         with patch(
-            "apps.dashboard.repositories.ubicaciones_repository."
-            "obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ), patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"

@@ -1,7 +1,7 @@
 from decimal import Decimal, InvalidOperation
 import uuid
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
 
 
 PROCEDIMIENTOS_RECALCULO = {
@@ -27,7 +27,7 @@ def obtener_reglas(claves_ordenadas):
         for i, clave in enumerate(claves_ordenadas, start=1)
     }
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, parametros)
             columnas = [col[0].lower() for col in cursor.description]
@@ -74,7 +74,7 @@ def actualizar_reglas(actualizaciones, tipos_permitidos):
         WHERE CLAVE = :clave
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         try:
             with conexion.cursor() as cursor:
                 cursor.execute(query_actuales, parametros_claves)
@@ -147,7 +147,7 @@ def obtener_procedimiento_recalculo(modo_recalculo):
 def recalcular_alertas(modo_recalculo):
     procedimiento = obtener_procedimiento_recalculo(modo_recalculo)
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(f"BEGIN {procedimiento}; END;")
         conexion.commit()
@@ -186,7 +186,7 @@ def crear_solicitud_recalculo(modo_recalculo, usuario_solicitante):
         "usuario_solicitante": usuario[:128],
     }
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         try:
             with conexion.cursor() as cursor:
                 cursor.execute(query, parametros)
@@ -226,7 +226,7 @@ def obtener_estado_solicitud_recalculo(solicitud_id):
         WHERE SOLICITUD_ID = :solicitud_id
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"solicitud_id": solicitud_id})
             fila = cursor.fetchone()
