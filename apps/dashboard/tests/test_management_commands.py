@@ -409,6 +409,11 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("fallo sintético", mock_log.call_args.kwargs["mensaje"])
 
+    # Esta prueba verifica la rama de hilo. La rama durable devuelve un
+    # diccionario de solicitud y escribe en Oracle, asi que el resultado
+    # dependia del valor de ALERTAS_RECALCULO_DURABLE_ENABLED en el .env local
+    # y la prueba abria una conexion real a Oracle al ejecutarse.
+    @override_settings(ALERTAS_RECALCULO_DURABLE_ENABLED=False)
     def test_recalculo_segundo_plano_crea_thread_mock_sin_iniciarlo_real(self):
         if reglas_alertas_service._recalculo_lock.locked():
             reglas_alertas_service._recalculo_lock.release()
