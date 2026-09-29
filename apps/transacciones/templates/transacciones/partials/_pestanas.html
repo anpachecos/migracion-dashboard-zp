@@ -1,0 +1,32 @@
+{% comment %}
+Navegación interna de Transacciones. Una sola sección en el sidebar y tres
+pestañas dentro del panel. La querystring de filtros se conserva para que
+cambiar de pestaña no pierda el rango seleccionado.
+
+Las etiquetas llegan desde `trx_service.ETIQUETAS_PESTANA`. La de "> 15 min" se
+deriva de `trx_reglas.UMBRAL_CORTE_MINUTOS`; no se escribe el número aquí.
+{% endcomment %}
+
+<a
+    class="trx-pestana {% if pestana_activa == 'informe_interno' %}is-activa{% endif %}"
+    href="{% url 'transacciones:informe_interno' %}{% if querystring_filtros %}?{{ querystring_filtros }}{% endif %}"
+    {% if pestana_activa == 'informe_interno' %}aria-current="page"{% endif %}
+>
+    {{ etiquetas_pestana.informe_interno }}
+</a>
+
+<a
+    class="trx-pestana {% if pestana_activa == 'mayor_15' %}is-activa{% endif %}"
+    href="{% url 'transacciones:mayor_15' %}{% if querystring_filtros %}?{{ querystring_filtros }}{% endif %}"
+    {% if pestana_activa == 'mayor_15' %}aria-current="page"{% endif %}
+>
+    {{ etiquetas_pestana.mayor_15 }}
+</a>
+
+<a
+    class="trx-pestana {% if pestana_activa == 'rezagadas' %}is-activa{% endif %}"
+    href="{% url 'transacciones:rezagadas' %}{% if querystring_filtros %}?{{ querystring_filtros }}{% endif %}"
+    {% if pestana_activa == 'rezagadas' %}aria-current="page"{% endif %}
+>
+    {{ etiquetas_pestana.rezagadas }}
+</a>

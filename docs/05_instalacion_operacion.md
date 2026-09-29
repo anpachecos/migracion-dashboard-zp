@@ -43,6 +43,7 @@ no inicia.
 | `ORACLE_SERVICE_NAME` | Service name Oracle. |
 | `ORACLE_CLIENT_PATH` | Cliente para modo Thick, si aplica. |
 | `DASHBOARD_SCHEDULER_ENABLED` | `False` por defecto; requiere instancia única. |
+| `TRX_GRUPOS_PERMITIDOS` | Grupos de Django con acceso al módulo de transacciones. Vaciarlo deja la sección solo para superusuarios. |
 
 `.env.example` debe listar estas claves con valores vacíos o seguros.
 `DEBUG` acepta `true`, `1`, `yes`, `on`, `false`, `0`, `no` y `off`, sin
@@ -73,6 +74,7 @@ python manage.py runserver
 | `/perfil/ejecutar-comando/` | Acciones administrativas. |
 | `/baterias/exportar/`, `/gps/exportar/` | Exportaciones XLSX vigentes. |
 | `/alertas/exportar/` | Ruta conservada, pero la exportación está deshabilitada en el flujo actual. |
+| `/transacciones/`, `/transacciones/informe-interno/`, `/transacciones/mayor-15/`, `/transacciones/rezagadas/` | Módulo de transacciones. Requieren sesión **y** ser superusuario o miembro de un grupo de `TRX_GRUPOS_PERMITIDOS`; en caso contrario devuelven `403`. |
 | `/admin/` | Administración Django. |
 
 ## Comandos

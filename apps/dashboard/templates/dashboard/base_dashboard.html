@@ -1,4 +1,5 @@
 {% load static %}
+{% load trx_permisos %}
 
 <!DOCTYPE html>
 <html lang="es">
@@ -39,6 +40,13 @@
             <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}">
                 Alertas
             </a>
+
+            {% puede_ver_transacciones user as puede_ver_trx %}
+            {% if puede_ver_trx %}
+                <a href="{% url 'transacciones:informe_interno' %}" class="sidebar-link {% if active_page == 'transacciones' %}active{% endif %}">
+                    Transacciones
+                </a>
+            {% endif %}
 
             <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}">
                 Perfil

@@ -72,6 +72,7 @@ INSTALLED_APPS = [
 
     # App propia
     "apps.dashboard.apps.DashboardConfig",
+    "apps.transacciones.apps.TransaccionesConfig",
 ]
 
 
@@ -244,3 +245,42 @@ DASHBOARD_SCHEDULER_ENABLED = os.getenv(
     "DASHBOARD_SCHEDULER_ENABLED",
     "False"
 ) == "True"
+
+
+
+# =========================
+# Módulo de Transacciones (TRX C2D)
+# =========================
+# El módulo de Transacciones es de solo lectura: consulta Oracle bajo demanda
+# y no crea objetos, tablas ni jobs. Permanece apagado hasta validar el
+# universo del dataset contra los Excel de referencia del Informe Interno.
+
+# Apagado por defecto. El panel funciona como estructura sin consultar Oracle.
+TRX_ORACLE_HABILITADO = os.getenv(
+    "TRX_ORACLE_HABILITADO",
+    "False",
+).strip().lower() in {"true", "1", "yes", "on"}
+
+# Universo ZP. Correlato de AMID_MINIMO_ALERTAS del panel de alertas.
+TRX_AMID_MINIMO = int(os.getenv("TRX_AMID_MINIMO", "7500000"))
+
+# Límite operativo versionado. La fuente TRX tiene alto volumen: no se cargan
+# rangos amplios sin filtro explícito.
+TRX_RANGO_MAXIMO_DIAS = int(os.getenv("TRX_RANGO_MAXIMO_DIAS", "7"))
+TRX_FILAS_POR_PAGINA = int(os.getenv("TRX_FILAS_POR_PAGINA", "200"))
+TRX_MAX_FILAS_DETALLE = int(os.getenv("TRX_MAX_FILAS_DETALLE", "2000"))
+
+# Día base del filtro de fechas: "trx" (día de la TRX) o "bd" (día de llegada).
+# Ver docs/09_transacciones_trx.md, supuesto S1.
+TRX_MODO_FECHA_BASE = os.getenv("TRX_MODO_FECHA_BASE", "trx")
+
+# Grupos de Django con acceso al módulo de Transacciones, separados por coma.
+# La política vive en configuración y no en el código para no requerir un
+# despliegue al cambiar quién entra. Deben coincidir EXACTAMENTE con los
+# nombres de `auth_group`: la comparación es case-sensitive, "SONDA" no es
+# "Sonda". Vaciar la lista deja el módulo únicamente para superusuarios.
+TRX_GRUPOS_PERMITIDOS = tuple(
+    grupo.strip()
+    for grupo in os.getenv("TRX_GRUPOS_PERMITIDOS", "Admin,SONDA").split(",")
+    if grupo.strip()
+)

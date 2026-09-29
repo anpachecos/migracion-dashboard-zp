@@ -45,6 +45,7 @@ estados GPS y cumplimiento.
 - No versionar `.env`, `db.sqlite3`, cargas ni logs sensibles.
 - Usar `DEBUG=False`, clave aleatoria y hosts restrictivos.
 - Aplicar mínimos privilegios Oracle, CSRF y autorización del lado servidor.
+- Ocultar un enlace no autoriza: el control real de Transacciones es el `403` de sus vistas, comprobado en `test_transacciones_views.py`. El tag del sidebar es solo comodidad visual.
 - Validar tamaño, extensión y contenido de Excel.
 - Usar parámetros SQL enlazados y allowlists.
 - Tratar exportaciones como telemetría protegida.

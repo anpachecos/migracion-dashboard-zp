@@ -19,6 +19,14 @@ urlpatterns = [
         name="logout"
     ),
 
+    path(
+        "transacciones/",
+        include(
+            ("apps.transacciones.urls", "transacciones"),
+            namespace="transacciones",
+        ),
+    ),
+
     path("", include(("apps.dashboard.urls", "dashboard"), namespace="dashboard")),
     path(
         "password_change/",

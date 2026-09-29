@@ -58,6 +58,38 @@ sumarlas ni aplicar nuevamente `BAT_CAIDA_MIN_DETECTAR` o
 - **Fuera del radio** se reserva para coordenadas válidas cuya distancia
   Haversine es mayor que `RADIO_METROS`.
 
+### Contrato de la fuente de transacciones C2D
+
+La app `apps/transacciones/` consume una sola fuente, de **solo lectura**:
+
+```
+DBPTE.TRANSACCION_FLUJO_VC2D_FISC@CLEAMTT3PRODG
+```
+
+- `TVF_SFECTRANSACCION` es `VARCHAR2` y se convierte con
+  `TO_DATE(..., 'YYYY/MM/DD HH24:MI:SS')`. Ese formato está validado sobre
+  muestras; si el dato real difiere, Oracle responde `ORA-01861`. Debe
+  verificarse con `oracle/diagnostics/TRX_001__validar_fuente_lectura.sql`
+  antes de encender el módulo.
+- `TVF_DFECREGISTRO` es la fecha de llegada a BD y ya es tipo fecha.
+- `TVF_NIDAS` es un **AMID**, no un NID. El universo ZP es
+  `TVF_NIDAS > AMID_MINIMO_ALERTAS` (7 500 000), el mismo criterio que usa el
+  panel de alertas.
+- Entidad y sitio se resuelven con `LEFT JOIN` a `DBCLEARING.ENTIDAD` y
+  `DBCLEARING.SITIO` en la **misma** consulta, con los mismos filtros que el
+  conteo. Una TRX sin entidad o sin sitio sigue siendo TRX válida del
+  universo: la interfaz muestra `Sin operador` / `Sin sitio` en lugar de
+  descartarla.
+- El módulo **no persiste** TRX en SQLite y no tiene modelos ni migraciones
+  propias.
+- `TVF_NFILEID` no forma parte del contrato: la guía menciona `TVF_DFECFILEID`
+  y su significado está sin confirmar.
+
+Las reglas funcionales derivadas de esta fuente (corte de 15 minutos,
+tramos, cambio de día, exclusividad) están especificadas en
+[09_transacciones_trx.md](09_transacciones_trx.md) y se implementan solo en
+`apps/transacciones/services/trx_reglas.py`.
+
 ### Datos locales de preferencias
 
 `AlertaAmidExcluido` y `AlertaUbicacionExcluida` pertenecen a SQLite y tienen

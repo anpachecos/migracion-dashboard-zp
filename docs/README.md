@@ -13,6 +13,7 @@ operación y presentación del sistema.
 6. [Datos e integraciones](06_datos_e_integraciones.md): contratos y objetos externos.
 7. [Calidad y seguridad](07_calidad_y_seguridad.md): validaciones y riesgos.
 8. [Historial de optimización de alertas](08_historial_optimizacion_alertas.md): cambios ya aplicados y decisiones.
+9. [Módulo de Transacciones TRX](09_transacciones_trx.md): reglas funcionales, fuente Oracle y estado de validación.
 
 Para explicar el sistema en una presentación, comenzar por los documentos 01,
 02 y 03. El documento 03 contiene el diagrama principal y las reglas del flujo.

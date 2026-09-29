@@ -1,0 +1,137 @@
+{% extends "transacciones/base_transacciones.html" %}
+
+{% block title %}Rezagadas · Transacciones{% endblock %}
+
+{% comment %}
+Análisis de TRX rezagadas: DATE(FEC_TRX) != DATE(FEC_BD). El cambio de día
+manda aunque la diferencia temporal sea mínima. No hay tope de días asumido.
+{% endcomment %}
+
+{% block trx_tabla %}
+    {% if hay_datos %}
+        <div class="trx-sub-bloques">
+            <section class="trx-bloque trx-bloque-interno" aria-label="Detalle de TRX rezagadas">
+                <h3 class="trx-bloque-subtitulo">Detalle de TRX rezagadas</h3>
+                {% include "transacciones/partials/_tabla_trx.html" %}
+            </section>
+
+            <section class="trx-bloque trx-bloque-interno" aria-label="Matriz día TRX por día llegada">
+                <h3 class="trx-bloque-subtitulo">Matriz día TRX x día llegada a BD</h3>
+                <div class="trx-tabla-envoltorio">
+                    <table class="trx-tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Día TRX</th>
+                                <th scope="col">Día llegada</th>
+                                <th scope="col" class="trx-num">Días rezago</th>
+                                <th scope="col" class="trx-num">TRX</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in matriz_dia_trx_dia_bd %}
+                                <tr>
+                                    <td>{{ fila.dia_trx }}</td>
+                                    <td>{{ fila.dia_bd }}</td>
+                                    <td class="trx-num">{{ fila.dias_rezago }}</td>
+                                    <td class="trx-num">{{ fila.total }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="trx-bloque trx-bloque-interno" aria-label="Días de rezago">
+                <h3 class="trx-bloque-subtitulo">Días de rezago</h3>
+                <div class="trx-tabla-envoltorio">
+                    <table class="trx-tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="trx-num">Días</th>
+                                <th scope="col" class="trx-num">TRX</th>
+                                <th scope="col" class="trx-num">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in resumen_por_dias_rezago %}
+                                <tr>
+                                    <td class="trx-num">{{ fila.dias_rezago }}</td>
+                                    <td class="trx-num">{{ fila.total }}</td>
+                                    <td class="trx-num">{{ fila.porcentaje }}%</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="trx-bloque trx-bloque-interno" aria-label="Tendencia por día">
+                <h3 class="trx-bloque-subtitulo">Tendencia por día de llegada</h3>
+                <div class="trx-tabla-envoltorio">
+                    <table class="trx-tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Día</th>
+                                <th scope="col" class="trx-num">Rezagadas</th>
+                                <th scope="col" class="trx-num">Duración promedio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in tendencia_por_dia %}
+                                <tr>
+                                    <td>{{ fila.dia }}</td>
+                                    <td class="trx-num">{{ fila.total }}</td>
+                                    <td class="trx-num">{{ fila.duracion_promedio_texto }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="trx-bloque trx-bloque-interno" aria-label="Análisis por AMID">
+                <h3 class="trx-bloque-subtitulo">Análisis por AMID</h3>
+                <div class="trx-tabla-envoltorio">
+                    <table class="trx-tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="trx-num">AMID</th>
+                                <th scope="col">Operador</th>
+                                <th scope="col">Sitio / ZP</th>
+                                <th scope="col" class="trx-num">Rezagadas</th>
+                                <th scope="col" class="trx-num">Máx. días</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in analisis_por_amid %}
+                                <tr>
+                                    <td class="trx-num">{{ fila.amid }}</td>
+                                    <td>{{ fila.nombre_entidad }}</td>
+                                    <td>{{ fila.nombre_sitio }}</td>
+                                    <td class="trx-num">{{ fila.total }}</td>
+                                    <td class="trx-num">{{ fila.maximo_dias_rezago }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    {% else %}
+        {% include "transacciones/partials/_tabla_trx.html" %}
+    {% endif %}
+{% endblock %}
+
+{% block trx_exportacion %}
+    <div class="placeholder-card trx-placeholder" data-trx-placeholder-zona="exportacion">
+        <p class="trx-placeholder-titulo">Exportación no disponible</p>
+        <p class="trx-placeholder-texto">
+            {% if exportacion_disponible %}
+                La descarga está habilitada.
+            {% else %}
+                Descarga XLSX del detalle mensual de rezagadas, de los días de
+                rezago y de la matriz día TRX x día llegada.
+            {% endif %}
+        </p>
+    </div>
+{% endblock %}

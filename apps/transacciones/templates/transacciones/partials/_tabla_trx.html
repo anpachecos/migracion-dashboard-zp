@@ -1,0 +1,67 @@
+{% comment %}
+Tabla de detalle de TRX. Muestra únicamente campos derivados por `trx_service`.
+No calcula nada en el template: todo llega calculado desde el service.
+{% endcomment %}
+
+{% if not hay_datos %}
+    <div class="placeholder-card trx-placeholder" data-trx-sin-datos="true">
+        <p class="trx-placeholder-titulo">Sin datos en el rango seleccionado</p>
+        <p class="trx-placeholder-texto">
+            Ajusta el rango de fechas o habilita la consulta Oracle con
+            <code>TRX_ORACLE_HABILITADO</code>.
+        </p>
+    </div>
+{% else %}
+    {% if truncado %}
+        <p class="trx-nota-validacion" role="note">
+            Se muestran {{ total_muestra }} de {{ total_universo }} TRX del rango.
+            La tabla y los agregados se calculan sobre esa muestra acotada.
+        </p>
+    {% endif %}
+
+    <div class="trx-tabla-envoltorio">
+        <table class="trx-tabla">
+            <thead>
+                <tr>
+                    <th scope="col">FEC TRX</th>
+                    <th scope="col">FEC BD</th>
+                    <th scope="col" class="trx-num">Duración</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Clasificación</th>
+                    <th scope="col">Tramo</th>
+                    <th scope="col" class="trx-num">Días rezago</th>
+                    <th scope="col" class="trx-num">AMID</th>
+                    <th scope="col">Operador</th>
+                    <th scope="col">Sitio / ZP</th>
+                    <th scope="col">ID contexto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trx in filas %}
+                    <tr class="{{ trx.clase_estado }}">
+                        <td>{{ trx.fec_trx_texto|default:"-" }}</td>
+                        <td>{{ trx.fec_bd_texto|default:"-" }}</td>
+                        <td class="trx-num">{{ trx.duracion_texto }}</td>
+                        <td>
+                            <span class="trx-pill {{ trx.clase_estado }}">{{ trx.estado_texto }}</span>
+                        </td>
+                        <td>{{ trx.clasificacion }}</td>
+                        <td>
+                            {{ trx.tramo_etiqueta|default:"-" }}
+                            {% if trx.tramo_rango %}
+                                <span class="trx-sub">{{ trx.tramo_rango }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="trx-num">
+                            {% if trx.es_rezagada %}{{ trx.dias_rezago }}{% else %}0{% endif %}
+                        </td>
+                        <td class="trx-num">{{ trx.amid|default:"-" }}</td>
+                        <td>{{ trx.nombre_entidad }}</td>
+                        <td>{{ trx.nombre_sitio }}</td>
+                        <td>{{ trx.nid_contexto_opte|default:"-" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}

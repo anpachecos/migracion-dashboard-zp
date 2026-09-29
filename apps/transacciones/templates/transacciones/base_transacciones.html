@@ -1,0 +1,89 @@
+{% extends "dashboard/base_dashboard.html" %}
+
+{% load static %}
+
+{% comment %}
+Base del módulo de Transacciones.
+
+Extiende `dashboard/base_dashboard.html` para reutilizar el layout, el sidebar y
+el bloque de estado del sistema. Aquí solo se centraliza lo propio de TRX: el
+encabezado, la navegación interna entre pestañas y las zonas comunes de KPIs,
+gráficos, tabla y exportación.
+
+Cada pestaña provee su propio contenido. Las zonas que aún no tienen
+implementación se dejan visibles como placeholder, nunca como dato inventado.
+{% endcomment %}
+
+{% block title %}{{ titulo_pestana }} · Transacciones{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'transacciones/css/transacciones.css' %}?v=1">
+{% endblock %}
+
+{% block content %}
+<div class="trx-page">
+
+    <header class="panel-header trx-header">
+        <h1>Transacciones</h1>
+        <p>{{ descripcion_pestana }}</p>
+    </header>
+
+    <nav class="trx-pestanas" aria-label="Análisis de transacciones">
+        {% include "transacciones/partials/_pestanas.html" %}
+    </nav>
+
+    {% if mensaje %}
+        <p class="trx-aviso" role="status" data-trx-aviso>{{ mensaje }}</p>
+    {% endif %}
+
+    <section class="trx-bloque trx-bloque-filtros" aria-label="Filtros">
+        <h2 class="trx-bloque-titulo">Filtros</h2>
+        {% include "transacciones/partials/_filtros.html" %}
+    </section>
+
+    <section class="trx-bloque trx-bloque-kpis" aria-label="Indicadores">
+        <h2 class="trx-bloque-titulo">Indicadores</h2>
+        {% block trx_kpis %}
+            {% include "transacciones/partials/_kpis.html" %}
+        {% endblock %}
+    </section>
+
+    <section class="trx-bloque trx-bloque-graficos" aria-label="Gráficos">
+        <h2 class="trx-bloque-titulo">Gráficos</h2>
+        {% block trx_graficos %}
+            {% include "transacciones/partials/_placeholder.html" %}
+        {% endblock %}
+    </section>
+
+    <section class="trx-bloque trx-bloque-tabla" aria-label="Detalle">
+        <h2 class="trx-bloque-titulo">Detalle</h2>
+        {% block trx_tabla %}
+            {% include "transacciones/partials/_placeholder.html" %}
+        {% endblock %}
+    </section>
+
+    <section class="trx-bloque trx-bloque-exportacion" aria-label="Exportación">
+        <h2 class="trx-bloque-titulo">Exportación</h2>
+        {% block trx_exportacion %}
+            {% include "transacciones/partials/_placeholder.html" %}
+        {% endblock %}
+    </section>
+
+    <section class="trx-bloque trx-bloque-notas" aria-label="Notas de avance">
+        <h2 class="trx-bloque-titulo">Próximas zonas</h2>
+        <ul class="trx-notas">
+            {% for zona in zonas_preparadas %}
+                <li class="trx-nota">
+                    <strong>{{ zona.titulo }}</strong>
+                    <span>{{ zona.descripcion }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'transacciones/js/transacciones.js' %}?v=1" defer></script>
+{% endblock %}

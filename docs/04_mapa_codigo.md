@@ -145,6 +145,70 @@ apps/dashboard/
 - `tests.py` ya contiene pruebas básicas, pero todavía no cubre todo el sistema. Se recomienda ampliarlas progresivamente.
 ---
 
+## Carpeta `apps/transacciones/`
+
+Aplicación independiente para el análisis de transacciones C2D. Es de **solo lectura**: consulta Oracle bajo demanda y no crea objetos, tablas ni jobs. Sustituye progresivamente los Excel de Informe Interno, Mayor a 15 min y Rezagadas.
+
+Su documentación específica está en [09_transacciones_trx.md](09_transacciones_trx.md). Aquí solo se registra la ubicación de las piezas.
+
+```txt
+apps/transacciones/
+├── apps.py
+├── urls.py
+├── views.py
+├── permisos.py
+├── templatetags/
+│   └── trx_permisos.py
+├── repositories/
+│   └── trx_repository.py
+├── services/
+│   ├── trx_reglas.py
+│   ├── trx_service.py
+│   ├── informe_interno_service.py
+│   ├── mayor_15_service.py
+│   ├── rezagadas_service.py
+│   └── exportaciones_service.py
+├── static/transacciones/
+│   ├── css/transacciones.css
+│   └── js/transacciones.js
+├── templates/transacciones/
+│   ├── base_transacciones.html
+│   ├── informe_interno.html
+│   ├── mayor_15.html
+│   ├── rezagadas.html
+│   └── partials/
+└── tests/
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `views.py` | Cuatro vistas con `@requiere_permiso_transacciones`: redirección de la raíz y las tres pestañas. No contiene SQL ni reglas. | Vigente |
+| `urls.py` | Rutas bajo el namespace `transacciones`: raíz, `informe-interno/`, `mayor-15/` y `rezagadas/`. | Vigente |
+| `apps.py` | `TransaccionesConfig`. No inicia tareas ni jobs. | Vigente |
+| `permisos.py` | **Control de acceso del módulo.** `usuario_puede_ver_transacciones` acepta superusuario o pertenencia a cualquier grupo de `TRX_GRUPOS_PERMITIDOS` en una sola consulta. `requiere_permiso_transacciones` encadena `@login_required` y devuelve `403` sin armar contexto. | Vigente |
+| `repositories/trx_repository.py` | Único lugar con SQL Oracle. Binds obligatorios, proyección explícita sin `SELECT *`, paginación con `ROW_NUMBER` para Oracle 11g. El conteo y el detalle comparten `armar_filtros_trx` para que no puedan divergir. | Vigente |
+| `services/trx_reglas.py` | **Fuente única de las reglas funcionales.** Umbrales, clasificación, tramos, mismo día, rezago y exclusividad. Ningún otro módulo debe escribir un umbral. | Vigente |
+| `services/trx_service.py` | Normaliza cada fila una sola vez y calcula los campos derivados que comparten las tres salidas. Valida los filtros de la querystring y decide si se consulta Oracle según `TRX_ORACLE_HABILITADO`. | Vigente |
+| `services/informe_interno_service.py` | Salida del Informe Interno. Agrega el selector de universo completo vs. solo mismo día. | Vigente / supuesto S1 abierto |
+| `services/mayor_15_service.py` | Salida de `> 15 min`. Incluye matriz validador x día y ranking de validadores. | Vigente |
+| `services/rezagadas_service.py` | Salida de rezagadas. Incluye matriz día TRX x día llegada, días de rezago, tendencia diaria y análisis por AMID. | Vigente |
+| `services/exportaciones_service.py` | Interfaz reservada. Las tres funciones lanzan `NotImplementedError` a propósito para que no se consuman por error. | Pendiente |
+| `templates/transacciones/base_transacciones.html` | Extiende `dashboard/base_dashboard.html`. Centraliza encabezado, pestañas, KPIs y zonas comunes. | Vigente |
+| `templatetags/trx_permisos.py` | Tag `{% puede_ver_transacciones user %}` que oculta el enlace del sidebar. Es comodidad visual; la garantía es el `403` de las vistas. | Vigente |
+| `static/transacciones/css/transacciones.css` | Estilos propios del módulo. Reutiliza la paleta de `base_dashboard.css`. | Vigente |
+| `static/transacciones/js/transacciones.js` | Mínimo a propósito: el hito 1 es GET puro, sin gráficos ni paginación de cliente. | Vigente |
+
+### Observaciones
+
+- El módulo está **apagado por defecto**: `TRX_ORACLE_HABILITADO=False`. Las pantallas funcionan como estructura sin abrir conexión a Oracle.
+- `CONSULTAS_VALIDADAS` está en `False` en `trx_service.py` y la interfaz muestra una advertencia permanente. Las cifras no están contrastadas con los Excel de referencia.
+- Las zonas sin implementar (gráficos, análisis mensual, exportación) se muestran con un marcador explícito. No hay datos simulados.
+- `trx_repository.py` importa `obtener_conexion_oracle` de `apps/dashboard/services/oracle_connection.py` porque hay una refactorización en curso. Es la única dependencia cruzada pendiente de resolver.
+- No hay modelos ni migraciones propias: el módulo no persiste nada en SQLite.
+- El acceso está restringido a superusuario y a los grupos de `TRX_GRUPOS_PERMITIDOS` (`Admin,SONDA` por defecto). La política vive en la variable de entorno, no en el código, así que cambiar quién entra no requiere despliegue. Los grupos y sus miembros se administran en `/admin/`; no hay comando ni migración. Ver [09_transacciones_trx.md](09_transacciones_trx.md).
+- Las pruebas viven en `apps/transacciones/tests/`, siguiendo el patrón de pruebas por app.
+---
+
 ## Carpeta `services/`
 
 La carpeta `services/` contiene la lógica de negocio del dashboard. Es una de las carpetas más importantes del proyecto porque aquí se consulta Oracle, se preparan datos para los paneles y se centralizan cálculos.
@@ -216,7 +280,7 @@ apps/dashboard/templates/dashboard/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. | Vigente |
+| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. El enlace a Transacciones se oculta con `{% puede_ver_transacciones user %}`. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
 | `panel_baterias.html` | Muestra búsqueda por AMID, horarios vigentes, filtro Horario Zona Paga, tarjetas, eventos oficiales, bloques y gráficos. | Vigente |
 | `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |

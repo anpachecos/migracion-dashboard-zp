@@ -28,6 +28,12 @@ Navegador -> URL -> sesión Django -> view -> service
 
 Los paneles y exportaciones requieren login. Las acciones administrativas comprueban superusuario o grupo Django `Admin`.
 
+El módulo de transacciones aplica un control adicional: además de sesión,
+requiere superusuario o pertenencia a un grupo de `TRX_GRUPOS_PERMITIDOS`
+(`Admin,SONDA` por defecto). El permiso se resuelve en
+`apps/transacciones/permisos.py` antes de armar el contexto, y el enlace del
+menú se oculta a quien no lo tiene.
+
 ## Flujos
 
 ### Baterías
