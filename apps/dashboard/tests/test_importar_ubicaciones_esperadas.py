@@ -511,3 +511,67 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
 
         mock_persistir.assert_not_called()
         mock_ausentes.assert_not_called()
+
+
+class ImportarUbicacionesEsperadasTests(SimpleTestCase):
+    def test_ausentes_usan_maestro_activo_y_respetan_amids_del_excel(self):
+        cursor = MagicMock()
+        cursor.description = [("AMID",), ("SERIE_VALIDADOR",)]
+        cursor.fetchall.return_value = [
+            ("750001", "SERIE-1"),
+            ("750002", None),
+        ]
+
+        referencia_laboratorio = {
+            "NOMBRE": "Laboratorio Zonas Pagas",
+            "LATITUD_ESPERADA": -33.437191,
+            "LONGITUD_ESPERADA": -70.656102,
+            "RADIO_METROS": 150,
+            "OPERATIVA": 0,
+            "ORIGEN_UBICACION": "laboratorio_default",
+        }
+        with patch.object(
+            ubicaciones_repository,
+            "obtener_historial_vigente",
+            return_value=None,
+        ), patch.object(
+            ubicaciones_repository,
+            "upsert_vigente",
+        ) as mock_upsert, patch.object(
+            ubicaciones_repository,
+            "crear_historial",
+        ) as mock_crear:
+            resultado = ubicaciones_repository.mover_ausentes_a_laboratorio(
+                cursor=cursor,
+                amids_excel={"750001"},
+                fecha_carga=datetime(2026, 8, 27, 12, 0),
+                archivo_origen="ZONA PAGA V755.xlsx",
+                version_zp="V755",
+                referencia_laboratorio=referencia_laboratorio,
+            )
+
+        consulta_maestro = cursor.execute.call_args.args[0]
+        self.assertIn("AMID_MAESTRO_ALERTAS", consulta_maestro)
+        self.assertIn("WHERE ACTIVO = 1", consulta_maestro)
+        self.assertIn(
+            "LEFT JOIN USR_LAB.UBICACION_ESPERADA_VALIDADOR",
+            consulta_maestro,
+        )
+
+        mock_upsert.assert_called_once()
+        datos_laboratorio = mock_upsert.call_args.args[1]
+        self.assertEqual(datos_laboratorio["AMID"], "750002")
+        self.assertEqual(datos_laboratorio["NOMBRE"], "Laboratorio Zonas Pagas")
+        self.assertEqual(datos_laboratorio["OPERATIVA"], 0)
+        self.assertIsNone(datos_laboratorio["HORARIO"])
+        self.assertIsNone(datos_laboratorio["HORARIO_LABORAL_PM"])
+        self.assertIsNone(datos_laboratorio["HORARIO_SABADO"])
+        self.assertIsNone(datos_laboratorio["HORARIO_DOMINGO"])
+
+        mock_crear.assert_called_once()
+        datos_historial = mock_crear.call_args.args[1]
+        self.assertEqual(
+            datos_historial["ORIGEN_UBICACION"],
+            "laboratorio_default",
+        )
+        self.assertEqual(resultado, (1, 0, 1))

@@ -8,7 +8,7 @@ from django.test import SimpleTestCase
 
 
 class SettingsFailClosedTests(SimpleTestCase):
-    RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
+    RAIZ_PROYECTO = Path(__file__).resolve().parents[3]
     SECRET_KEY_SINTETICA = "clave-sintetica-exclusiva-para-tests-1234567890"
     SCRIPT_CARGA_SETTINGS = r"""
 import json
