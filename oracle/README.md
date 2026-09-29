@@ -16,7 +16,8 @@ oracle/
 │   └── V009__detalle_caidas_bateria_fuente_unica.sql
 ├── pending/
 │   ├── V010__indice_estatus_zp_amid_fecha_registro.sql
-│   └── V011__sincronizar_amids_ubicaciones.sql
+│   ├── V011__sincronizar_amids_ubicaciones.sql
+│   └── bkl-002c/  # lease/solicitudes/jobs preparados; no desplegados
 └── diagnostics/
     ├── 00_auditoria_previa.sql
     ├── 01_auditoria_rendimiento_etapa3.sql

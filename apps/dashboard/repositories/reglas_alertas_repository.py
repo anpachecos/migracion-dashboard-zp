@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+import uuid
 
 from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
 
@@ -150,3 +151,86 @@ def recalcular_alertas(modo_recalculo):
         with conexion.cursor() as cursor:
             cursor.execute(f"BEGIN {procedimiento}; END;")
         conexion.commit()
+
+
+def crear_solicitud_recalculo(modo_recalculo, usuario_solicitante):
+    """Registra una solicitud durable sin ejecutar el recálculo."""
+    obtener_procedimiento_recalculo(modo_recalculo)
+    solicitud_id = uuid.uuid4().hex.upper()
+    modo_oracle = modo_recalculo.upper()
+    usuario = (usuario_solicitante or "SISTEMA").strip() or "SISTEMA"
+    query = """
+        INSERT INTO USR_LAB.ALERTA_RECALCULO_SOLICITUD (
+            SOLICITUD_ID,
+            ORIGEN,
+            MODO,
+            ESTADO,
+            USUARIO_SOLICITANTE,
+            FECHA_SOLICITUD,
+            INTENTOS,
+            FECHA_ACTUALIZACION
+        ) VALUES (
+            :solicitud_id,
+            'DJANGO_PANEL',
+            :modo,
+            'PENDIENTE',
+            :usuario_solicitante,
+            SYSTIMESTAMP,
+            0,
+            SYSTIMESTAMP
+        )
+    """
+    parametros = {
+        "solicitud_id": solicitud_id,
+        "modo": modo_oracle,
+        "usuario_solicitante": usuario[:128],
+    }
+
+    with obtener_conexion_oracle() as conexion:
+        try:
+            with conexion.cursor() as cursor:
+                cursor.execute(query, parametros)
+            conexion.commit()
+        except Exception:
+            conexion.rollback()
+            raise
+
+    return {
+        "solicitud_id": solicitud_id,
+        "origen": "DJANGO_PANEL",
+        "modo": modo_oracle,
+        "estado": "PENDIENTE",
+        "usuario_solicitante": usuario[:128],
+    }
+
+
+def obtener_estado_solicitud_recalculo(solicitud_id):
+    """Consulta el estado durable sin alterar la solicitud."""
+    query = """
+        SELECT
+            SOLICITUD_ID,
+            ORIGEN,
+            MODO,
+            ESTADO,
+            USUARIO_SOLICITANTE,
+            FECHA_SOLICITUD,
+            FECHA_INICIO,
+            FECHA_FIN,
+            INTENTOS,
+            OWNER_TOKEN,
+            LEASE_VERSION,
+            ERROR_CODIGO,
+            ERROR_MENSAJE,
+            FECHA_ACTUALIZACION
+        FROM USR_LAB.ALERTA_RECALCULO_SOLICITUD
+        WHERE SOLICITUD_ID = :solicitud_id
+    """
+
+    with obtener_conexion_oracle() as conexion:
+        with conexion.cursor() as cursor:
+            cursor.execute(query, {"solicitud_id": solicitud_id})
+            fila = cursor.fetchone()
+            if fila is None:
+                return None
+            columnas = [columna[0].lower() for columna in cursor.description]
+            return dict(zip(columnas, fila))

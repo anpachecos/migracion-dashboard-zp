@@ -475,13 +475,25 @@ def panel_perfil(request):
                     messages.info(request, "No se detectaron cambios en las reglas.")
                 elif accion == "guardar_y_recalcular_alertas":
                     hilo = iniciar_recalculo_en_segundo_plano(
-                        modo_recalculo=modo_recalculo
+                        modo_recalculo=modo_recalculo,
+                        usuario_solicitante=usuario_actual.get_username(),
                     )
                     if hilo is None:
                         messages.warning(
                             request,
                             f"Se guardaron {cantidad} regla(s), pero ya hay un "
                             "recálculo manual en curso. No se inició otro proceso.",
+                        )
+                    elif isinstance(hilo, dict) and hilo.get("tipo") == "durable":
+                        descripcion_modo = (
+                            "completo, porque cambió una regla de detección"
+                            if modo_recalculo == "completo"
+                            else "rápido, porque solo cambiaron reglas de clasificación"
+                        )
+                        messages.success(
+                            request,
+                            f"Se guardaron {cantidad} regla(s). Se registró la "
+                            f"solicitud de recálculo {descripcion_modo}.",
                         )
                     else:
                         descripcion_modo = (
