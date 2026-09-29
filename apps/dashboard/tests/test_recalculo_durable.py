@@ -1,10 +1,60 @@
-from unittest.mock import MagicMock, patch
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase, override_settings
 
 from apps.dashboard.repositories import reglas_alertas_repository
 from apps.dashboard.services import reglas_alertas_service
+
+
+class RecalculoDurableSettingsTests(SimpleTestCase):
+    RAIZ_PROYECTO = Path(__file__).resolve().parents[3]
+    AUSENTE = object()
+    SCRIPT_CARGA_SETTINGS = r"""
+import json
+from unittest.mock import patch
+
+with patch("dotenv.load_dotenv", return_value=False):
+    import config.settings as project_settings
+
+print(json.dumps({
+    "durable_enabled": project_settings.ALERTAS_RECALCULO_DURABLE_ENABLED,
+}))
+"""
+
+    def cargar_flag(self, valor=AUSENTE):
+        entorno = os.environ.copy()
+        entorno["SECRET_KEY"] = "clave-sintetica-exclusiva-para-tests-1234567890"
+        entorno.pop("ALERTAS_RECALCULO_DURABLE_ENABLED", None)
+        if valor is not self.AUSENTE:
+            entorno["ALERTAS_RECALCULO_DURABLE_ENABLED"] = valor
+
+        proceso = subprocess.run(
+            [sys.executable, "-c", self.SCRIPT_CARGA_SETTINGS],
+            cwd=self.RAIZ_PROYECTO,
+            env=entorno,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        salida = proceso.stdout.strip().splitlines()
+        datos = json.loads(salida[-1]) if salida else {}
+        self.assertEqual(proceso.returncode, 0, proceso.stderr)
+        return datos["durable_enabled"]
+
+    def test_flag_ausente_usa_false_por_default(self):
+        self.assertIs(self.cargar_flag(), False)
+
+    def test_flag_false_es_false(self):
+        self.assertIs(self.cargar_flag("False"), False)
+
+    def test_flag_true_es_true(self):
+        self.assertIs(self.cargar_flag("True"), True)
 
 
 class SolicitudRecalculoRepositoryTests(SimpleTestCase):
@@ -139,7 +189,7 @@ class RecalculoDurableSqlArtifactsTests(SimpleTestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.carpeta = (
-            Path(__file__).resolve().parents[2]
+            Path(__file__).resolve().parents[3]
             / "oracle"
             / "pending"
             / "bkl-002c"
@@ -191,7 +241,7 @@ class RecalculoDurableProcessorSafetyTests(SimpleTestCase):
     def setUpClass(cls):
         super().setUpClass()
         ruta = (
-            Path(__file__).resolve().parents[2]
+            Path(__file__).resolve().parents[3]
             / "oracle"
             / "pending"
             / "bkl-002c"
