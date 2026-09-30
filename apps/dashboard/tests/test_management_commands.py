@@ -2,8 +2,6 @@ import importlib
 import os
 from datetime import datetime
 from io import StringIO
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
 
 from django.core.management import call_command, get_commands
@@ -12,17 +10,8 @@ from django.db import OperationalError
 from django.test import TestCase, override_settings
 
 from apps.dashboard.apps import DashboardConfig
-from apps.dashboard.management.commands.actualizar_validadores import (
-    Command as ActualizarValidadoresCommand,
-)
-from apps.dashboard.management.commands.cargar_validadores_limpios import (
-    Command as CargarValidadoresLimpiosCommand,
-)
 from apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle import (
     Command as LimpiarHistorialOracleCommand,
-)
-from apps.dashboard.management.commands.limpiar_registros_antiguos import (
-    Command as LimpiarRegistrosAntiguosCommand,
 )
 from apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas import (
     Command as LimpiarTablasSqliteCommand,
@@ -143,20 +132,26 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertIn("Error registrando estado Oracle: fallo sintético", stderr.getvalue())
         self.assertEqual(stdout.getvalue(), "")
 
-    def test_comandos_sqlite_antiguos_informan_que_estan_deshabilitados(self):
-        casos = (
-            (ActualizarValidadoresCommand, "actualización antigua de validadores"),
-            (CargarValidadoresLimpiosCommand, "flujo antiguo de carga"),
-            (LimpiarRegistrosAntiguosCommand, "limpieza de EstadoValidadorLimpio"),
-        )
-        for clase, fragmento in casos:
-            with self.subTest(command=clase.__module__):
-                comando, stdout, stderr = self.comando(clase)
-                resultado = comando.handle()
-                self.assertIsNone(resultado)
-                self.assertIn("Este comando está deshabilitado.", stdout.getvalue())
-                self.assertIn(fragmento, stdout.getvalue())
-                self.assertEqual(stderr.getvalue(), "")
+    def test_comandos_sqlite_inertes_ya_no_estan_registrados(self):
+        comandos_disponibles = get_commands()
+
+        for nombre in (
+            "actualizar_validadores",
+            "cargar_validadores_limpios",
+            "limpiar_registros_antiguos",
+        ):
+            with self.subTest(command=nombre):
+                self.assertNotIn(nombre, comandos_disponibles)
+
+    def test_limpiar_tablas_sqlite_antiguas_esta_deshabilitado(self):
+        comando, stdout, stderr = self.comando(LimpiarTablasSqliteCommand)
+
+        resultado = comando.handle()
+
+        self.assertIsNone(resultado)
+        self.assertIn("Este comando está deshabilitado.", stdout.getvalue())
+        self.assertIn("VACUUM", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
 
     def test_importadores_obsoletos_ya_no_estan_disponibles(self):
         comandos_disponibles = get_commands()
@@ -195,8 +190,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         cursor.var.return_value = variable_salida
 
         with patch(
-            "apps.dashboard.repositories.ubicaciones_repository."
-            "obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ), patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"
@@ -229,36 +223,6 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("fallo sintético de limpieza", stderr.getvalue())
         self.assertEqual(stdout.getvalue(), "")
-
-    def test_limpiar_tablas_sqlite_falla_si_la_base_no_existe(self):
-        comando, stdout, stderr = self.comando(LimpiarTablasSqliteCommand)
-        with TemporaryDirectory() as directorio:
-            ruta_inexistente = os.path.join(directorio, "inexistente.sqlite3")
-            with patch(
-                "apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas."
-                "settings.DATABASES",
-                {"default": {"NAME": ruta_inexistente}},
-            ):
-                with self.assertRaisesRegex(CommandError, "No existe la base SQLite"):
-                    comando.handle(confirmar=False)
-
-        self.assertIn("No existe la base SQLite", stderr.getvalue())
-        self.assertEqual(stdout.getvalue(), "")
-
-    def test_limpiar_tablas_sqlite_sin_tablas_antiguas_es_exito(self):
-        comando, stdout, stderr = self.comando(LimpiarTablasSqliteCommand)
-        with TemporaryDirectory() as directorio:
-            ruta_db = os.path.join(directorio, "vacia.sqlite3")
-            Path(ruta_db).touch()
-            with patch(
-                "apps.dashboard.management.commands.limpiar_tablas_sqlite_antiguas."
-                "settings.DATABASES",
-                {"default": {"NAME": ruta_db}},
-            ), patch.object(comando, "obtener_tablas", return_value=[]):
-                comando.handle(confirmar=False)
-
-        self.assertIn("No se encontraron tablas antiguas para borrar.", stdout.getvalue())
-        self.assertEqual(stderr.getvalue(), "")
 
     def test_call_command_expone_fallo_controlado_de_probar_oracle(self):
         stdout = StringIO()
@@ -410,6 +374,11 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         self.assertEqual(mock_log.call_args.kwargs["estado"], "ERROR")
         self.assertIn("fallo sintético", mock_log.call_args.kwargs["mensaje"])
 
+    # Esta prueba verifica la rama de hilo. La rama durable devuelve un
+    # diccionario de solicitud y escribe en Oracle, asi que el resultado
+    # dependia del valor de ALERTAS_RECALCULO_DURABLE_ENABLED en el .env local
+    # y la prueba abria una conexion real a Oracle al ejecutarse.
+    @override_settings(ALERTAS_RECALCULO_DURABLE_ENABLED=False)
     def test_recalculo_segundo_plano_crea_thread_mock_sin_iniciarlo_real(self):
         if reglas_alertas_service._recalculo_lock.locked():
             reglas_alertas_service._recalculo_lock.release()

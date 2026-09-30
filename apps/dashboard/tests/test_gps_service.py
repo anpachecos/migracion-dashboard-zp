@@ -130,7 +130,7 @@ class GpsServiceLogicaPuraTests(SimpleTestCase):
         self.assertEqual(filtros["fecha_desde_input"], "2026-09-10")
         self.assertEqual(filtros["fecha_hasta_input"], "2026-09-10")
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_fecha_hora_repetida_anula_coordenadas_del_bloque(
         self,
         mock_conexion,

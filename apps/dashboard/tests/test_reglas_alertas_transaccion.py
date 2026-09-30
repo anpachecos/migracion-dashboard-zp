@@ -27,7 +27,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         return {f"regla_{self.CLAVE}": valor}
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_regla_inexistente_revierte_y_propaga_error(self, mock_conexion):
         contexto, conexion, cursor = self.preparar_oracle([])
@@ -45,7 +45,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_fallo_select_for_update_revierte_y_propaga(self, mock_conexion):
         contexto, conexion, cursor = self.preparar_oracle([])
@@ -59,7 +59,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_update_sin_fila_revierte_y_propaga_error(self, mock_conexion):
         contexto, conexion, cursor = self.preparar_oracle(
@@ -79,7 +79,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_excepcion_durante_update_revierte_y_propaga(self, mock_conexion):
         contexto, conexion, cursor = self.preparar_oracle(
@@ -100,7 +100,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_fallo_procedure_validacion_revierte_y_no_confirma(
         self,
@@ -124,7 +124,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_orden_transaccional_select_update_validacion_commit(
         self,
@@ -165,7 +165,7 @@ class ReglasAlertasTransaccionCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_not_called()
 
     @patch(
-        "apps.dashboard.repositories.reglas_alertas_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_recalculo_con_fallo_no_confirma_y_propaga_runtime_error(
         self,

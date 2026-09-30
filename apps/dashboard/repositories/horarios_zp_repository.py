@@ -1,4 +1,5 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 def obtener_datos_horario_zp(amid):
@@ -9,13 +10,7 @@ def obtener_datos_horario_zp(amid):
         WHERE AMID = :amid
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": str(amid).strip()})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0] for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=False)

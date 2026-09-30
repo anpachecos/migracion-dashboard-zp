@@ -13,7 +13,7 @@ class GpsRepositoryTests(SimpleTestCase):
             .cursor.return_value.__enter__.return_value
         )
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_registros_conservan_consulta_anterior_rango_parametros_y_retorno(
         self,
         mock_conexion,
@@ -59,7 +59,7 @@ class GpsRepositoryTests(SimpleTestCase):
             [{"id": 1, "amid": 7500001, "fecha_hora": datetime(2026, 9, 10, 8, 0)}],
         )
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_registros_sin_filas_conservan_resultado_vacio(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.fetchone.return_value = None
@@ -77,7 +77,7 @@ class GpsRepositoryTests(SimpleTestCase):
             {"fecha_hora_anterior": None, "registros": []},
         )
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_ultimo_gps_valido_conserva_filtros_y_diccionario(
         self,
         mock_conexion,
@@ -99,7 +99,7 @@ class GpsRepositoryTests(SimpleTestCase):
             {"id": 3, "amid": 7500001, "latitud": -33.45, "longitud": -70.66},
         )
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_ultimo_gps_valido_sin_fila_retorna_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.fetchone.return_value = None
@@ -108,7 +108,7 @@ class GpsRepositoryTests(SimpleTestCase):
 
         self.assertIsNone(resultado)
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_datos_ubicacion_conservan_dos_queries_parametro_y_retorno(
         self,
         mock_conexion,
@@ -147,7 +147,7 @@ class GpsRepositoryTests(SimpleTestCase):
             },
         )
 
-    @patch("apps.dashboard.repositories.gps_repository.obtener_conexion_oracle")
+    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
     def test_datos_ubicacion_sin_filas_conserva_estructuras_vacias(
         self,
         mock_conexion,

@@ -9,8 +9,7 @@ from apps.dashboard.services.ubicaciones_service import (
 
 class SincronizarAmidsUbicacionesTests(SimpleTestCase):
     @patch(
-        "apps.dashboard.repositories.ubicaciones_repository."
-        "obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_invoca_procedimiento_y_devuelve_validacion(self, mock_conexion):
         conexion = mock_conexion.return_value.__enter__.return_value

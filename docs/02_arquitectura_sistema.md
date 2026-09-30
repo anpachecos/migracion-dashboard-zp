@@ -81,8 +81,7 @@ Reúne datos del usuario, logs, carga de ubicaciones y reglas. Solo permite clav
 
 ## Límites
 
-- Oracle se consulta con SQL directo; no es backend Django.
-- `EstatusZP` es no administrado sobre `VW_ESTATUS_ZP_DJANGO`.
+- Oracle se consulta con SQL directo; no es backend Django. La vista `VW_ESTATUS_ZP_DJANGO` no tiene modelo Django (el modelo `EstatusZP` de referencia se retiró en BKL-002C).
 - Las exportaciones viven en `views.py` y pueden consumir recursos con rangos grandes.
 - `LocMemCache` no se comparte entre procesos.
 - La referencia/radio GPS del laboratorio están en `gps_service.py`.

@@ -10,17 +10,18 @@ Reglas de este modulo:
 - no crea, altera ni modifica ningun objeto Oracle.
 
 TODO(refactor): `obtener_conexion_oracle` sigue viviendo en
-`apps/dashboard/services/oracle_connection.py` porque hay una
-refactorizacion en curso. Cuando exista un modulo compartido de conexion,
-esta importacion debe cambiar y solo esa.
+`apps/dashboard/services/oracle_connection.py`, de modo que esta app depende
+de `dashboard`. Cuando exista un modulo compartido de conexion, esa es la unica
+linea que debe cambiar.
 """
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 # Objeto consumido, no administrado. No se debe modificar ni redefinir.
 ORIGEN_TRX = "DBPTE.TRANSACCION_FLUJO_VC2D_FISC@CLEAMTT3PRODG"
 
-# Joins de contexto ya demostrados en Queries_TRX_C2D_guia_Antonia_V2.sql.
+# Joins de contexto ya demostrados en oracle/notas/Queries_TRX_C2D_guia_Antonia_V2.sql.
 # Son LEFT JOIN a proposito: la guia usa INNER JOIN y descarta las TRX sin
 # entidad o sin sitio, lo que romperia el universo del Informe Interno.
 SQL_DESDE_TRX = f"""
@@ -191,7 +192,7 @@ def contar_trx_base(fecha_desde, fecha_hasta, **filtros):
         {construir_where(segmentos)}
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, params)
             fila = cursor.fetchone()
@@ -236,8 +237,7 @@ def obtener_trx_base(fecha_desde, fecha_hasta, limite=200, offset=0, **filtros):
         WHERE RN BETWEEN :offset + 1 AND :offset + :limite
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, params)
-            columnas = [col[0].lower() for col in cursor.description if col and col[0]]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)

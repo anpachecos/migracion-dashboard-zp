@@ -1,4 +1,5 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 def obtener_registros_gps(amid, fecha_inicio, fecha_fin):
@@ -40,7 +41,7 @@ def obtener_registros_gps(amid, fecha_inicio, fecha_fin):
         "fecha_fin": fecha_fin,
     }
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
                 query_anterior,
@@ -52,11 +53,7 @@ def obtener_registros_gps(amid, fecha_inicio, fecha_fin):
             fila_anterior = cursor.fetchone()
 
             cursor.execute(query, parametros)
-            columnas = [col[0].lower() for col in cursor.description]
-            registros = [
-                dict(zip(columnas, fila))
-                for fila in cursor.fetchall()
-            ]
+            registros = oracle_cursor.mapear_filas(cursor, minusculas=True)
 
     return {
         "fecha_hora_anterior": fila_anterior[0] if fila_anterior else None,
@@ -90,16 +87,10 @@ def obtener_ultimo_registro_gps_valido(amid):
         WHERE ROWNUM = 1
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=True)
 
 
 def obtener_datos_ubicacion_amid(amid):
@@ -142,21 +133,18 @@ def obtener_datos_ubicacion_amid(amid):
 
     parametros = {"amid": str(amid).strip()}
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query_historial, parametros)
-            columnas_historial = [col[0] for col in cursor.description]
-            historial = [
-                dict(zip(columnas_historial, fila))
-                for fila in cursor.fetchall()
-            ]
+            historial = oracle_cursor.mapear_filas(cursor, minusculas=False)
 
             cursor.execute(query_vigente, parametros)
             fila_vigente = cursor.fetchone()
 
             if fila_vigente:
-                columnas_vigente = [col[0] for col in cursor.description]
-                vigente = dict(zip(columnas_vigente, fila_vigente))
+                vigente = oracle_cursor.mapear_registro(
+                    cursor, fila_vigente, minusculas=False
+                )
             else:
                 vigente = None
 

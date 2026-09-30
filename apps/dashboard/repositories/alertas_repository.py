@@ -1,4 +1,5 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 SQL_ORDEN_ALERTAS = {
@@ -185,7 +186,7 @@ def contar_alertas_validadores(ubicacion_sin_asignar, **filtros_semanticos):
         {where_sql}
     """
 
-    with obtener_conexion_oracle() as connection:
+    with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(query, params)
         row = cursor.fetchone()
@@ -279,11 +280,10 @@ def obtener_alertas_validadores(
     params["limite"] = int(limite)
     params["ubicacion_sin_asignar"] = ubicacion_sin_asignar
 
-    with obtener_conexion_oracle() as connection:
+    with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(query, params)
-        columnas = [col[0].lower() for col in cursor.description if col and col[0]]
-        return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+        return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_ubicaciones_alertas_disponibles(ubicacion_sin_asignar):
@@ -299,7 +299,7 @@ def obtener_ubicaciones_alertas_disponibles(ubicacion_sin_asignar):
         ORDER BY ubicacion_actual
     """
 
-    with obtener_conexion_oracle() as connection:
+    with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(query, {"ubicacion_sin_asignar": ubicacion_sin_asignar})
         return [row[0] for row in cursor.fetchall() if row and row[0]]
@@ -317,7 +317,7 @@ def buscar_amids_alertas(termino, limite):
         WHERE ROWNUM <= :limite
     """
 
-    with obtener_conexion_oracle() as connection:
+    with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(
             query,
@@ -360,7 +360,7 @@ def obtener_resumen_alertas(
         {where_sql}
     """
 
-    with obtener_conexion_oracle() as connection:
+    with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(query, params)
         return cursor.fetchone()

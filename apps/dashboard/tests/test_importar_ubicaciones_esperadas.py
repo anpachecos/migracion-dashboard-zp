@@ -88,7 +88,7 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         contexto, conexion, cursor = self.conexion_falsa()
 
         with patch(
-            "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle",
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
             return_value=contexto,
         ) as mock_obtener_conexion, patch(
             "apps.dashboard.repositories.ubicaciones_repository.existe_vigente",
@@ -120,7 +120,7 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
     def test_archivo_inexistente_registra_error_y_no_conecta_oracle(self):
         ruta = Path("archivo-sintetico-inexistente-V755.xlsx")
         with patch(
-            "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle"
+            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
         ) as mock_conexion, patch(
             "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
         ) as mock_log:
@@ -155,7 +155,7 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
         with TemporaryDirectory() as directorio:
             ruta = self.crear_excel(directorio, [self.fila_valida()], hoja="OtraHoja")
             with patch(
-                "apps.dashboard.repositories.ubicaciones_repository.obtener_conexion_oracle"
+                "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
             ) as mock_conexion, patch(
                 "apps.dashboard.management.commands.importar_ubicaciones_esperadas.registrar_log_importacion"
             ) as mock_log:
@@ -441,8 +441,8 @@ class ImportarUbicacionesEsperadasCaracterizacionTests(SimpleTestCase):
             ruta = self.crear_excel(directorio, [self.fila_valida(IDDS=None)])
             with patch.object(
                 ubicaciones_repository, "persistir_importacion"
-            ) as mock_persistir, patch.object(
-                ubicaciones_repository, "obtener_conexion_oracle"
+            ) as mock_persistir, patch(
+                "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
             ) as mock_conexion, patch(
                 "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
                 "registrar_log_importacion"

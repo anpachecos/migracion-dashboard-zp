@@ -101,7 +101,7 @@ copia de `ALERTA_VALIDADOR_RESUMEN` ni de las ubicaciones Oracle.
 - `LogImportacion` registra origen, estado, fechas, contadores y mensaje. Un fallo de logging no interrumpe la operación principal.
 - Las preferencias de alertas se guardan atómicamente y se eliminan en cascada
   si se elimina el usuario Django.
-- `EstatusZP` tiene `managed = False`: Django no crea ni migra la vista.
+- La vista Oracle `VW_ESTATUS_ZP_DJANGO` se lee por SQL directo; el modelo Django `EstatusZP` que la referenciaba se retiró en BKL-002C (Django no administra la vista).
 - Código nuevo debe reutilizar `oracle_connection.py` y parámetros enlazados (`:nombre`).
 - Las reglas solo se editan si están en `CLAVES_PERMITIDAS`; la app no crea ni elimina claves.
 - La importación Excel actualiza ubicación vigente y conserva historial en Oracle; los temporales no se versionan.

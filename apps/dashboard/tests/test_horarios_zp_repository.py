@@ -13,7 +13,7 @@ class HorariosZonaPagaRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.repositories.horarios_zp_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_horario_conserva_sql_parametro_y_diccionario(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
@@ -37,7 +37,7 @@ class HorariosZonaPagaRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.repositories.horarios_zp_repository.obtener_conexion_oracle"
+        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
     )
     def test_horario_sin_fila_retorna_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)

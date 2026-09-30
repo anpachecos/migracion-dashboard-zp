@@ -9,14 +9,31 @@
 
 Dependencias principales: Django 6.0.5, python-oracledb 4.0.1, APScheduler 3.11.2, pandas 3.0.3 y openpyxl 3.1.5.
 
+## Almacenamiento
+
+| Artefacto | Qué guarda | ¿Se puede borrar? |
+|---|---|---|
+| `db.sqlite3` | Base de datos `default` de Django: usuarios, sesiones, permisos y el panel `admin`. | **No.** Borrarla elimina los usuarios y el login deja de funcionar. |
+| Base de datos Oracle | Todo el dato de negocio. Se accede por conexión cruda con `python-oracledb`, no por el ORM de Django. | No aplica. |
+| `temp_uploads/` | Archivos subidos mientras se procesan. | Sí, se limpia por sí sola. |
+| `staticfiles/` | Salida de `collectstatic`. | Sí, se regenera. |
+
+Que el proyecto use Oracle **no** vuelve a `db.sqlite3` un residuo de una era
+anterior: Django lo necesita para autenticación y permisos. Está declarado en
+`config/settings.py` y no se versiona porque contiene datos de usuarios.
+
 ## Preparación en Windows
 
 ```powershell
 py -m venv venv_pc
 .\venv_pc\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
+
+El nombre del entorno es libre: `venv_pc` es el de la documentación, pero
+`venv` funciona igual y ambos están contemplados en `.gitignore`.
 
 Complete `.env` sin versionarlo.
 
@@ -30,6 +47,16 @@ Copie el resultado únicamente al `.env` privado del entorno correspondiente.
 No suba ese archivo ni reutilice la misma clave entre desarrollo, PRE y
 producción. Si `SECRET_KEY` falta, está vacía o contiene solo espacios, Django
 no inicia.
+
+Verifique que el entorno quedó completo antes de seguir:
+
+```powershell
+python manage.py check
+```
+
+Debe responder `System check identified no issues (0 silenced)`. Si reporta
+problemas, no avance: la configuración de este proyecto es *fail-closed* y
+Django no arranca con valores faltantes.
 
 ## Configuración
 
@@ -85,8 +112,8 @@ python manage.py runserver
 | `importar_ubicaciones_esperadas <xlsx>` | Vigente | Carga ubicaciones e historial. |
 | `registrar_estado_oracle` | Vigente | Registra estado Oracle en SQLite. |
 | `limpiar_historial_ubicacion_oracle` | Vigente | Aplica retención al historial. |
-| `limpiar_tablas_sqlite_antiguas` | Excepcional/destructivo | Requiere confirmación explícita. |
-| `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Deshabilitados | Flujo SQLite antiguo. |
+| `limpiar_tablas_sqlite_antiguas` | Deshabilitado | Era un `VACUUM` destructivo sobre `db.sqlite3`; quedó inerte porque esa base es la `default` de Django. |
+| `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Retirados (BKL-002C) | No hacían nada (imprimían un aviso) y su pertenencia al flujo SQLite antiguo estaba confirmada. |
 
 Los comandos históricos `importar_validadores_csv` e
 `importar_validadores_oracle` fueron retirados en BKL-015 porque dependían de

@@ -1,6 +1,7 @@
 import pandas as pd
 
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 COLUMNAS_ORACLE = [
@@ -102,7 +103,7 @@ def persistir_importacion(
     referencia_laboratorio,
     estadisticas,
 ):
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             for datos in filas_normalizadas:
                 amid = datos["AMID"]
@@ -250,13 +251,7 @@ def obtener_historial_vigente(cursor, amid):
         {"amid": amid},
     )
 
-    fila = cursor.fetchone()
-
-    if not fila:
-        return None
-
-    columnas = [col[0] for col in cursor.description]
-    return dict(zip(columnas, fila))
+    return oracle_cursor.mapear_fila(cursor, minusculas=False)
 
 
 def crear_historial(cursor, datos, fecha_carga):
@@ -341,11 +336,7 @@ def mover_ausentes_a_laboratorio(
             """
     )
 
-    filas_maestro = cursor.fetchall()
-    columnas = [col[0] for col in cursor.description]
-
-    for fila in filas_maestro:
-        registro_maestro = dict(zip(columnas, fila))
+    for registro_maestro in oracle_cursor.mapear_filas(cursor, minusculas=False):
         amid = str(registro_maestro["AMID"]).strip()
 
         if amid in amids_excel:
@@ -419,7 +410,7 @@ def mover_ausentes_a_laboratorio(
 
 
 def sincronizar_amids_ubicaciones():
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             ubicaciones_creadas_var = cursor.var(int)
             historiales_creados_var = cursor.var(int)
@@ -477,7 +468,7 @@ def sincronizar_amids_ubicaciones():
 
 
 def limpiar_historial(dias_retencion):
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             filas_eliminadas_var = cursor.var(int)
 

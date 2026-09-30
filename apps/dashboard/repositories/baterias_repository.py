@@ -1,4 +1,5 @@
-from apps.dashboard.services.oracle_connection import obtener_conexion_oracle
+from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 def obtener_ultimo_registro(amid):
@@ -27,16 +28,10 @@ def obtener_ultimo_registro(amid):
         WHERE ROWNUM = 1
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=True)
 
 
 def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
@@ -58,7 +53,7 @@ def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
         ORDER BY FECHA_HORA_BLOQUE
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(
                 query,
@@ -69,8 +64,7 @@ def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
                 },
             )
 
-            columnas = [col[0].lower() for col in cursor.description]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_detalle_caidas_bateria(amid):
@@ -88,11 +82,10 @@ def obtener_detalle_caidas_bateria(amid):
         ORDER BY FECHA_CAIDA DESC
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            columnas = [col[0].lower() for col in cursor.description]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_resumen_alerta_bateria(amid):
@@ -120,13 +113,7 @@ def obtener_resumen_alerta_bateria(amid):
         WHERE AMID = :amid
     """
 
-    with obtener_conexion_oracle() as conexion:
+    with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=True)

@@ -19,11 +19,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from apps.dashboard.config.version_zp import (
-    VERSION_ZP_SHEET_NAME,
-    nombre_columna_oracle,
-    normalizar_nombre_columna,
-)
 from apps.dashboard.repositories import ubicaciones_repository
 from apps.dashboard.services.logs_service import registrar_log_importacion
 from apps.dashboard.services.ubicaciones_dataset_validation import (
@@ -31,6 +26,11 @@ from apps.dashboard.services.ubicaciones_dataset_validation import (
     formatear_reporte_validacion,
     resumir_incidencias,
     validar_dataset_ubicaciones,
+)
+from apps.dashboard.services.version_zp import (
+    VERSION_ZP_SHEET_NAME,
+    nombre_columna_oracle,
+    normalizar_nombre_columna,
 )
 from apps.dashboard.services.version_zp_validation import (
     VersionZPValidationError,

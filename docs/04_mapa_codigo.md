@@ -127,7 +127,7 @@ apps/dashboard/
 |---|---|---|
 | `views.py` | Contiene las vistas principales del dashboard. Recibe solicitudes web, valida permisos, llama a servicios, renderiza templates y gestiona acciones como exportaciones o comandos administrativos. Actualmente también contiene lógica auxiliar de exportación Excel que podría moverse a un servicio dedicado. | Vigente / refactorizar |
 | `urls.py` | Define las rutas internas de la app `dashboard`, incluyendo paneles principales, acciones administrativas y exportaciones Excel. | Vigente |
-| `models.py` | Define modelos Django. Actualmente contiene `LogImportacion`, usado en SQLite para logs internos, y `EstatusZP`, modelo no administrado que referencia la vista Oracle `VW_ESTATUS_ZP_DJANGO`. | Vigente / revisar `EstatusZP` |
+| `models.py` | Define modelos Django. Actualmente contiene `LogImportacion`, usado en SQLite para logs internos, y los modelos de reglas/alertas/ubicaciones. El modelo de referencia sobre `VW_ESTATUS_ZP_DJANGO` se retiró en BKL-002C. | Vigente |
 | `context_processors.py` | Agrega datos comunes al layout general del dashboard, como la hora de renderizado, último dato recibido desde Oracle y última actualización de versión ZP. Usa caché para evitar consultas Oracle en cada petición. | Vigente / revisar simplificación |
 | `admin.py` | Configura qué modelos locales se muestran en el administrador de Django. Actualmente no registra modelos propios de la app. | Vigente / opcional |
 | `apps.py` | Configura la app `dashboard`. Si `DASHBOARD_SCHEDULER_ENABLED=True`, puede iniciar el scheduler interno al levantar Django. | Vigente / revisar en despliegue |
@@ -137,7 +137,7 @@ apps/dashboard/
 ### Observaciones
 
 - `views.py` funciona correctamente, pero concentra varias responsabilidades. Más adelante se recomienda mover la lógica de exportación Excel a un servicio dedicado, por ejemplo `services/exportaciones_excel_service.py`.
-- `EstatusZP` aparece como modelo de referencia sobre Oracle, pero actualmente las consultas operativas se realizan principalmente desde los servicios usando `python-oracledb`.
+- La vista Oracle `VW_ESTATUS_ZP_DJANGO` se consulta por SQL directo desde los servicios; dejó de tener modelo Django en BKL-002C.
 - `context_processors.py` usa caché para no consultar Oracle en cada petición. Se puede simplificar si se elimina la lógica de precarga en segundo plano.
 - `admin.py` está vacío porque no hay modelos propios registrados en el administrador de Django. Si más adelante se quiere revisar `LogImportacion` desde `/admin`, se puede registrar ahí.
 - `apps.py` puede iniciar el scheduler interno. Antes de usarlo en despliegue, se debe revisar que no active tareas antiguas o innecesarias.
@@ -392,11 +392,8 @@ Contiene comandos personalizados que se ejecutan con `python manage.py`.
 
 ```txt
 apps/dashboard/management/commands/
-├── actualizar_validadores.py
-├── cargar_validadores_limpios.py
 ├── importar_ubicaciones_esperadas.py
 ├── limpiar_historial_ubicacion_oracle.py
-├── limpiar_registros_antiguos.py
 ├── limpiar_tablas_sqlite_antiguas.py
 ├── probar_oracle.py
 └── registrar_estado_oracle.py
@@ -408,10 +405,11 @@ apps/dashboard/management/commands/
 | `importar_ubicaciones_esperadas.py` | Importa primero las ubicaciones del Excel y luego reconcilia todos los AMID activos del maestro; los ausentes quedan en Laboratorio Zonas Pagas y generan historial desde la carga actual. | Vigente |
 | `registrar_estado_oracle.py` | Registra estado o disponibilidad de Oracle en logs. | Vigente |
 | `limpiar_historial_ubicacion_oracle.py` | Limpia historial antiguo de ubicaciones esperadas en Oracle. | Vigente |
-| `limpiar_tablas_sqlite_antiguas.py` | Limpieza puntual de tablas antiguas en SQLite. | Uso puntual |
-| `actualizar_validadores.py` | Flujo antiguo o pendiente de revisión. | Revisar |
-| `cargar_validadores_limpios.py` | Flujo antiguo o pendiente de revisión. | Revisar |
-| `limpiar_registros_antiguos.py` | Confirmar si sigue vigente o pertenece al flujo anterior. | Revisar |
+| `limpiar_tablas_sqlite_antiguas.py` | Antes hacía `VACUUM` y borraba tablas de `db.sqlite3`. Quedó deshabilitado: esa base es la `default` de Django y no debe tocarse. | Deshabilitado |
+
+Los comandos `actualizar_validadores.py`, `cargar_validadores_limpios.py` y
+`limpiar_registros_antiguos.py` fueron **retirados** (BKL-002C): no hacían
+nada salvo imprimir un aviso de que pertenecían al flujo SQLite antiguo.
 
 Los comandos históricos `importar_validadores_csv` e
 `importar_validadores_oracle` fueron retirados en BKL-015. Dependían de los
@@ -476,9 +474,6 @@ Deben estar incluidos en `.gitignore`.
 |---|---|
 | `alertas_bateria_utils.py` | Puede duplicar lógica de alertas de batería con Oracle. |
 | `panel_alertas_mantencion.html` | Puede ser una versión antigua o temporal. Confirmar si se usa. |
-| `actualizar_validadores.py` | Posible flujo antiguo SQLite. |
-| `cargar_validadores_limpios.py` | Posible flujo antiguo SQLite. |
-| `limpiar_registros_antiguos.py` | Confirmar si sigue vigente. |
 | `panel_alertas.js` | Confirmar si todavía se usa en la versión actual del Panel Alertas. |
 | `views.py` | Archivo funcional, pero podría ordenarse por secciones o separarse más adelante. |
 
