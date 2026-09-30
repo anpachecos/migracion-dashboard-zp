@@ -97,3 +97,41 @@ def normalizar_texto_sin_acentos(valor):
     texto = unicodedata.normalize("NFKD", str(valor or "").strip().lower())
 
     return "".join(caracter for caracter in texto if not unicodedata.combining(caracter))
+
+
+def es_coordenada_cero(latitud, longitud):
+    """
+    Detecta pares de coordenadas 0,0 compartidos por GPS y exportaciones.
+
+    None o valores no numéricos no son "0,0". Contrato: devuelve bool.
+    """
+    if latitud is None or longitud is None:
+        return False
+
+    try:
+        return float(latitud) == 0 and float(longitud) == 0
+    except (ValueError, TypeError):
+        return False
+
+
+def obtener_fecha(valor):
+    """
+    Devuelve solo la fecha, sin aplicar timezone.localtime().
+    """
+    if not valor:
+        return None
+
+    valor = normalizar_fecha_para_comparar(valor)
+    return valor.date()
+
+
+def convertir_entero(valor, defecto=0):
+    """
+    Convierte valores numéricos Oracle/Python a int.
+    """
+    numero = convertir_numero(valor)
+
+    if numero is None:
+        return defecto
+
+    return int(numero)

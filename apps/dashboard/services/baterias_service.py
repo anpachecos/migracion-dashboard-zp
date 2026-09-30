@@ -4,14 +4,17 @@ from types import SimpleNamespace
 from apps.dashboard.repositories import baterias_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
+    generar_bloques_media_hora,
     obtener_columnas_media_hora_para_hoy,
     obtener_datos_horario_zp_oracle,
 )
 from apps.dashboard.services.normalizacion import (
+    convertir_entero,
     convertir_numero,
     normalizar_booleano_oracle,
     normalizar_fecha_para_comparar,
     obtener_ahora_referencia,
+    obtener_fecha,
 )
 
 """
@@ -36,29 +39,6 @@ Python:
 - El detalle de cada caída se lee desde USR_LAB.ALERTA_BATERIA_CAIDA_EVENTO.
 - Django no detecta ni clasifica caídas de batería.
 """
-
-
-def obtener_fecha(valor):
-    """
-    Devuelve solo la fecha, sin aplicar timezone.localtime().
-    """
-    if not valor:
-        return None
-
-    valor = normalizar_fecha_para_comparar(valor)
-    return valor.date()
-
-
-def convertir_entero(valor, defecto=0):
-    """
-    Convierte valores numéricos Oracle/Python a int.
-    """
-    numero = convertir_numero(valor)
-
-    if numero is None:
-        return defecto
-
-    return int(numero)
 
 
 def formatear_bateria_entera(valor):
@@ -473,7 +453,7 @@ def obtener_contexto_baterias(request):
 
     ultimo_registro = None
     bloques = []
-    columnas_horas = generar_columnas_media_hora(hora_inicio, hora_fin)
+    columnas_horas = generar_bloques_media_hora(hora_inicio, hora_fin)
     tabla_bateria = []
     datos_grafico_dia = []
     datos_grafico_periodo = []
@@ -668,22 +648,6 @@ def obtener_contexto_baterias(request):
     }
 
 
-def generar_columnas_media_hora(hora_inicio="00:00", hora_fin="23:30"):
-    columnas = []
-    inicio = datetime.strptime(hora_inicio, "%H:%M").time()
-    fin = datetime.strptime(hora_fin, "%H:%M").time()
-
-    for hora in range(24):
-        for minuto in [0, 30]:
-            hora_texto = f"{hora:02d}:{minuto:02d}"
-            hora_obj = datetime.strptime(hora_texto, "%H:%M").time()
-
-            if inicio <= hora_obj <= fin:
-                columnas.append(hora_texto)
-
-    return columnas
-
-
 def generar_fechas_ultimos_dias(cantidad_dias=14):
     hoy = obtener_ahora_referencia().date()
     fechas = []
@@ -709,7 +673,7 @@ def construir_tabla_bateria(
     columnas_horas = (
         list(columnas_horas_filtradas)
         if columnas_horas_filtradas is not None
-        else generar_columnas_media_hora(hora_inicio, hora_fin)
+        else generar_bloques_media_hora(hora_inicio, hora_fin)
     )
     fechas = generar_fechas_ultimos_dias(cantidad_dias)
 
@@ -834,7 +798,7 @@ def construir_datos_grafico_dia(bloques, fecha_objetivo=None):
     if fecha_objetivo is None:
         fecha_objetivo = obtener_ahora_referencia().date()
 
-    columnas_horas = generar_columnas_media_hora("00:00", "23:30")
+    columnas_horas = generar_bloques_media_hora("00:00", "23:30")
     bloques_por_hora = {}
 
     for bloque in bloques:

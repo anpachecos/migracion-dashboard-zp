@@ -159,18 +159,38 @@ def filtrar_registros_por_horario_zp(
     return registros_filtrados, bool(fechas_con_horario)
 
 
+def generar_bloques_media_hora(hora_inicio="00:00", hora_fin="23:30"):
+    """
+    Devuelve los bloques de 30 minutos entre hora_inicio y hora_fin.
+
+    Usado para las columnas de la tabla Baterías y para los filtros horarios GPS.
+    """
+    inicio = datetime.strptime(hora_inicio, "%H:%M").time()
+    fin = datetime.strptime(hora_fin, "%H:%M").time()
+
+    bloques = []
+
+    for hora in range(24):
+        for minuto in (0, 30):
+            hora_bloque = time(hora, minuto)
+            if inicio <= hora_bloque <= fin:
+                bloques.append(hora_bloque.strftime("%H:%M"))
+
+    return bloques
+
+
 def obtener_columnas_media_hora_para_hoy(configuracion):
     """Devuelve bloques de 30 minutos incluidos en el horario vigente de hoy."""
     intervalos = configuracion.get("intervalos_hoy", []) if configuracion else []
     if not intervalos:
         return []
-    columnas = []
-    for hora in range(24):
-        for minuto in (0, 30):
-            hora_bloque = time(hora, minuto)
-            if hora_esta_en_intervalos(hora_bloque, intervalos):
-                columnas.append(hora_bloque.strftime("%H:%M"))
-    return columnas
+    return [
+        bloque
+        for bloque in generar_bloques_media_hora()
+        if hora_esta_en_intervalos(
+            datetime.strptime(bloque, "%H:%M").time(), intervalos
+        )
+    ]
 
 
 def obtener_datos_horario_zp_oracle(amid):
