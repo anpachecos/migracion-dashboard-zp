@@ -247,6 +247,12 @@ DASHBOARD_SCHEDULER_ENABLED = os.getenv(
 ) == "True"
 
 
+ALERTAS_RECALCULO_DURABLE_ENABLED = os.getenv(
+    "ALERTAS_RECALCULO_DURABLE_ENABLED",
+    "False",
+).strip().lower() in {"true", "1", "yes", "on"}
+
+
 
 # =========================
 # Módulo de Transacciones (TRX C2D)
