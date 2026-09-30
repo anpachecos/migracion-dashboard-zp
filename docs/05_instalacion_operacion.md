@@ -112,8 +112,8 @@ python manage.py runserver
 | `importar_ubicaciones_esperadas <xlsx>` | Vigente | Carga ubicaciones e historial. |
 | `registrar_estado_oracle` | Vigente | Registra estado Oracle en SQLite. |
 | `limpiar_historial_ubicacion_oracle` | Vigente | Aplica retención al historial. |
-| `limpiar_tablas_sqlite_antiguas` | Excepcional/destructivo | Requiere confirmación explícita. |
-| `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Deshabilitados | Flujo SQLite antiguo. |
+| `limpiar_tablas_sqlite_antiguas` | Deshabilitado | Era un `VACUUM` destructivo sobre `db.sqlite3`; quedó inerte porque esa base es la `default` de Django. |
+| `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Retirados (BKL-002C) | No hacían nada (imprimían un aviso) y su pertenencia al flujo SQLite antiguo estaba confirmada. |
 
 Los comandos históricos `importar_validadores_csv` e
 `importar_validadores_oracle` fueron retirados en BKL-015 porque dependían de
