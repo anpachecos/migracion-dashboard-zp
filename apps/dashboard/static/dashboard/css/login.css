@@ -88,6 +88,28 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-group-checkbox input {
+    width: 18px;
+    height: 18px;
+    accent-color: #2563eb;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.form-group-checkbox label {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+    color: #374151;
+    cursor: pointer;
+}
+
 .login-button {
     margin-top: 6px;
     width: 100%;

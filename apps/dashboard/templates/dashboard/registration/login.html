@@ -52,6 +52,13 @@
                     {{ form.password }}
                 </div>
 
+                <div class="form-group form-group-checkbox">
+                    {{ form.remember_me }}
+                    <label for="{{ form.remember_me.id_for_label }}">
+                        Recordarme
+                    </label>
+                </div>
+
                 <button type="submit" class="login-button">
                     Ingresar
                 </button>

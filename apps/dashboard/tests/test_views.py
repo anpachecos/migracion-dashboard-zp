@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -673,3 +674,53 @@ class SidebarGruposTests(TestCase):
         contenido = self.contenido("dashboard:panel_baterias")
 
         self.assertIn('aria-current="page"', contenido)
+
+
+class LoginRecordarTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        get_user_model().objects.create_user(
+            username="recordar_test",
+            password="clave-test",
+        )
+
+    def ingresar(self, con_recordar):
+        datos = {
+            "username": "recordar_test",
+            "password": "clave-test",
+        }
+
+        if con_recordar:
+            datos["remember_me"] = "on"
+
+        return self.client.post(reverse("login"), datos)
+
+    def test_el_formulario_incluye_el_checkbox_recordarme(self):
+        respuesta = self.client.get(reverse("login"))
+
+        self.assertContains(respuesta, 'name="remember_me"')
+        self.assertContains(respuesta, "Recordarme")
+
+    def test_recordarme_marcado_persiste_la_sesion_30_dias(self):
+        respuesta = self.ingresar(con_recordar=True)
+
+        self.assertRedirects(
+            respuesta,
+            reverse("dashboard:panel_baterias"),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(self.client.session.get_expire_at_browser_close())
+        self.assertEqual(
+            self.client.session.get_expiry_age(),
+            settings.SESION_RECORDAR_DIAS * 24 * 60 * 60,
+        )
+
+    def test_sin_recordarme_la_sesion_se_cierra_con_el_navegador(self):
+        respuesta = self.ingresar(con_recordar=False)
+
+        self.assertRedirects(
+            respuesta,
+            reverse("dashboard:panel_baterias"),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(self.client.session.get_expire_at_browser_close())

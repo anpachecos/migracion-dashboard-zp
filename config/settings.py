@@ -208,6 +208,11 @@ SESSION_SAVE_EVERY_REQUEST = True
 # Cierra sesión al cerrar el navegador
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+# Sesión persistente del checkbox "Recordarme" del login.
+# Al marcar la opción la sesión dura esta cantidad de días aunque se cierre
+# el navegador. Sin marcar aplica SESSION_EXPIRE_AT_BROWSER_CLOSE.
+SESION_RECORDAR_DIAS = 30
+
 
 # =========================
 # Caché local
