@@ -8,10 +8,11 @@
 -- 2. No crea ESTATUS_ZP, JOBS_STATUS_ZP ni los objetos heredados base.
 -- 3. Para una instalacion controlada, ejecutar como script completo en DBeaver
 --    (Alt+X) y validar previamente las dependencias descritas en oracle/README.md.
--- 4. Los cambios futuros deben reflejarse aqui y en una migracion nueva.
+-- 4. Los cambios futuros deben reflejarse aqui y en oracle/pending/ mientras
+--    no esten desplegados.
 --
--- El archivo es unico para facilitar lectura y reconstruccion. Los scripts
--- originales permanecen en oracle/history como evidencia de la evolucion.
+-- El archivo es unico para facilitar lectura y reconstruccion. Ya contiene la
+-- version final a partir de V006 y V007 (incluidas sus correcciones).
 
 -- ============================================================================
 -- PARTE 1 - VISTA ACTIVA Y RECLASIFICACION RAPIDA
@@ -288,7 +289,7 @@ SELECT
 -- PARTE 2 - GOBIERNO, AUDITORIA Y WRAPPERS SEGUROS
 -- ============================================================================
 -- Etapa 2: gobierno, validacion y auditoria de reglas.
--- Requiere haber ejecutado V006__alertas_fase1_sin_perdida.sql.
+-- Requiere la vista activa y la reclasificacion rapida de la Parte 1.
 --
 -- Este script no elimina datos ni modifica ESTATUS_ZP/JOBS_STATUS_ZP.
 -- Agrega metadatos a las reglas, una bitacora y wrappers seguros.

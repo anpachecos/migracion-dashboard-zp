@@ -24,8 +24,8 @@ Para explicar el sistema en una presentación, comenzar por los documentos 01,
 - El código Django desplegado es la fuente de verdad del backend.
 - `oracle/current/alertas_oracle_estado_actual.sql` es la referencia consolidada
   de los objetos Oracle incorporados durante la optimización.
-- `oracle/history/` conserva scripts ya ejecutados y no debe utilizarse como
-  punto de partida para una instalación nueva.
+- `oracle/pending/` contiene cambios preparados pero no desplegados (por ahora
+  `bkl-002c/`); no forman parte del esquema hasta ejecutarse y validarse.
 - Si el código, Oracle y estos documentos difieren, deben corregirse juntos en
   el mismo cambio.
 
@@ -52,7 +52,8 @@ No se versionan:
 Cuando cambie el flujo Oracle o Django:
 
 1. actualizar el archivo de `oracle/current/`;
-2. agregar una migración puntual al historial si fue necesario ejecutar SQL;
+2. agregar el script preparado en `oracle/pending/` si aún no se ejecuta o se
+   incorporó un objeto nuevo;
 3. actualizar el documento 03;
 4. actualizar el mapa de archivos (04) si se agregaron servicios, templates o
    scripts;
