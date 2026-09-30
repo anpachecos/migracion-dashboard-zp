@@ -1,7 +1,8 @@
 """Contrato funcional del archivo Version_DB."""
 
 import re
-import unicodedata
+
+from apps.dashboard.services.normalizacion import normalizar_texto_sin_acentos
 
 
 VERSION_ZP_EXTENSION = ".xlsx"
@@ -57,10 +58,9 @@ COLUMNAS_ESTRUCTURALES_REQUERIDAS = frozenset({
 
 
 def normalizar_nombre_columna(valor):
-    texto = str(valor).strip().lower()
-    texto = unicodedata.normalize("NFKD", texto)
-    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    texto = normalizar_texto_sin_acentos(valor)
     texto = re.sub(r"[^a-z0-9]+", " ", texto)
+
     return re.sub(r"\s+", " ", texto).strip()
 
 

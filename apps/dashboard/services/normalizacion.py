@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.utils import timezone
 
 
@@ -71,3 +73,27 @@ def convertir_numero(valor):
         return float(valor)
     except (ValueError, TypeError):
         return None
+
+
+def normalizar_numero(valor, default=0):
+    if valor is None:
+        return default
+
+    return valor
+
+
+def normalizar_texto(valor, default=""):
+    if valor is None:
+        return default
+
+    return str(valor)
+
+
+def normalizar_texto_sin_acentos(valor):
+    """
+    Normaliza texto para búsquedas y comparaciones sin importar acentos,
+    mayúsculas ni espacios: NFKD + minúsculas + quita signos diacríticos.
+    """
+    texto = unicodedata.normalize("NFKD", str(valor or "").strip().lower())
+
+    return "".join(caracter for caracter in texto if not unicodedata.combining(caracter))

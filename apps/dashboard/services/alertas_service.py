@@ -1,5 +1,3 @@
-import unicodedata
-
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -10,6 +8,12 @@ from apps.dashboard.services.claves_cache import (
     CACHE_KEY_RESUMEN_ALERTAS,
     CACHE_KEY_UBICACIONES_ALERTAS,
 )
+from apps.dashboard.services.normalizacion import (
+    normalizar_numero,
+    normalizar_texto,
+    normalizar_texto_sin_acentos,
+)
+
 
 ORDEN_ALERTAS_PREDETERMINADO = (
     ("prioridad", "asc"),
@@ -44,18 +48,6 @@ LIMITE_SUGERENCIAS_ALERTAS = 15
 MAX_LIMITE_SUGERENCIAS_ALERTAS = 20
 AMID_MINIMO_ALERTAS = 7_500_000
 AMID_MAX_DIGITOS_ALERTAS = 7
-
-
-def normalizar_numero(valor, default=0):
-    if valor is None:
-        return default
-    return valor
-
-
-def normalizar_texto(valor, default=""):
-    if valor is None:
-        return default
-    return str(valor)
 
 
 def normalizar_amid_alertas(valor):
@@ -404,10 +396,7 @@ def buscar_amids_alertas(termino, limite=LIMITE_SUGERENCIAS_ALERTAS):
 
 
 def _normalizar_termino_busqueda(valor):
-    texto = unicodedata.normalize("NFD", str(valor or "").casefold())
-    return "".join(
-        caracter for caracter in texto if not unicodedata.combining(caracter)
-    )
+    return normalizar_texto_sin_acentos(valor)
 
 
 def buscar_ubicaciones_alertas(termino, limite=LIMITE_SUGERENCIAS_ALERTAS):

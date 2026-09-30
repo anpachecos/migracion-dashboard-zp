@@ -27,6 +27,7 @@ from apps.dashboard.services.gps_service import (
     RADIO_LABORATORIO_ZP,
 )
 from apps.dashboard.services.logs_service import registrar_log_importacion
+from apps.dashboard.importacion.utilidades_pandas import texto
 from apps.dashboard.importacion.ubicaciones_dataset_validation import (
     CAMPO_FILA_ORIGEN,
     formatear_reporte_validacion,
@@ -378,13 +379,7 @@ class Command(BaseCommand):
         return valor
 
     def texto(self, valor):
-        if valor is None:
-            return ""
-
-        if pd.isna(valor):
-            return ""
-
-        return str(valor).strip()
+        return texto(valor)
 
     def texto_o_none(self, valor):
         texto = self.texto(valor)
