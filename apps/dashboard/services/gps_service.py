@@ -504,6 +504,385 @@ def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):
     }
 
 
+def _armar_resumen_amid_gps(estado):
+    """
+    Consulta los bloques GPS del AMID y aplica el fallback al último día reportado
+    cuando no hubo coordenadas GPS hoy.
+    """
+    try:
+        registros_periodo_base = obtener_registros_gps_oracle(
+            amid=estado.amid,
+            fecha_inicio=estado.filtros_fecha["fecha_inicio"],
+            fecha_fin=estado.filtros_fecha["fecha_fin"],
+        )
+
+        registros_reportados_inicial = [
+            registro for registro in registros_periodo_base
+            if gps_tiene_coordenadas(registro)
+        ]
+
+        # Fallback:
+        # Solo buscamos el último día si NO hubo GPS reportado hoy.
+        # Si hubo 0,0 hoy, se muestra hoy y se cuenta como fuera.
+        if estado.filtros_por_defecto and not registros_reportados_inicial:
+            ultimo_gps_valido = obtener_ultimo_registro_gps_valido_oracle(estado.amid)
+
+            if ultimo_gps_valido and ultimo_gps_valido.fecha_hora:
+                fecha_ultimo_dia_reportado = ultimo_gps_valido.fecha_hora.date()
+                estado.filtros_fecha = construir_filtros_gps_para_dia(
+                    fecha_ultimo_dia_reportado
+                )
+
+                registros_periodo_base = obtener_registros_gps_oracle(
+                    amid=estado.amid,
+                    fecha_inicio=estado.filtros_fecha["fecha_inicio"],
+                    fecha_fin=estado.filtros_fecha["fecha_fin"],
+                )
+
+                estado.usando_ultimo_dia_reportado = True
+                estado.rango_manual = "0"
+                estado.fecha_ultimo_dia_reportado = fecha_ultimo_dia_reportado
+
+                estado.resumen_gps = crear_resumen_gps_rango(
+                    fecha_desde=estado.filtros_fecha["fecha_desde"],
+                    fecha_hasta=estado.filtros_fecha["fecha_hasta"],
+                    hora_desde=estado.filtros_fecha["hora_desde"],
+                    hora_hasta=estado.filtros_fecha["hora_hasta"],
+                )
+
+                estado.mensaje = (
+                    "El AMID no envió coordenadas GPS hoy. "
+                    "Se muestran las últimas coordenadas válidas disponibles "
+                    f"del {fecha_ultimo_dia_reportado.strftime('%d-%m-%Y')}."
+                )
+    except ValueError:
+        estado.mensaje = "El AMID ingresado no es válido."
+        registros_periodo_base = []
+    except Exception as error:
+        estado.mensaje = f"Error consultando datos GPS en Oracle: {error}"
+        registros_periodo_base = []
+
+    estado.registros_periodo_base = registros_periodo_base
+
+
+def _armar_ubicacion_y_horario_gps(estado):
+    """
+    Recupera la ubicación esperada del AMID y aplica el filtro por horario ZP
+    cuando fue solicitado y existe horario vigente para hoy.
+    """
+    try:
+        estado.historial_amid, estado.vigente_amid = (
+            obtener_datos_ubicacion_amid_oracle(estado.amid)
+        )
+
+        estado.horario_zp = crear_configuracion_horario_zp(
+            datos=estado.vigente_amid,
+            fecha_referencia=obtener_ahora_referencia(),
+        )
+    except Exception as error:
+        estado.aviso_horario_zp = (
+            "No fue posible consultar el horario vigente; "
+            "los registros se mantienen sin filtro."
+        )
+        if not estado.mensaje:
+            estado.mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
+
+    if estado.horario_zp_solicitado and not estado.horario_zp["tiene_horario_hoy"]:
+        estado.horario_zp_solicitado = False
+
+    if estado.horario_zp_solicitado and estado.horario_zp["tiene_horario_hoy"]:
+        estado.registros_periodo_base, estado.horario_zp_activo = (
+            filtrar_registros_por_horario_zp(
+                registros=estado.registros_periodo_base,
+                configuracion=estado.horario_zp,
+                atributo_fecha="fecha_registro",
+            )
+        )
+
+
+def _armar_detalle_periodo_gps(estado):
+    """
+    Construye mapa, historial, resumen de cumplimiento y última ubicación
+    a partir de los bloques ya filtrados del AMID.
+    """
+    registros_periodo_base = estado.registros_periodo_base
+
+    estado.resumen_gps["registros_totales_periodo"] = len(registros_periodo_base)
+
+    estado.resumen_gps["errores_gps_periodo"] = sum(
+        1 for registro in registros_periodo_base
+        if es_error_gps(registro)
+    )
+
+    estado.resumen_gps["clase_errores_gps_periodo"] = obtener_clase_errores_gps(
+        estado.resumen_gps["errores_gps_periodo"]
+    )
+
+    registros_reportados = [
+        registro for registro in registros_periodo_base
+        if gps_tiene_coordenadas(registro)
+    ]
+
+    registros_validos = [
+        registro for registro in registros_periodo_base
+        if gps_tiene_coordenadas_validas_no_cero(registro)
+    ]
+
+    registros_sin_transmision = [
+        registro for registro in registros_periodo_base
+        if registro.transmitio_gps is False
+    ]
+
+    registros_cero = [
+        registro for registro in registros_periodo_base
+        if gps_es_coordenada_cero(registro)
+    ]
+
+    estado.resumen_gps["registros_gps_reportados_periodo"] = len(registros_reportados)
+    estado.resumen_gps["registros_gps_validos_periodo"] = len(registros_validos)
+    estado.resumen_gps["registros_sin_transmision_periodo"] = len(
+        registros_sin_transmision
+    )
+    estado.resumen_gps["registros_gps_cero_periodo"] = len(registros_cero)
+
+    try:
+        ultima_ubicacion_reportada = None
+        ultimo_registro_reportado = None
+        ultima_ubicacion_valida = None
+        ultimo_registro_valido = None
+        ubicaciones_mapa_por_id = {}
+
+        for registro in registros_reportados:
+            try:
+                lat = float(registro.latitud)
+                lon = float(registro.longitud)
+            except (ValueError, TypeError):
+                continue
+
+            referencia_esperada = obtener_referencia_desde_cache(
+                fecha_consulta=registro.fecha_registro or registro.fecha_hora,
+                historial_amid=estado.historial_amid,
+                vigente_amid=estado.vigente_amid,
+            )
+
+            coordenada_cero = lat == 0 and lon == 0
+
+            if coordenada_cero:
+                distancia = None
+                dentro_radio = None
+                estado.resumen_gps["registros_periodo"] += 1
+            else:
+                distancia = calcular_distancia_metros(
+                    lat,
+                    lon,
+                    referencia_esperada["latitud"],
+                    referencia_esperada["longitud"],
+                )
+
+                dentro_radio = None
+
+                if distancia is not None:
+                    dentro_radio = distancia <= referencia_esperada["radio_metros"]
+
+                    estado.resumen_gps["registros_periodo"] += 1
+
+                    if dentro_radio:
+                        estado.resumen_gps["registros_dentro_periodo"] += 1
+                    else:
+                        estado.resumen_gps["registros_fuera_periodo"] += 1
+
+            ubicacion_mapa = {
+                "id": registro.id,
+                "latitud": lat,
+                "longitud": lon,
+                "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
+                "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                "transmitio_gps": True,
+                "porcentaje_bateria": registro.porcentaje_bateria,
+                "distancia_metros": round(distancia, 2) if distancia is not None else None,
+                "dentro_radio": dentro_radio,
+                "coordenada_cero": coordenada_cero,
+                "ubicacion_esperada_nombre": referencia_esperada["nombre"],
+                "ubicacion_esperada_latitud": referencia_esperada["latitud"],
+                "ubicacion_esperada_longitud": referencia_esperada["longitud"],
+                "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
+                "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
+                "indice_mapa": len(estado.ubicaciones_gps),
+            }
+
+            estado.ubicaciones_gps.append(ubicacion_mapa)
+            ubicaciones_mapa_por_id[str(registro.id)] = ubicacion_mapa
+
+            ultima_ubicacion_reportada = ubicacion_mapa
+            ultimo_registro_reportado = registro
+
+            if not coordenada_cero:
+                ultima_ubicacion_valida = ubicacion_mapa
+                ultimo_registro_valido = registro
+
+        # El historial representa bloques, no solo puntos del mapa.
+        # FECHA_REGISTRO identifica el bloque; una FECHA_HORA repetida indica
+        # que el validador no transmitió coordenadas nuevas en ese bloque.
+        for registro in registros_periodo_base:
+            ubicacion_transmitida = ubicaciones_mapa_por_id.get(str(registro.id))
+
+            if ubicacion_transmitida is not None:
+                estado.historial_gps.append(ubicacion_transmitida)
+                continue
+
+            referencia_esperada = obtener_referencia_desde_cache(
+                fecha_consulta=registro.fecha_registro or registro.fecha_hora,
+                historial_amid=estado.historial_amid,
+                vigente_amid=estado.vigente_amid,
+            )
+
+            estado.historial_gps.append({
+                "id": registro.id,
+                "latitud": None,
+                "longitud": None,
+                "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
+                "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
+                "transmitio_gps": registro.transmitio_gps,
+                "porcentaje_bateria": (
+                    registro.porcentaje_bateria
+                    if registro.transmitio_gps
+                    else None
+                ),
+                "distancia_metros": None,
+                "dentro_radio": None,
+                "coordenada_cero": False,
+                "ubicacion_esperada_nombre": referencia_esperada["nombre"],
+                "ubicacion_esperada_latitud": referencia_esperada["latitud"],
+                "ubicacion_esperada_longitud": referencia_esperada["longitud"],
+                "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
+                "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
+                "indice_mapa": None,
+            })
+
+        if estado.resumen_gps["registros_periodo"] > 0:
+            estado.resumen_gps["porcentaje_cumplimiento_periodo"] = round(
+                estado.resumen_gps["registros_dentro_periodo"] * 100 / estado.resumen_gps["registros_periodo"],
+                1
+            )
+
+        estado.resumen_gps["clase_cumplimiento_periodo"] = obtener_clase_cumplimiento(
+            estado.resumen_gps["porcentaje_cumplimiento_periodo"]
+        )
+
+        # Para centrar el mapa usamos la última coordenada válida.
+        # Si solo hay 0,0, no centramos en 0,0.
+        if ultima_ubicacion_valida:
+            estado.latitud = ultima_ubicacion_valida["latitud"]
+            estado.longitud = ultima_ubicacion_valida["longitud"]
+
+        # Para estado y última ubicación usamos la última coordenada reportada.
+        if ultimo_registro_reportado:
+            estado.ultimo_registro = ultimo_registro_reportado
+            fecha_ultima_referencia = (
+                ultimo_registro_reportado.fecha_registro
+                or ultimo_registro_reportado.fecha_hora
+            )
+        else:
+            fecha_ultima_referencia = None
+
+        if estado.ultimo_registro and (
+            estado.ultimo_registro.fecha_registro or estado.ultimo_registro.fecha_hora
+        ):
+            fecha_ultima_transmision = (
+                estado.ultimo_registro.fecha_registro or estado.ultimo_registro.fecha_hora
+            )
+            estado.resumen_gps["texto_ultima_ubicacion"] = (
+                fecha_ultima_transmision.strftime("%d-%m-%Y %H:%M")
+            )
+
+            minutos_desde_ultima = max(
+                0,
+                (
+                    obtener_ahora_referencia() - fecha_ultima_transmision
+                ).total_seconds() / 60,
+            )
+
+            if minutos_desde_ultima < 1:
+                estado.resumen_gps["texto_tiempo_desde_ultima"] = "Hace menos de 1 min"
+            elif minutos_desde_ultima < 60:
+                estado.resumen_gps["texto_tiempo_desde_ultima"] = (
+                    f"Hace {int(minutos_desde_ultima)} min"
+                )
+            elif minutos_desde_ultima < 1440:
+                estado.resumen_gps["texto_tiempo_desde_ultima"] = (
+                    f"Hace {int(minutos_desde_ultima // 60)} h"
+                )
+            else:
+                dias_desde_ultima = int(minutos_desde_ultima // 1440)
+                sufijo_dia = "día" if dias_desde_ultima == 1 else "días"
+                estado.resumen_gps["texto_tiempo_desde_ultima"] = (
+                    f"Hace {dias_desde_ultima} {sufijo_dia}"
+                )
+
+            if minutos_desde_ultima <= 60:
+                estado.resumen_gps["clase_ultima_ubicacion"] = "gps-estado-ok"
+            elif minutos_desde_ultima <= 180:
+                estado.resumen_gps["clase_ultima_ubicacion"] = "gps-estado-advertencia"
+            else:
+                estado.resumen_gps["clase_ultima_ubicacion"] = "gps-estado-alerta"
+
+        if ultimo_registro_reportado:
+            referencia_actual = obtener_referencia_desde_cache(
+                fecha_consulta=fecha_ultima_referencia,
+                historial_amid=estado.historial_amid,
+                vigente_amid=estado.vigente_amid,
+            )
+
+            ultima_reportada_es_cero = (
+                ultima_ubicacion_reportada is not None
+                and ultima_ubicacion_reportada.get("coordenada_cero") is True
+            )
+
+            if ultima_reportada_es_cero:
+                distancia_actual = None
+                dentro_radio_actual = None
+            elif ultima_ubicacion_reportada:
+                distancia_actual = calcular_distancia_metros(
+                    ultima_ubicacion_reportada["latitud"],
+                    ultima_ubicacion_reportada["longitud"],
+                    referencia_actual["latitud"],
+                    referencia_actual["longitud"],
+                )
+
+                dentro_radio_actual = (
+                    distancia_actual <= referencia_actual["radio_metros"]
+                    if distancia_actual is not None
+                    else None
+                )
+            else:
+                distancia_actual = None
+                dentro_radio_actual = None
+
+            estado.ubicacion_esperada = {
+                "nombre": referencia_actual["nombre"],
+                "latitud": referencia_actual["latitud"],
+                "longitud": referencia_actual["longitud"],
+                "radio_metros": referencia_actual["radio_metros"],
+                "distancia_metros": round(distancia_actual, 2) if distancia_actual is not None else None,
+                "dentro_radio": dentro_radio_actual,
+                "operativa": referencia_actual["operativa"],
+                "origen_ubicacion": referencia_actual["origen_ubicacion"],
+                "version_zp": referencia_actual.get("version_zp"),
+                "ultima_reportada_es_cero": ultima_reportada_es_cero,
+            }
+
+        if not estado.ubicaciones_gps and not estado.mensaje:
+            estado.mensaje = (
+                "No se encontraron coordenadas GPS para el AMID ingresado "
+                "en el rango seleccionado."
+            )
+
+    except Exception as error:
+        estado.mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
+
+
 def obtener_contexto_gps(request):
     amid = request.GET.get("amid", "").strip()
     horario_zp_solicitado = request.GET.get("horario_zp", "0") == "1"
@@ -515,420 +894,67 @@ def obtener_contexto_gps(request):
         filtros_fecha=filtros_fecha,
     )
 
-    ultimo_registro = None
-    mensaje = ""
-    latitud = None
-    longitud = None
-    ubicaciones_gps = []
-    historial_gps = []
-    ubicacion_esperada = None
-    usando_ultimo_dia_reportado = False
-    fecha_ultimo_dia_reportado = None
-    historial_amid = []
-    vigente_amid = None
-    horario_zp_activo = False
-    horario_zp = crear_configuracion_horario_zp(
-        fecha_referencia=obtener_ahora_referencia()
-    )
-    aviso_horario_zp = ""
-
-    ubicacion_laboratorio = {
-        "nombre": NOMBRE_LABORATORIO_ZP,
-        "latitud": LATITUD_LABORATORIO_ZP,
-        "longitud": LONGITUD_LABORATORIO_ZP,
-        "radio_metros": RADIO_LABORATORIO_ZP,
-    }
-
-    resumen_gps = crear_resumen_gps_rango(
-        fecha_desde=filtros_fecha["fecha_desde"],
-        fecha_hasta=filtros_fecha["fecha_hasta"],
-        hora_desde=filtros_fecha["hora_desde"],
-        hora_hasta=filtros_fecha["hora_hasta"],
+    estado = SimpleNamespace(
+        amid=amid,
+        filtros_fecha=filtros_fecha,
+        filtros_por_defecto=filtros_por_defecto,
+        rango_manual=rango_manual,
+        horario_zp_solicitado=horario_zp_solicitado,
+        horario_zp=crear_configuracion_horario_zp(
+            fecha_referencia=obtener_ahora_referencia()
+        ),
+        resumen_gps=crear_resumen_gps_rango(
+            fecha_desde=filtros_fecha["fecha_desde"],
+            fecha_hasta=filtros_fecha["fecha_hasta"],
+            hora_desde=filtros_fecha["hora_desde"],
+            hora_hasta=filtros_fecha["hora_hasta"],
+        ),
+        mensaje="",
+        aviso_horario_zp="",
+        usando_ultimo_dia_reportado=False,
+        fecha_ultimo_dia_reportado=None,
+        horario_zp_activo=False,
+        ultimo_registro=None,
+        latitud=None,
+        longitud=None,
+        ubicaciones_gps=[],
+        historial_gps=[],
+        ubicacion_esperada=None,
+        historial_amid=[],
+        vigente_amid=None,
     )
 
     if amid:
-        try:
-            registros_periodo_base = obtener_registros_gps_oracle(
-                amid=amid,
-                fecha_inicio=filtros_fecha["fecha_inicio"],
-                fecha_fin=filtros_fecha["fecha_fin"],
-            )
-
-            registros_reportados_inicial = [
-                registro for registro in registros_periodo_base
-                if gps_tiene_coordenadas(registro)
-            ]
-
-            # Fallback:
-            # Solo buscamos el último día si NO hubo GPS reportado hoy.
-            # Si hubo 0,0 hoy, se muestra hoy y se cuenta como fuera.
-            if filtros_por_defecto and not registros_reportados_inicial:
-                ultimo_gps_valido = obtener_ultimo_registro_gps_valido_oracle(amid)
-
-                if ultimo_gps_valido and ultimo_gps_valido.fecha_hora:
-                    fecha_ultimo_dia_reportado = ultimo_gps_valido.fecha_hora.date()
-                    filtros_fecha = construir_filtros_gps_para_dia(
-                        fecha_ultimo_dia_reportado
-                    )
-
-                    registros_periodo_base = obtener_registros_gps_oracle(
-                        amid=amid,
-                        fecha_inicio=filtros_fecha["fecha_inicio"],
-                        fecha_fin=filtros_fecha["fecha_fin"],
-                    )
-
-                    usando_ultimo_dia_reportado = True
-                    rango_manual = "0"
-
-                    resumen_gps = crear_resumen_gps_rango(
-                        fecha_desde=filtros_fecha["fecha_desde"],
-                        fecha_hasta=filtros_fecha["fecha_hasta"],
-                        hora_desde=filtros_fecha["hora_desde"],
-                        hora_hasta=filtros_fecha["hora_hasta"],
-                    )
-
-                    mensaje = (
-                        "El AMID no envió coordenadas GPS hoy. "
-                        "Se muestran las últimas coordenadas válidas disponibles "
-                        f"del {fecha_ultimo_dia_reportado.strftime('%d-%m-%Y')}."
-                    )
-
-        except ValueError:
-            mensaje = "El AMID ingresado no es válido."
-            registros_periodo_base = []
-        except Exception as error:
-            mensaje = f"Error consultando datos GPS en Oracle: {error}"
-            registros_periodo_base = []
-
-        try:
-            historial_amid, vigente_amid = obtener_datos_ubicacion_amid_oracle(
-                amid
-            )
-
-            horario_zp = crear_configuracion_horario_zp(
-                datos=vigente_amid,
-                fecha_referencia=obtener_ahora_referencia(),
-            )
-        except Exception as error:
-            aviso_horario_zp = (
-                "No fue posible consultar el horario vigente; "
-                "los registros se mantienen sin filtro."
-            )
-            if not mensaje:
-                mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
-
-        if horario_zp_solicitado and not horario_zp["tiene_horario_hoy"]:
-            horario_zp_solicitado = False
-
-        if horario_zp_solicitado and horario_zp["tiene_horario_hoy"]:
-            registros_periodo_base, horario_zp_activo = (
-                filtrar_registros_por_horario_zp(
-                    registros=registros_periodo_base,
-                    configuracion=horario_zp,
-                    atributo_fecha="fecha_registro",
-                )
-            )
-
-        resumen_gps["registros_totales_periodo"] = len(registros_periodo_base)
-
-        resumen_gps["errores_gps_periodo"] = sum(
-            1 for registro in registros_periodo_base
-            if es_error_gps(registro)
-        )
-
-        resumen_gps["clase_errores_gps_periodo"] = obtener_clase_errores_gps(
-            resumen_gps["errores_gps_periodo"]
-        )
-
-        registros_reportados = [
-            registro for registro in registros_periodo_base
-            if gps_tiene_coordenadas(registro)
-        ]
-
-        registros_validos = [
-            registro for registro in registros_periodo_base
-            if gps_tiene_coordenadas_validas_no_cero(registro)
-        ]
-
-        registros_sin_transmision = [
-            registro for registro in registros_periodo_base
-            if registro.transmitio_gps is False
-        ]
-
-        registros_cero = [
-            registro for registro in registros_periodo_base
-            if gps_es_coordenada_cero(registro)
-        ]
-
-        resumen_gps["registros_gps_reportados_periodo"] = len(registros_reportados)
-        resumen_gps["registros_gps_validos_periodo"] = len(registros_validos)
-        resumen_gps["registros_sin_transmision_periodo"] = len(
-            registros_sin_transmision
-        )
-        resumen_gps["registros_gps_cero_periodo"] = len(registros_cero)
-
-        try:
-            ultima_ubicacion_reportada = None
-            ultimo_registro_reportado = None
-            ultima_ubicacion_valida = None
-            ultimo_registro_valido = None
-            ubicaciones_mapa_por_id = {}
-
-            for registro in registros_reportados:
-                try:
-                    lat = float(registro.latitud)
-                    lon = float(registro.longitud)
-                except (ValueError, TypeError):
-                    continue
-
-                referencia_esperada = obtener_referencia_desde_cache(
-                    fecha_consulta=registro.fecha_registro or registro.fecha_hora,
-                    historial_amid=historial_amid,
-                    vigente_amid=vigente_amid,
-                )
-
-                coordenada_cero = lat == 0 and lon == 0
-
-                if coordenada_cero:
-                    distancia = None
-                    dentro_radio = None
-                    resumen_gps["registros_periodo"] += 1
-                else:
-                    distancia = calcular_distancia_metros(
-                        lat,
-                        lon,
-                        referencia_esperada["latitud"],
-                        referencia_esperada["longitud"],
-                    )
-
-                    dentro_radio = None
-
-                    if distancia is not None:
-                        dentro_radio = distancia <= referencia_esperada["radio_metros"]
-
-                        resumen_gps["registros_periodo"] += 1
-
-                        if dentro_radio:
-                            resumen_gps["registros_dentro_periodo"] += 1
-                        else:
-                            resumen_gps["registros_fuera_periodo"] += 1
-
-                ubicacion_mapa = {
-                    "id": registro.id,
-                    "latitud": lat,
-                    "longitud": lon,
-                    "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
-                    "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
-                    "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
-                    "transmitio_gps": True,
-                    "porcentaje_bateria": registro.porcentaje_bateria,
-                    "distancia_metros": round(distancia, 2) if distancia is not None else None,
-                    "dentro_radio": dentro_radio,
-                    "coordenada_cero": coordenada_cero,
-                    "ubicacion_esperada_nombre": referencia_esperada["nombre"],
-                    "ubicacion_esperada_latitud": referencia_esperada["latitud"],
-                    "ubicacion_esperada_longitud": referencia_esperada["longitud"],
-                    "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
-                    "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
-                    "indice_mapa": len(ubicaciones_gps),
-                }
-
-                ubicaciones_gps.append(ubicacion_mapa)
-                ubicaciones_mapa_por_id[str(registro.id)] = ubicacion_mapa
-
-                ultima_ubicacion_reportada = ubicacion_mapa
-                ultimo_registro_reportado = registro
-
-                if not coordenada_cero:
-                    ultima_ubicacion_valida = ubicacion_mapa
-                    ultimo_registro_valido = registro
-
-            # El historial representa bloques, no sólo puntos del mapa.
-            # FECHA_REGISTRO identifica el bloque; una FECHA_HORA repetida indica
-            # que el validador no transmitió coordenadas nuevas en ese bloque.
-            for registro in registros_periodo_base:
-                ubicacion_transmitida = ubicaciones_mapa_por_id.get(str(registro.id))
-
-                if ubicacion_transmitida is not None:
-                    historial_gps.append(ubicacion_transmitida)
-                    continue
-
-                referencia_esperada = obtener_referencia_desde_cache(
-                    fecha_consulta=registro.fecha_registro or registro.fecha_hora,
-                    historial_amid=historial_amid,
-                    vigente_amid=vigente_amid,
-                )
-
-                historial_gps.append({
-                    "id": registro.id,
-                    "latitud": None,
-                    "longitud": None,
-                    "fecha_hora": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
-                    "fecha_registro": registro.fecha_registro.strftime("%d-%m-%Y %H:%M") if registro.fecha_registro else "",
-                    "fecha_hora_validador": registro.fecha_hora.strftime("%d-%m-%Y %H:%M") if registro.fecha_hora else "",
-                    "transmitio_gps": registro.transmitio_gps,
-                    "porcentaje_bateria": (
-                        registro.porcentaje_bateria
-                        if registro.transmitio_gps
-                        else None
-                    ),
-                    "distancia_metros": None,
-                    "dentro_radio": None,
-                    "coordenada_cero": False,
-                    "ubicacion_esperada_nombre": referencia_esperada["nombre"],
-                    "ubicacion_esperada_latitud": referencia_esperada["latitud"],
-                    "ubicacion_esperada_longitud": referencia_esperada["longitud"],
-                    "ubicacion_esperada_radio_metros": referencia_esperada["radio_metros"],
-                    "ubicacion_esperada_version": referencia_esperada.get("version_zp"),
-                    "indice_mapa": None,
-                })
-
-            if resumen_gps["registros_periodo"] > 0:
-                resumen_gps["porcentaje_cumplimiento_periodo"] = round(
-                    resumen_gps["registros_dentro_periodo"] * 100 / resumen_gps["registros_periodo"],
-                    1
-                )
-
-            resumen_gps["clase_cumplimiento_periodo"] = obtener_clase_cumplimiento(
-                resumen_gps["porcentaje_cumplimiento_periodo"]
-            )
-
-            # Para centrar el mapa usamos la última coordenada válida.
-            # Si solo hay 0,0, no centramos en 0,0.
-            if ultima_ubicacion_valida:
-                latitud = ultima_ubicacion_valida["latitud"]
-                longitud = ultima_ubicacion_valida["longitud"]
-
-            # Para estado y última ubicación usamos la última coordenada reportada.
-            if ultimo_registro_reportado:
-                ultimo_registro = ultimo_registro_reportado
-                fecha_ultima_referencia = (
-                    ultimo_registro_reportado.fecha_registro
-                    or ultimo_registro_reportado.fecha_hora
-                )
-            else:
-                fecha_ultima_referencia = None
-
-            if ultimo_registro and (
-                ultimo_registro.fecha_registro or ultimo_registro.fecha_hora
-            ):
-                fecha_ultima_transmision = (
-                    ultimo_registro.fecha_registro or ultimo_registro.fecha_hora
-                )
-                resumen_gps["texto_ultima_ubicacion"] = (
-                    fecha_ultima_transmision.strftime("%d-%m-%Y %H:%M")
-                )
-
-                minutos_desde_ultima = max(
-                    0,
-                    (
-                        obtener_ahora_referencia() - fecha_ultima_transmision
-                    ).total_seconds() / 60,
-                )
-
-                if minutos_desde_ultima < 1:
-                    resumen_gps["texto_tiempo_desde_ultima"] = "Hace menos de 1 min"
-                elif minutos_desde_ultima < 60:
-                    resumen_gps["texto_tiempo_desde_ultima"] = (
-                        f"Hace {int(minutos_desde_ultima)} min"
-                    )
-                elif minutos_desde_ultima < 1440:
-                    resumen_gps["texto_tiempo_desde_ultima"] = (
-                        f"Hace {int(minutos_desde_ultima // 60)} h"
-                    )
-                else:
-                    dias_desde_ultima = int(minutos_desde_ultima // 1440)
-                    sufijo_dia = "día" if dias_desde_ultima == 1 else "días"
-                    resumen_gps["texto_tiempo_desde_ultima"] = (
-                        f"Hace {dias_desde_ultima} {sufijo_dia}"
-                    )
-
-                if minutos_desde_ultima <= 60:
-                    resumen_gps["clase_ultima_ubicacion"] = "gps-estado-ok"
-                elif minutos_desde_ultima <= 180:
-                    resumen_gps["clase_ultima_ubicacion"] = "gps-estado-advertencia"
-                else:
-                    resumen_gps["clase_ultima_ubicacion"] = "gps-estado-alerta"
-
-            if ultimo_registro_reportado:
-                referencia_actual = obtener_referencia_desde_cache(
-                    fecha_consulta=fecha_ultima_referencia,
-                    historial_amid=historial_amid,
-                    vigente_amid=vigente_amid,
-                )
-
-                ultima_reportada_es_cero = (
-                    ultima_ubicacion_reportada is not None
-                    and ultima_ubicacion_reportada.get("coordenada_cero") is True
-                )
-
-                if ultima_reportada_es_cero:
-                    distancia_actual = None
-                    dentro_radio_actual = None
-                elif ultima_ubicacion_reportada:
-                    distancia_actual = calcular_distancia_metros(
-                        ultima_ubicacion_reportada["latitud"],
-                        ultima_ubicacion_reportada["longitud"],
-                        referencia_actual["latitud"],
-                        referencia_actual["longitud"],
-                    )
-
-                    dentro_radio_actual = (
-                        distancia_actual <= referencia_actual["radio_metros"]
-                        if distancia_actual is not None
-                        else None
-                    )
-                else:
-                    distancia_actual = None
-                    dentro_radio_actual = None
-
-                ubicacion_esperada = {
-                    "nombre": referencia_actual["nombre"],
-                    "latitud": referencia_actual["latitud"],
-                    "longitud": referencia_actual["longitud"],
-                    "radio_metros": referencia_actual["radio_metros"],
-                    "distancia_metros": round(distancia_actual, 2) if distancia_actual is not None else None,
-                    "dentro_radio": dentro_radio_actual,
-                    "operativa": referencia_actual["operativa"],
-                    "origen_ubicacion": referencia_actual["origen_ubicacion"],
-                    "version_zp": referencia_actual.get("version_zp"),
-                    "ultima_reportada_es_cero": ultima_reportada_es_cero,
-                }
-
-            if not ubicaciones_gps and not mensaje:
-                mensaje = (
-                    "No se encontraron coordenadas GPS para el AMID ingresado "
-                    "en el rango seleccionado."
-                )
-
-        except Exception as error:
-            mensaje = f"Error consultando ubicación esperada en Oracle: {error}"
+        _armar_resumen_amid_gps(estado)
+        _armar_ubicacion_y_horario_gps(estado)
+        _armar_detalle_periodo_gps(estado)
 
     return {
         "amid": amid,
-
-        "fecha_desde": filtros_fecha["fecha_desde_input"],
-        "fecha_hasta": filtros_fecha["fecha_hasta_input"],
-        "hora_desde": filtros_fecha["hora_desde"],
-        "hora_hasta": filtros_fecha["hora_hasta"],
-        "bloques_horarios": filtros_fecha["bloques_horarios"],
-
-        "ultimo_registro": ultimo_registro,
-        "mensaje": mensaje,
-        "latitud": latitud,
-        "longitud": longitud,
-        "ubicaciones_gps": ubicaciones_gps,
-        "historial_gps": historial_gps,
-        "ubicacion_esperada": ubicacion_esperada,
-        "ubicacion_laboratorio": ubicacion_laboratorio,
-        "resumen_gps": resumen_gps,
-
-        "horario_zp_solicitado": horario_zp_solicitado,
-        "horario_zp_activo": horario_zp_activo,
-        "horario_zp": horario_zp,
-        "aviso_horario_zp": aviso_horario_zp,
-
-        "usando_ultimo_dia_reportado": usando_ultimo_dia_reportado,
-        "fecha_ultimo_dia_reportado": fecha_ultimo_dia_reportado,
-        "rango_manual": rango_manual,
+        "fecha_desde": estado.filtros_fecha["fecha_desde_input"],
+        "fecha_hasta": estado.filtros_fecha["fecha_hasta_input"],
+        "hora_desde": estado.filtros_fecha["hora_desde"],
+        "hora_hasta": estado.filtros_fecha["hora_hasta"],
+        "bloques_horarios": estado.filtros_fecha["bloques_horarios"],
+        "ultimo_registro": estado.ultimo_registro,
+        "mensaje": estado.mensaje,
+        "latitud": estado.latitud,
+        "longitud": estado.longitud,
+        "ubicaciones_gps": estado.ubicaciones_gps,
+        "historial_gps": estado.historial_gps,
+        "ubicacion_esperada": estado.ubicacion_esperada,
+        "ubicacion_laboratorio": {
+            "nombre": NOMBRE_LABORATORIO_ZP,
+            "latitud": LATITUD_LABORATORIO_ZP,
+            "longitud": LONGITUD_LABORATORIO_ZP,
+            "radio_metros": RADIO_LABORATORIO_ZP,
+        },
+        "resumen_gps": estado.resumen_gps,
+        "horario_zp_solicitado": estado.horario_zp_solicitado,
+        "horario_zp_activo": estado.horario_zp_activo,
+        "horario_zp": estado.horario_zp,
+        "aviso_horario_zp": estado.aviso_horario_zp,
+        "usando_ultimo_dia_reportado": estado.usando_ultimo_dia_reportado,
+        "fecha_ultimo_dia_reportado": estado.fecha_ultimo_dia_reportado,
+        "rango_manual": estado.rango_manual,
     }
