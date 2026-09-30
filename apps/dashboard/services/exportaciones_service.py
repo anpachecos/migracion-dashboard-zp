@@ -8,7 +8,11 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from .normalizacion import obtener_ahora_referencia
+from .normalizacion import (
+    convertir_numero,
+    es_coordenada_cero,
+    obtener_ahora_referencia,
+)
 
 COLUMNAS_EXCEL_ALERTAS = (
     ("Prioridad", "nivel_alerta_global"),
@@ -173,30 +177,14 @@ def crear_excel_alertas(alertas, fecha_generacion=None):
 
     return wb
 
-def convertir_numero_excel(valor):
-    """
-    Convierte valores numéricos Oracle/Python a float.
-    Sirve para cálculos del resumen.
-    """
-
-    if valor is None or valor == "":
-        return None
-
-    try:
-        return float(valor)
-    except (ValueError, TypeError):
-        return None
-
-
 def es_gps_cero(registro):
     """
     Detecta registros GPS 0,0.
     """
-
-    latitud = convertir_numero_excel(registro.get("latitud"))
-    longitud = convertir_numero_excel(registro.get("longitud"))
-
-    return latitud == 0 and longitud == 0
+    return es_coordenada_cero(
+        registro.get("latitud"),
+        registro.get("longitud"),
+    )
 
 
 def construir_resumen_exportacion(
@@ -219,9 +207,9 @@ def construir_resumen_exportacion(
     ]
 
     baterias = [
-        convertir_numero_excel(registro.get("porcentaje_bateria"))
+        convertir_numero(registro.get("porcentaje_bateria"))
         for registro in registros_dict
-        if convertir_numero_excel(registro.get("porcentaje_bateria")) is not None
+        if convertir_numero(registro.get("porcentaje_bateria")) is not None
     ]
 
     registros_con_gps = [

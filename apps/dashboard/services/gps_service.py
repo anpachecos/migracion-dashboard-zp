@@ -6,8 +6,10 @@ from apps.dashboard.repositories import gps_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
     filtrar_registros_por_horario_zp,
+    generar_bloques_media_hora,
 )
 from apps.dashboard.services.normalizacion import (
+    es_coordenada_cero,
     normalizar_booleano_oracle,
     normalizar_fecha_para_comparar,
     obtener_ahora_referencia,
@@ -27,19 +29,6 @@ def fecha_a_texto_oracle(fecha):
         return None
 
     return fecha.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def normalizar_booleano_oracle(valor):
-    if valor is None:
-        return False
-
-    if isinstance(valor, bool):
-        return valor
-
-    if isinstance(valor, (int, float)):
-        return int(valor) == 1
-
-    return str(valor).strip().upper() in ["TRUE", "1", "SI", "SÍ", "Y"]
 
 
 def calcular_distancia_metros(lat1, lon1, lat2, lon2):
@@ -110,16 +99,6 @@ def construir_referencia_desde_fila(fila, origen_ubicacion):
         return None
 
 
-def generar_bloques_horarios():
-    bloques = []
-
-    for hora in range(24):
-        for minuto in [0, 30]:
-            bloques.append(f"{hora:02d}:{minuto:02d}")
-
-    return bloques
-
-
 def obtener_rango_fechas_gps(request):
     """
     Lee filtros de fecha/hora desde GET.
@@ -138,7 +117,7 @@ def obtener_rango_fechas_gps(request):
     hora_desde = request.GET.get("hora_desde", "00:00")
     hora_hasta = request.GET.get("hora_hasta", "23:30")
 
-    bloques_validos = generar_bloques_horarios()
+    bloques_validos = generar_bloques_media_hora()
 
     if hora_desde not in bloques_validos:
         hora_desde = "00:00"
@@ -250,17 +229,7 @@ def gps_es_coordenada_cero(registro):
     """
     True cuando el registro reportó latitud/longitud 0,0.
     """
-
-    if registro.latitud is None or registro.longitud is None:
-        return False
-
-    try:
-        latitud = float(registro.latitud)
-        longitud = float(registro.longitud)
-    except (ValueError, TypeError):
-        return False
-
-    return latitud == 0 and longitud == 0
+    return es_coordenada_cero(registro.latitud, registro.longitud)
 
 
 def gps_tiene_coordenadas_validas_no_cero(registro):
@@ -300,7 +269,7 @@ def construir_filtros_gps_para_dia(fecha_objetivo):
     Se usa para mostrar el último día con GPS disponible.
     """
 
-    bloques_validos = generar_bloques_horarios()
+    bloques_validos = generar_bloques_media_hora()
 
     fecha_inicio = datetime.combine(fecha_objetivo, time.min)
     fecha_fin_bloque = datetime.combine(fecha_objetivo, time(hour=23, minute=30))
