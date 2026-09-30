@@ -283,44 +283,6 @@ class UbicacionesRepositoryTests(SimpleTestCase):
     @patch(
         "apps.core.oracle.connection.obtener_conexion_oracle"
     )
-    def test_sincronizacion_conserva_procedure_salida_y_validacion(
-        self,
-        mock_conexion,
-    ):
-        contexto, conexion, cursor = self.preparar_oracle()
-        mock_conexion.return_value = contexto
-        ubicaciones_var = MagicMock()
-        historiales_var = MagicMock()
-        ubicaciones_var.getvalue.return_value = 2
-        historiales_var.getvalue.return_value = 3
-        cursor.var.side_effect = [ubicaciones_var, historiales_var]
-        cursor.fetchone.return_value = (4, 5)
-
-        resultado = ubicaciones_repository.sincronizar_amids_ubicaciones()
-
-        self.assertEqual(cursor.var.call_args_list, [call(int), call(int)])
-        cursor.callproc.assert_called_once_with(
-            "USR_LAB.PRC_SINC_UBIC_AMID",
-            [ubicaciones_var, historiales_var],
-        )
-        query_validacion = cursor.execute.call_args.args[0]
-        self.assertIn("AMID_MAESTRO_ALERTAS", query_validacion)
-        self.assertIn("sin_historial_abierto", query_validacion)
-        self.assertEqual(
-            resultado,
-            {
-                "ubicaciones_creadas": 2,
-                "historiales_creados": 3,
-                "sin_ubicacion": 4,
-                "sin_historial_abierto": 5,
-            },
-        )
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_not_called()
-
-    @patch(
-        "apps.core.oracle.connection.obtener_conexion_oracle"
-    )
     def test_limpieza_conserva_procedure_parametros_y_retorno(
         self,
         mock_conexion,

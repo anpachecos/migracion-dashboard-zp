@@ -14,9 +14,6 @@ from apps.dashboard.management.commands.importar_ubicaciones_esperadas import (
 from apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle import (
     Command as LimpiarHistorialCommand,
 )
-from apps.dashboard.services.ubicaciones_service import (
-    sincronizar_amids_ubicaciones_oracle,
-)
 
 
 class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
@@ -208,23 +205,6 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
 
 
 class OperacionesUbicacionesCaracterizacionTests(SimpleTestCase):
-    @patch(
-        "apps.core.oracle.connection.obtener_conexion_oracle"
-    )
-    def test_fallo_sincronizacion_propaga_sin_commit_ni_rollback(self, mock_conexion):
-        conexion = mock_conexion.return_value.__enter__.return_value
-        cursor = conexion.cursor.return_value.__enter__.return_value
-        cursor.callproc.side_effect = RuntimeError("fallo sintético sincronización")
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "fallo sintético sincronización",
-        ):
-            sincronizar_amids_ubicaciones_oracle()
-
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_not_called()
-
     @patch(
         "apps.core.oracle.connection.obtener_conexion_oracle"
     )

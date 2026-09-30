@@ -83,5 +83,6 @@ de borrado independiente.
 - Los dos paneles consumen los mismos eventos de caída calculados por Oracle.
 - Los eventos de caída se mantienen automáticamente en una ventana de 14 días.
 
-Los archivos de `oracle/history/` conservan las sentencias ejecutadas y sus
-reparaciones. No deben volver a ejecutarse sobre el esquema actual.
+La referencia del esquema vigente está consolidada en `oracle/current/`; los
+scripts preparados para desplegar viven en `oracle/pending/`. No se conservan
+migraciones intermedias en este repositorio.

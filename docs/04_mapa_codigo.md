@@ -59,7 +59,7 @@ Durante el desarrollo pueden existir scripts auxiliares usados solo para pruebas
 Los objetos Oracle mantenidos por este proyecto se organizan en:
 
 - `oracle/current/`: baseline consolidado vigente;
-- `oracle/history/`: scripts ya ejecutados;
+- `oracle/pending/`: cambios preparados pero no desplegados;
 - `oracle/diagnostics/`: auditorías de solo lectura.
 
 La prueba oficial de conexión se realiza con:
@@ -225,7 +225,6 @@ apps/dashboard/services/
 ├── normalizacion.py
 ├── preferencias_alertas_service.py
 ├── reglas_alertas_service.py
-├── ubicaciones_service.py
 └── __init__.py
 ```
 
@@ -238,7 +237,6 @@ apps/dashboard/services/
 | `horarios_zp_service.py` | Consulta e interpreta los cuatro horarios vigentes de `UBICACION_ESPERADA_VALIDADOR`. Es compartido por Baterías y GPS. | Vigente |
 | `reglas_alertas_service.py` | Consulta y actualiza reglas configurables desde el Perfil/Admin. Mantiene el guardado, validación Oracle y selección de recálculo rápido o completo. | Vigente |
 | `preferencias_alertas_service.py` | Lee y guarda atómicamente en SQLite las exclusiones de AMID y ubicaciones propias de cada usuario. | Vigente |
-| `ubicaciones_service.py` | Invoca `PRC_SINC_UBIC_AMID` desde la acción administrativa y valida que no queden AMID activos sin ubicación o historial abierto. No decide ubicaciones en Python. | Pendiente de desplegar V011 |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
 | `normalizacion.py` | Utilidades compartidas por los servicios: hora de referencia sin tzinfo, fechas naive, booleano Oracle de tres estados (`True`/`False`/`None` con `None` = sin dato) y conversión a número. | Vigente |
 | `claves_cache.py` | Claves de caché centralizadas. `CACHE_KEY_RESUMEN_ALERTAS` vive aquí para que lectura e invalidación usen siempre la misma clave. | Vigente |
@@ -313,7 +311,7 @@ apps/dashboard/templates/dashboard/
 | `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |
 | `panel_alertas.html` | Muestra filtros y orden combinables tipo Excel en Prioridad/GPS/Batería/Estatus, además de filtro por texto —sin orden— en Ubicación actual. El filtro global se sincroniza con las tarjetas. Incluye restablecimiento completo, tabla, detalle de caídas, preferencias personales plegables y descarga Excel completa. | Vigente |
 | `panel_alertas_mantencion.html` | Template antiguo usado cuando el panel de alertas estaba en mantención. Actualmente podría quedar como respaldo o eliminarse si ya no se usa. | Revisar / posible obsoleto |
-| `panel_perfil.html` | Perfil y administración. Incluye la carga Excel, el disparador manual de sincronización Oracle y la configuración diferida de reglas. | Vigente; sincronización requiere V011 |
+| `panel_perfil.html` | Perfil y administración. Incluye la carga Excel y la configuración diferida de reglas. | Vigente |
 | `partials/editor_reglas_alertas.html` | Formulario del editor que Django devuelve bajo demanda. Conserva las dos formas de guardado. | Vigente |
 | `partials/reglas_alertas_categoria.html` | Presenta pestañas, acordeones, controles y detalle técnico de cada regla. | Vigente |
 
@@ -625,7 +623,6 @@ apps/dashboard/static/dashboard/js/
 - Revisar si `panel_alertas_mantencion.html` sigue siendo necesario.
 - Ordenar `views.py` por secciones o evaluar separación futura.
 - Ampliar las pruebas automáticas de GPS para transmisión, `0,0`, radio y cumplimiento.
-- Evaluar V010 con un plan de ejecución antes de sacar el script de `oracle/pending/`.
 - Confirmar que `.env`, `db.sqlite3`, `venv/`, `__pycache__/` y archivos temporales estén ignorados por Git.
 
 ---
