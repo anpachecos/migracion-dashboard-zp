@@ -1,4 +1,5 @@
 from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 def obtener_ultima_carga_datos():
@@ -71,8 +72,4 @@ def obtener_registros_completos(amid, fecha_inicio, fecha_fin):
                 },
             )
 
-            columnas = [col[0].lower() for col in cursor.description]
-            return [
-                dict(zip(columnas, fila))
-                for fila in cursor.fetchall()
-            ]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)

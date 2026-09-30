@@ -1,6 +1,7 @@
 import pandas as pd
 
 from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 COLUMNAS_ORACLE = [
@@ -250,13 +251,7 @@ def obtener_historial_vigente(cursor, amid):
         {"amid": amid},
     )
 
-    fila = cursor.fetchone()
-
-    if not fila:
-        return None
-
-    columnas = [col[0] for col in cursor.description]
-    return dict(zip(columnas, fila))
+    return oracle_cursor.mapear_fila(cursor, minusculas=False)
 
 
 def crear_historial(cursor, datos, fecha_carga):
@@ -341,11 +336,7 @@ def mover_ausentes_a_laboratorio(
             """
     )
 
-    filas_maestro = cursor.fetchall()
-    columnas = [col[0] for col in cursor.description]
-
-    for fila in filas_maestro:
-        registro_maestro = dict(zip(columnas, fila))
+    for registro_maestro in oracle_cursor.mapear_filas(cursor, minusculas=False):
         amid = str(registro_maestro["AMID"]).strip()
 
         if amid in amids_excel:

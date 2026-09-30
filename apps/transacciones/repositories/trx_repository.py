@@ -16,6 +16,7 @@ linea que debe cambiar.
 """
 
 from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 # Objeto consumido, no administrado. No se debe modificar ni redefinir.
 ORIGEN_TRX = "DBPTE.TRANSACCION_FLUJO_VC2D_FISC@CLEAMTT3PRODG"
@@ -239,5 +240,4 @@ def obtener_trx_base(fecha_desde, fecha_hasta, limite=200, offset=0, **filtros):
     with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, params)
-            columnas = [col[0].lower() for col in cursor.description if col and col[0]]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)

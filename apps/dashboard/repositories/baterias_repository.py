@@ -1,4 +1,5 @@
 from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 def obtener_ultimo_registro(amid):
@@ -30,13 +31,7 @@ def obtener_ultimo_registro(amid):
     with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=True)
 
 
 def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
@@ -69,8 +64,7 @@ def obtener_bloques_bateria(amid, fecha_inicio, fecha_fin):
                 },
             )
 
-            columnas = [col[0].lower() for col in cursor.description]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_detalle_caidas_bateria(amid):
@@ -91,8 +85,7 @@ def obtener_detalle_caidas_bateria(amid):
     with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            columnas = [col[0].lower() for col in cursor.description]
-            return [dict(zip(columnas, fila)) for fila in cursor.fetchall()]
+            return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_resumen_alerta_bateria(amid):
@@ -123,10 +116,4 @@ def obtener_resumen_alerta_bateria(amid):
     with oracle_connection.obtener_conexion_oracle() as conexion:
         with conexion.cursor() as cursor:
             cursor.execute(query, {"amid": int(amid)})
-            fila = cursor.fetchone()
-
-            if not fila:
-                return None
-
-            columnas = [col[0].lower() for col in cursor.description]
-            return dict(zip(columnas, fila))
+            return oracle_cursor.mapear_fila(cursor, minusculas=True)

@@ -1,4 +1,5 @@
 from apps.dashboard.services import oracle_connection
+from apps.dashboard.services import oracle_cursor
 
 
 SQL_ORDEN_ALERTAS = {
@@ -282,8 +283,7 @@ def obtener_alertas_validadores(
     with oracle_connection.obtener_conexion_oracle() as connection:
         cursor = connection.cursor()
         cursor.execute(query, params)
-        columnas = [col[0].lower() for col in cursor.description if col and col[0]]
-        return [dict(zip(columnas, row)) for row in cursor.fetchall()]
+        return oracle_cursor.mapear_filas(cursor, minusculas=True)
 
 
 def obtener_ubicaciones_alertas_disponibles(ubicacion_sin_asignar):
