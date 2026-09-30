@@ -20,27 +20,28 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.dashboard.repositories import ubicaciones_repository
+from apps.dashboard.services.gps_service import (
+    LATITUD_LABORATORIO_ZP,
+    LONGITUD_LABORATORIO_ZP,
+    NOMBRE_LABORATORIO_ZP,
+    RADIO_LABORATORIO_ZP,
+)
 from apps.dashboard.services.logs_service import registrar_log_importacion
-from apps.dashboard.services.ubicaciones_dataset_validation import (
+from apps.dashboard.importacion.ubicaciones_dataset_validation import (
     CAMPO_FILA_ORIGEN,
     formatear_reporte_validacion,
     resumir_incidencias,
     validar_dataset_ubicaciones,
 )
-from apps.dashboard.services.version_zp import (
+from apps.dashboard.importacion.version_zp import (
     VERSION_ZP_SHEET_NAME,
     nombre_columna_oracle,
     normalizar_nombre_columna,
 )
-from apps.dashboard.services.version_zp_validation import (
+from apps.dashboard.importacion.version_zp_validation import (
     VersionZPValidationError,
     validar_archivo_version_zp,
 )
-
-LATITUD_LABORATORIO_ZP = -33.437191
-LONGITUD_LABORATORIO_ZP = -70.656102
-RADIO_LABORATORIO_ZP = 150
-NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
 
 
 class Command(BaseCommand):

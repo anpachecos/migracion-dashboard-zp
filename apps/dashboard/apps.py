@@ -30,6 +30,6 @@ class DashboardConfig(AppConfig):
         if not getattr(settings, "DASHBOARD_SCHEDULER_ENABLED", False):
             return
 
-        from apps.dashboard.services.scheduler import iniciar_scheduler
+        from apps.dashboard.scheduler import iniciar_scheduler
 
         iniciar_scheduler()

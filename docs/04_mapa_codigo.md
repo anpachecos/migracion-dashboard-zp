@@ -101,7 +101,7 @@ config/
 - `ALLOWED_HOSTS` se configura desde `.env` para permitir acceso desde localhost, IPs internas o nombre del servidor.
 - SQLite se usa para datos internos de Django, como usuarios, sesiones, permisos, logs y migraciones.
 - Los datos operativos del dashboard se consultan desde Oracle.
-- Antes de activar o mantener activo `DASHBOARD_SCHEDULER_ENABLED`, se debe revisar `apps/dashboard/services/scheduler.py`.
+- Antes de activar o mantener activo `DASHBOARD_SCHEDULER_ENABLED`, se debe revisar `apps/dashboard/scheduler.py`.
 
 ## Carpeta `apps/dashboard/`
 
@@ -203,7 +203,7 @@ apps/transacciones/
 - El módulo está **apagado por defecto**: `TRX_ORACLE_HABILITADO=False`. Las pantallas funcionan como estructura sin abrir conexión a Oracle.
 - `CONSULTAS_VALIDADAS` está en `False` en `trx_service.py` y la interfaz muestra una advertencia permanente. Las cifras no están contrastadas con los Excel de referencia.
 - Las zonas sin implementar (gráficos, análisis mensual, exportación) se muestran con un marcador explícito. No hay datos simulados.
-- `trx_repository.py` importa `obtener_conexion_oracle` de `apps/dashboard/services/oracle_connection.py` porque hay una refactorización en curso. Es la única dependencia cruzada pendiente de resolver.
+- `trx_repository.py` importa la conexión Oracle compartida desde `apps/core/oracle/`, igual que los repositorios del dashboard. La dependencia cruzada antigua hacia `apps/dashboard/services/` quedó resuelta.
 - No hay modelos ni migraciones propias: el módulo no persiste nada en SQLite.
 - El acceso está restringido a superusuario y a los grupos de `TRX_GRUPOS_PERMITIDOS` (`Admin,SONDA` por defecto). La política vive en la variable de entorno, no en el código, así que cambiar quién entra no requiere despliegue. Los grupos y sus miembros se administran en `/admin/`; no hay comando ni migración. Ver [09_transacciones_trx.md](09_transacciones_trx.md).
 - Las pruebas viven en `apps/transacciones/tests/`, siguiendo el patrón de pruebas por app.
@@ -218,20 +218,19 @@ apps/dashboard/services/
 ├── alertas_service.py
 ├── baterias_service.py
 ├── catalogo_reglas_alertas.py
+├── claves_cache.py
 ├── gps_service.py
-├── ubicaciones_service.py
 ├── horarios_zp_service.py
 ├── logs_service.py
-├── oracle_connection.py
+├── normalizacion.py
 ├── preferencias_alertas_service.py
 ├── reglas_alertas_service.py
-├── scheduler.py
+├── ubicaciones_service.py
 └── __init__.py
 ```
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `oracle_connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza la creación del pool y la obtención de conexiones. | Vigente |
 | `baterias_service.py` | Prepara tarjetas, tabla y gráficos del Panel Baterías. Lee el resumen y el detalle oficial de caídas desde Oracle. | Vigente |
 | `gps_service.py` | Prepara el Panel GPS: bloques ordenados por `FECHA_REGISTRO`, estado de transmisión, puntos del mapa, referencia esperada histórica, versión ZP, distancia, cumplimiento e historial. | Vigente |
 | `alertas_service.py` | Consulta el resumen Oracle, aplica filtros y exclusiones, valida cuatro criterios combinados de orden antes de paginar y entrega búsquedas acotadas. La exportación usa una lectura explícita de todos los AMID activos, sin filtros ni preferencias personales. | Vigente |
@@ -241,8 +240,36 @@ apps/dashboard/services/
 | `preferencias_alertas_service.py` | Lee y guarda atómicamente en SQLite las exclusiones de AMID y ubicaciones propias de cada usuario. | Vigente |
 | `ubicaciones_service.py` | Invoca `PRC_SINC_UBIC_AMID` desde la acción administrativa y valida que no queden AMID activos sin ubicación o historial abierto. No decide ubicaciones en Python. | Pendiente de desplegar V011 |
 | `logs_service.py` | Registra logs de procesos, ejecuciones o errores. | Vigente |
-| `scheduler.py` | Define procesos automáticos programados desde Django. | Vigente / revisar |
+| `normalizacion.py` | Utilidades compartidas por los servicios: hora de referencia sin tzinfo, fechas naive, booleano Oracle de tres estados (`True`/`False`/`None` con `None` = sin dato) y conversión a número. | Vigente |
+| `claves_cache.py` | Claves de caché centralizadas. `CACHE_KEY_RESUMEN_ALERTAS` vive aquí para que lectura e invalidación usen siempre la misma clave. | Vigente |
 | `__init__.py` | Indica que la carpeta es un paquete Python. | Vigente |
+
+### Infraestructura compartida y procesos
+
+```txt
+apps/core/oracle/
+├── connection.py
+├── cursor.py
+└── __init__.py
+```
+
+| Archivo | Descripción | Estado |
+|---|---|---|
+| `apps/core/oracle/connection.py` | Maneja la conexión a Oracle usando `python-oracledb`. Centraliza el pool y la obtención de conexiones. Lo usan `dashboard` y `transacciones`. | Vigente |
+| `apps/core/oracle/cursor.py` | Mapea filas de un cursor Oracle a `dict`, tomando `cursor.description` como fuente de nombres de columna. El parámetro `minusculas` es obligatorio a propósito. | Vigente |
+| `apps/dashboard/scheduler.py` | Orquestador de jobs automáticos del dashboard. Vive a nivel de app porque orquesta comandos de esta misma app. | Vigente / revisar |
+
+### Importación de ubicaciones esperadas
+
+```txt
+apps/dashboard/importacion/
+├── version_zp.py
+├── version_zp_validation.py
+├── ubicaciones_dataset_validation.py
+└── __init__.py
+```
+
+Validan e interpretan los Excel de ubicaciones esperadas. Los usan el comando `importar_ubicaciones_esperadas` y la carga desde el panel Perfil.
 
 ### Observación importante sobre alertas de batería
 
@@ -573,7 +600,7 @@ apps/dashboard/views.py
 apps/dashboard/urls.py
 apps/dashboard/context_processors.py
 apps/dashboard/models.py
-apps/dashboard/services/oracle_connection.py
+apps/core/oracle/connection.py
 apps/dashboard/services/baterias_service.py
 apps/dashboard/services/gps_service.py
 apps/dashboard/services/alertas_service.py

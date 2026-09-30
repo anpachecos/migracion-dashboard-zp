@@ -6,6 +6,10 @@ from urllib.parse import urlencode
 from django.core.cache import cache
 
 from apps.dashboard.repositories import alertas_repository
+from apps.dashboard.services.claves_cache import (
+    CACHE_KEY_RESUMEN_ALERTAS,
+    CACHE_KEY_UBICACIONES_ALERTAS,
+)
 
 ORDEN_ALERTAS_PREDETERMINADO = (
     ("prioridad", "asc"),
@@ -32,9 +36,7 @@ OPCIONES_ESTATUS_ALERTA = (
 ESTATUS_ALERTA_VALIDOS = frozenset(valor for _, valor, _ in OPCIONES_ESTATUS_ALERTA if valor)
 
 ALERTAS_POR_PAGINA = 10
-CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v3"
 CACHE_TIMEOUT_RESUMEN_ALERTAS = 60
-CACHE_KEY_UBICACIONES_ALERTAS = "dashboard:ubicaciones-alertas:v1"
 CACHE_TIMEOUT_UBICACIONES_ALERTAS = 300
 UBICACION_SIN_ASIGNAR = "Sin ubicaci\u00f3n asignada"
 MIN_CARACTERES_BUSQUEDA_ALERTAS = 2

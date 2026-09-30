@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from apps.dashboard.services.ubicaciones_dataset_validation import (
+from apps.dashboard.importacion.ubicaciones_dataset_validation import (
     CAMPO_FILA_ORIGEN,
     formatear_reporte_validacion,
     validar_dataset_ubicaciones,

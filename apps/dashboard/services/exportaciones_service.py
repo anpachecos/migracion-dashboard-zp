@@ -8,7 +8,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from .baterias_service import obtener_ahora_referencia
+from .normalizacion import obtener_ahora_referencia
 
 COLUMNAS_EXCEL_ALERTAS = (
     ("Prioridad", "nivel_alerta_global"),

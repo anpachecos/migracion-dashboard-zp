@@ -7,7 +7,7 @@ estas pruebas tienen que fallar.
 from unittest.mock import MagicMock
 
 from apps.dashboard.repositories import horarios_zp_repository
-from apps.dashboard.services import oracle_connection
+from apps.core.oracle import connection as oracle_connection
 from apps.dashboard.tests.base import SEAM_ORACLE, OracleTestCase
 
 
@@ -16,7 +16,7 @@ class OracleTestCaseAislaElSeamTests(OracleTestCase):
         self.assertIsInstance(oracle_connection.obtener_conexion_oracle, MagicMock)
         self.assertEqual(
             SEAM_ORACLE,
-            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
+            "apps.core.oracle.connection.obtener_conexion_oracle",
         )
 
     def test_llamar_a_un_repositorio_no_crea_pool_real(self):

@@ -42,7 +42,7 @@ from apps.dashboard.services.reglas_alertas_service import (
 from apps.dashboard.services.ubicaciones_service import (
     sincronizar_amids_ubicaciones_oracle,
 )
-from apps.dashboard.services.version_zp_validation import (
+from apps.dashboard.importacion.version_zp_validation import (
     VersionZPValidationError,
     validar_upload_basico,
 )
@@ -50,13 +50,13 @@ from apps.dashboard.services.version_zp_validation import (
 from .models import LogImportacion
 from .services.baterias_service import (
     construir_tabla_bateria,
-    obtener_ahora_referencia,
     obtener_bloques_bateria_oracle,
     obtener_contexto_baterias,
     obtener_detalle_caidas_bateria_oracle,
     obtener_rango_fechas_panel,
 )
 from .services.gps_service import obtener_contexto_gps
+from .services.normalizacion import obtener_ahora_referencia
 
 def usuario_es_admin(user):
     return user.is_superuser or user.groups.filter(name="Admin").exists()

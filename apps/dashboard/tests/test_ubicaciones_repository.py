@@ -179,7 +179,7 @@ class UbicacionesRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, "cerrado_y_nuevo")
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_importacion_usa_una_conexion_cursor_commit_y_cierre(
         self,
@@ -239,7 +239,7 @@ class UbicacionesRepositoryTests(SimpleTestCase):
         contexto.__exit__.assert_called_once()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_importacion_existente_sin_cambios_conserva_estadisticas(
         self,
@@ -281,7 +281,7 @@ class UbicacionesRepositoryTests(SimpleTestCase):
         conexion.commit.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_sincronizacion_conserva_procedure_salida_y_validacion(
         self,
@@ -319,7 +319,7 @@ class UbicacionesRepositoryTests(SimpleTestCase):
         conexion.rollback.assert_not_called()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_limpieza_conserva_procedure_parametros_y_retorno(
         self,

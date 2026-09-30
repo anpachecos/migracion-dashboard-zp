@@ -9,14 +9,12 @@ Reglas de este modulo:
 - compatible con Oracle 11g (ROW_NUMBER + ROWNUM, nunca FETCH FIRST);
 - no crea, altera ni modifica ningun objeto Oracle.
 
-TODO(refactor): `obtener_conexion_oracle` sigue viviendo en
-`apps/dashboard/services/oracle_connection.py`, de modo que esta app depende
-de `dashboard`. Cuando exista un modulo compartido de conexion, esa es la unica
-linea que debe cambiar.
+La conexion Oracle compartida vive en `apps/core/oracle/` y se importa con alias
+para que los call-sites de esta app no cambien.
 """
 
-from apps.dashboard.services import oracle_connection
-from apps.dashboard.services import oracle_cursor
+from apps.core.oracle import connection as oracle_connection
+from apps.core.oracle import cursor as oracle_cursor
 
 # Objeto consumido, no administrado. No se debe modificar ni redefinir.
 ORIGEN_TRX = "DBPTE.TRANSACCION_FLUJO_VC2D_FISC@CLEAMTT3PRODG"

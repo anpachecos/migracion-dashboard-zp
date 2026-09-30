@@ -1,4 +1,4 @@
-from apps.dashboard.services import oracle_connection
+from apps.core.oracle import connection as oracle_connection
 
 
 def obtener_resumenes_estado():

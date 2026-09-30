@@ -6,7 +6,7 @@ import pandas as pd
 from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 
-from apps.dashboard.services.version_zp_validation import (
+from apps.dashboard.importacion.version_zp_validation import (
     VersionZPValidationError,
     validar_archivo_version_zp,
     validar_upload_basico,

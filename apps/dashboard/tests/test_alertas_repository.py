@@ -72,7 +72,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         self.assertIn("ULTIMO_ESTATUS ASC NULLS FIRST", resultado)
         self.assertTrue(resultado.endswith("AMID ASC"))
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_contar_conserva_query_filtros_parametros_y_escalar(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.fetchone.return_value = (4,)
@@ -92,7 +92,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         self.assertEqual(parametros, {"amid": 7500001, "nivel": "ALTA"})
         self.assertEqual(resultado, 4)
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_contar_sin_fila_retorna_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.fetchone.return_value = None
@@ -103,7 +103,7 @@ class AlertasRepositoryTests(SimpleTestCase):
 
         self.assertIsNone(resultado)
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_listado_conserva_paginacion_orden_parametros_y_diccionarios(
         self,
         mock_conexion,
@@ -141,7 +141,7 @@ class AlertasRepositoryTests(SimpleTestCase):
             [{"amid": 7500001, "nivel_alerta_global": "CRITICA", "rn": 6}],
         )
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_listado_sin_ordenar_conserva_orden_por_amid(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.description = []
@@ -159,7 +159,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         self.assertIn("ROW_NUMBER() OVER (ORDER BY AMID ASC)", query)
         self.assertEqual(resultado, [])
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_ubicaciones_conservan_distinct_orden_parametro_y_filtro_de_filas(
         self,
         mock_conexion,
@@ -180,7 +180,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         )
         self.assertEqual(resultado, ["Bodega", "Laboratorio"])
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_busqueda_amid_conserva_prefijo_limite_orden_y_retorno(
         self,
         mock_conexion,
@@ -197,7 +197,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         self.assertEqual(parametros, {"patron": "750%", "limite": 15})
         self.assertEqual(resultado, [7500001, 7500002])
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_resumen_conserva_agregados_exclusiones_parametros_y_fila(
         self,
         mock_conexion,
@@ -227,7 +227,7 @@ class AlertasRepositoryTests(SimpleTestCase):
         )
         self.assertEqual(resultado, fila)
 
-    @patch("apps.dashboard.services.oracle_connection.obtener_conexion_oracle")
+    @patch("apps.core.oracle.connection.obtener_conexion_oracle")
     def test_resumen_sin_fila_retorna_none(self, mock_conexion):
         cursor = self.obtener_cursor(mock_conexion)
         cursor.fetchone.return_value = None

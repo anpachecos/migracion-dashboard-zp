@@ -1,13 +1,17 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from django.utils import timezone
-
 from apps.dashboard.repositories import baterias_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
     obtener_columnas_media_hora_para_hoy,
     obtener_datos_horario_zp_oracle,
+)
+from apps.dashboard.services.normalizacion import (
+    convertir_numero,
+    normalizar_booleano_oracle,
+    normalizar_fecha_para_comparar,
+    obtener_ahora_referencia,
 )
 
 """
@@ -34,34 +38,6 @@ Python:
 """
 
 
-def obtener_ahora_referencia():
-    """
-    Retorna la fecha/hora actual sin tzinfo para comparar con fechas Oracle.
-    Oracle ya entrega las fechas en la hora correcta, por eso evitamos conversiones
-    que puedan generar desfase.
-    """
-    ahora = timezone.localtime(timezone.now())
-
-    if timezone.is_aware(ahora):
-        return timezone.make_naive(ahora)
-
-    return ahora
-
-
-def normalizar_fecha_para_comparar(fecha):
-    """
-    Evita errores al comparar/restar fechas aware vs naive.
-    No cambia la hora funcional, solo quita tzinfo si existe.
-    """
-    if not fecha:
-        return None
-
-    if timezone.is_aware(fecha):
-        return timezone.make_naive(fecha)
-
-    return fecha
-
-
 def obtener_fecha(valor):
     """
     Devuelve solo la fecha, sin aplicar timezone.localtime().
@@ -71,41 +47,6 @@ def obtener_fecha(valor):
 
     valor = normalizar_fecha_para_comparar(valor)
     return valor.date()
-
-
-def normalizar_booleano_oracle(valor):
-    """
-    Normaliza valores booleanos que pueden venir desde Oracle como:
-    1/0, true/false, TRUE/FALSE, Sí/No, etc.
-    """
-    if valor is None:
-        return None
-
-    if valor in [True, False]:
-        return valor
-
-    texto = str(valor).strip().lower()
-
-    if texto in ["true", "1", "si", "sí", "s", "yes", "y"]:
-        return True
-
-    if texto in ["false", "0", "no", "n"]:
-        return False
-
-    return None
-
-
-def convertir_numero(valor):
-    """
-    Convierte valores numéricos Oracle/Python a float.
-    """
-    if valor is None or valor == "":
-        return None
-
-    try:
-        return float(valor)
-    except (ValueError, TypeError):
-        return None
 
 
 def convertir_entero(valor, defecto=0):

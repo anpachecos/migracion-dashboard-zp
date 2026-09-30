@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-SEAM_ORACLE = "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+SEAM_ORACLE = "apps.core.oracle.connection.obtener_conexion_oracle"
 
 
 class OracleTestCase(SimpleTestCase):

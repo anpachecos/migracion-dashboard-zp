@@ -1,8 +1,8 @@
 from decimal import Decimal, InvalidOperation
 import uuid
 
-from apps.dashboard.services import oracle_connection
-from apps.dashboard.services import oracle_cursor
+from apps.core.oracle import connection as oracle_connection
+from apps.core.oracle import cursor as oracle_cursor
 
 
 PROCEDIMIENTOS_RECALCULO = {

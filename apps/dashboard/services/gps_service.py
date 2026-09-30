@@ -2,12 +2,15 @@ from datetime import datetime, time, timedelta
 from types import SimpleNamespace
 import math
 
-from django.utils import timezone
-
 from apps.dashboard.repositories import gps_repository
 from apps.dashboard.services.horarios_zp_service import (
     crear_configuracion_horario_zp,
     filtrar_registros_por_horario_zp,
+)
+from apps.dashboard.services.normalizacion import (
+    normalizar_booleano_oracle,
+    normalizar_fecha_para_comparar,
+    obtener_ahora_referencia,
 )
 
 
@@ -15,35 +18,6 @@ LATITUD_LABORATORIO_ZP = -33.437191
 LONGITUD_LABORATORIO_ZP = -70.656102
 RADIO_LABORATORIO_ZP = 150
 NOMBRE_LABORATORIO_ZP = "Laboratorio Zonas Pagas"
-
-
-def obtener_ahora_referencia():
-    """
-    Devuelve la hora actual local como datetime naive.
-    Se usa naive para comparar con fechas que vienen desde Oracle.
-    """
-
-    ahora = timezone.localtime(timezone.now())
-
-    if timezone.is_aware(ahora):
-        return timezone.make_naive(ahora)
-
-    return ahora
-
-
-def normalizar_fecha_para_comparar(fecha):
-    """
-    Deja las fechas sin tzinfo para evitar desfases.
-    Oracle ya trae las fechas en la hora correcta.
-    """
-
-    if not fecha:
-        return None
-
-    if timezone.is_aware(fecha):
-        return timezone.make_naive(fecha)
-
-    return fecha
 
 
 def fecha_a_texto_oracle(fecha):
@@ -209,16 +183,6 @@ def obtener_rango_fechas_gps(request):
         "fecha_fin": fecha_fin_query,
         "bloques_horarios": bloques_validos,
     }
-
-
-def obtener_rango_fechas_periodo(dias):
-    hoy = obtener_ahora_referencia().date()
-    fecha_inicio = hoy - timedelta(days=dias - 1)
-
-    inicio = datetime.combine(fecha_inicio, time.min)
-    fin = datetime.combine(hoy + timedelta(days=1), time.min)
-
-    return inicio, fin
 
 
 def obtener_registros_gps_oracle(amid, fecha_inicio, fecha_fin):
@@ -461,22 +425,6 @@ def obtener_referencia_desde_cache(fecha_consulta, historial_amid, vigente_amid)
     return obtener_referencia_laboratorio()
 
 
-def obtener_referencia_esperada(amid, fecha_consulta=None):
-    """
-    Función compatible para otros módulos.
-    Si otro servicio la llama directamente, consulta Oracle.
-    En el panel GPS optimizado usamos obtener_referencia_desde_cache().
-    """
-
-    historial, vigente = obtener_datos_ubicacion_amid_oracle(amid)
-
-    return obtener_referencia_desde_cache(
-        fecha_consulta=fecha_consulta,
-        historial_amid=historial,
-        vigente_amid=vigente,
-    )
-
-
 def es_error_gps(registro):
     valor = getattr(registro, "is_error_obtener_gps", None)
     return normalizar_booleano_oracle(valor)
@@ -503,56 +451,6 @@ def obtener_clase_cumplimiento(porcentaje):
         return "gps-estado-advertencia"
 
     return "gps-estado-alerta"
-
-
-def obtener_textos_periodo(dias):
-    if dias == 1:
-        return {
-            "texto_periodo": "Hoy",
-            "texto_cumplimiento": "Cumplimiento hoy",
-            "texto_dentro": "Dentro hoy",
-            "texto_fuera": "Fuera hoy",
-        }
-
-    return {
-        "texto_periodo": f"Últimos {dias} días",
-        "texto_cumplimiento": f"Cumplimiento {dias} días",
-        "texto_dentro": f"Dentro {dias} días",
-        "texto_fuera": f"Fuera {dias} días",
-    }
-
-
-def crear_resumen_gps(dias):
-    textos_periodo = obtener_textos_periodo(dias)
-
-    return {
-        "errores_gps_periodo": 0,
-        "clase_errores_gps_periodo": "gps-estado-ok",
-
-        "registros_periodo": 0,
-        "registros_dentro_periodo": 0,
-        "registros_fuera_periodo": 0,
-
-        "registros_totales_periodo": 0,
-        "registros_gps_reportados_periodo": 0,
-        "registros_gps_validos_periodo": 0,
-        "registros_sin_transmision_periodo": 0,
-        "registros_gps_cero_periodo": 0,
-
-        "porcentaje_cumplimiento_periodo": None,
-        "clase_cumplimiento_periodo": "",
-
-        "texto_periodo": textos_periodo["texto_periodo"],
-        "texto_fechas_periodo": textos_periodo["texto_periodo"],
-        "texto_horario_periodo": "",
-        "texto_cumplimiento": textos_periodo["texto_cumplimiento"],
-        "texto_dentro": textos_periodo["texto_dentro"],
-        "texto_fuera": textos_periodo["texto_fuera"],
-
-        "clase_ultima_ubicacion": "",
-        "texto_ultima_ubicacion": "-",
-        "texto_tiempo_desde_ultima": "",
-    }
 
 
 def crear_resumen_gps_rango(fecha_desde, fecha_hasta, hora_desde, hora_hasta):

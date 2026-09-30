@@ -270,7 +270,7 @@ class ConteoYDetalleCompartenFiltrosTests(SimpleTestCase):
         registro = []
 
         with mock.patch(
-            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
+            "apps.core.oracle.connection.obtener_conexion_oracle",
             return_value=_ConexionGrabadora(registro),
         ):
             trx_repository.contar_trx_base(self.fecha_desde, self.fecha_hasta, **filtros)

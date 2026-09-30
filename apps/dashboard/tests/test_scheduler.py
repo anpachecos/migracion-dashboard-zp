@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from apps.dashboard.services import scheduler as scheduler_service
+from apps.dashboard import scheduler as scheduler_service
 
 
 class SchedulerTests(SimpleTestCase):

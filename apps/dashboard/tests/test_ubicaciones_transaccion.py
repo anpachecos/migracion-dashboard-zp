@@ -52,7 +52,7 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
         stderr = StringIO()
         comando = ImportarUbicacionesCommand(stdout=stdout, stderr=stderr)
         with patch(
-            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
+            "apps.core.oracle.connection.obtener_conexion_oracle",
             return_value=contexto,
         ), patch(
             "apps.dashboard.management.commands.importar_ubicaciones_esperadas."
@@ -209,7 +209,7 @@ class ImportacionUbicacionesTransaccionCaracterizacionTests(SimpleTestCase):
 
 class OperacionesUbicacionesCaracterizacionTests(SimpleTestCase):
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_fallo_sincronizacion_propaga_sin_commit_ni_rollback(self, mock_conexion):
         conexion = mock_conexion.return_value.__enter__.return_value
@@ -226,7 +226,7 @@ class OperacionesUbicacionesCaracterizacionTests(SimpleTestCase):
         conexion.rollback.assert_not_called()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     @patch(
         "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle."

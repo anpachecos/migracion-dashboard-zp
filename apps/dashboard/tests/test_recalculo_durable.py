@@ -70,7 +70,7 @@ class SolicitudRecalculoRepositoryTests(SimpleTestCase):
         "apps.dashboard.repositories.reglas_alertas_repository.uuid.uuid4"
     )
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_crear_solicitud_durable_pendiente_confirma(
         self,
@@ -97,7 +97,7 @@ class SolicitudRecalculoRepositoryTests(SimpleTestCase):
         conexion.rollback.assert_not_called()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_crear_solicitud_revierte_si_oracle_falla(self, mock_conexion):
         contexto, conexion, cursor = self.preparar_oracle()
@@ -114,7 +114,7 @@ class SolicitudRecalculoRepositoryTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_consultar_solicitud_no_encontrada_retorna_none(self, mock_conexion):
         contexto, _conexion, cursor = self.preparar_oracle()

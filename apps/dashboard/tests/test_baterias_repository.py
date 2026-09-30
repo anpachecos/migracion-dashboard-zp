@@ -14,7 +14,7 @@ class BateriasRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_ultimo_registro_conserva_query_parametro_y_diccionario(
         self,
@@ -34,7 +34,7 @@ class BateriasRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, {"id": 2, "amid": 7500001})
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_bloques_conserva_rango_orden_y_lista_de_diccionarios(
         self,
@@ -74,7 +74,7 @@ class BateriasRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_detalle_caidas_conserva_orden_y_lista_de_diccionarios(
         self,
@@ -93,7 +93,7 @@ class BateriasRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, [{"amid": 7500001, "caida_dif": 7}])
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_resumen_conserva_parametro_y_diccionario(
         self,

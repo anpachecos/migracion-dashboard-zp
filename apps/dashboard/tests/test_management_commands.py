@@ -20,7 +20,8 @@ from apps.dashboard.management.commands.probar_oracle import Command as ProbarOr
 from apps.dashboard.management.commands.registrar_estado_oracle import (
     Command as RegistrarEstadoOracleCommand,
 )
-from apps.dashboard.services import reglas_alertas_service, scheduler as scheduler_service
+from apps.dashboard import scheduler as scheduler_service
+from apps.dashboard.services import reglas_alertas_service
 
 
 class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
@@ -190,7 +191,7 @@ class ManagementCommandsSchedulerCaracterizacionTests(TestCase):
         cursor.var.return_value = variable_salida
 
         with patch(
-            "apps.dashboard.services.oracle_connection.obtener_conexion_oracle",
+            "apps.core.oracle.connection.obtener_conexion_oracle",
             return_value=contexto,
         ), patch(
             "apps.dashboard.management.commands.limpiar_historial_ubicacion_oracle.registrar_log_importacion"

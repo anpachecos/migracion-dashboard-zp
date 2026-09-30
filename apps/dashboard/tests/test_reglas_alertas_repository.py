@@ -18,7 +18,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         return conexion, cursor
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_reglas_conserva_sql_binds_orden_y_diccionarios(
         self,
@@ -62,7 +62,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         )
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_obtener_reglas_sin_filas_retorna_lista_vacia(self, mock_conexion):
         self.mock_conexion = mock_conexion
@@ -74,7 +74,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         self.assertEqual(resultado, [])
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_actualizacion_conserva_orden_binds_transaccion_y_retorno(
         self,
@@ -134,7 +134,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         mock_conexion.return_value.__exit__.assert_called_once()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_sin_cambios_confirma_sin_update_ni_procedure(self, mock_conexion):
         self.mock_conexion = mock_conexion
@@ -153,7 +153,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         conexion.rollback.assert_not_called()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_tipo_persistido_invalido_revierte_antes_del_update(
         self,
@@ -178,7 +178,7 @@ class ReglasAlertasRepositoryTests(SimpleTestCase):
         conexion.rollback.assert_called_once_with()
 
     @patch(
-        "apps.dashboard.services.oracle_connection.obtener_conexion_oracle"
+        "apps.core.oracle.connection.obtener_conexion_oracle"
     )
     def test_recalculo_conserva_procedure_commit_y_ausencia_de_rollback_explicito(
         self,

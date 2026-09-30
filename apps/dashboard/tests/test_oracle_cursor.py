@@ -9,7 +9,7 @@ minusculas, el fallo apareceria lejos de aqui, como un KeyError en la vista.
 
 from django.test import SimpleTestCase
 
-from apps.dashboard.services import oracle_cursor
+from apps.core.oracle import cursor as oracle_cursor
 
 
 class CursorFalso:

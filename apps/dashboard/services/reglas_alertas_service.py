@@ -14,6 +14,7 @@ from apps.dashboard.services.catalogo_reglas_alertas import (
     construir_editor_reglas_alertas,
     validar_catalogo_reglas,
 )
+from apps.dashboard.services.claves_cache import CACHE_KEY_RESUMEN_ALERTAS
 
 CLAVES_PERMITIDAS = {
     "GPS": [
@@ -52,8 +53,6 @@ CLAVES_PERMITIDAS = {
 CLAVES_PERMITIDAS_TODO = set(CLAVES_PERMITIDAS["GPS"]) | set(CLAVES_PERMITIDAS["BATERIA"])
 TIPOS_REGLA_VALIDOS = frozenset({"DETECCION", "CLASIFICACION"})
 validar_catalogo_reglas(CLAVES_PERMITIDAS_TODO)
-
-CACHE_KEY_RESUMEN_ALERTAS = "dashboard:resumen-alertas-activos:v1"
 
 LOG_RECALCULO_MAX_BYTES = 1024 * 1024
 LOG_RECALCULO_LINEAS_VISIBLES = 100

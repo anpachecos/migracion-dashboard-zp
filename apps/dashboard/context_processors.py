@@ -4,33 +4,19 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from apps.dashboard.repositories import estado_dashboard_repository
+from apps.dashboard.services.claves_cache import (
+    CACHE_KEY_ULTIMA_CARGA_DATOS,
+    CACHE_KEY_ULTIMA_VERSION_ZP,
+)
+from apps.dashboard.services.normalizacion import normalizar_fecha_para_comparar
 
 
 logger = logging.getLogger(__name__)
 
-CACHE_KEY_ULTIMA_CARGA_DATOS = "dashboard_ultima_carga_datos_oracle"
-CACHE_KEY_ULTIMA_VERSION_ZP = "dashboard_ultima_version_zp_oracle"
 CACHE_MISS = object()
 
 # 5 minutos
 CACHE_TIMEOUT_SEGUNDOS = 300
-
-
-def normalizar_fecha_oracle(fecha):
-    """
-    Convierte una fecha Oracle a datetime compatible con templates Django.
-
-    No usamos timezone.localtime() para datos Oracle porque las fechas ya vienen
-    con la hora correcta desde la base.
-    """
-
-    if not fecha:
-        return None
-
-    if timezone.is_aware(fecha):
-        return timezone.make_naive(fecha)
-
-    return fecha
 
 
 def obtener_ultima_carga_datos_oracle():
@@ -52,7 +38,7 @@ def obtener_ultima_carga_datos_oracle():
         resultado = estado_dashboard_repository.obtener_ultima_carga_datos()
 
         if resultado and resultado[0]:
-            ultima_carga = normalizar_fecha_oracle(resultado[0])
+            ultima_carga = normalizar_fecha_para_comparar(resultado[0])
 
     except Exception as error:
         logger.exception(
@@ -89,7 +75,7 @@ def obtener_ultima_version_zp_oracle():
         resultado = estado_dashboard_repository.obtener_ultima_version_zp()
 
         if resultado and resultado[0]:
-            ultima_version = normalizar_fecha_oracle(resultado[0])
+            ultima_version = normalizar_fecha_para_comparar(resultado[0])
 
     except Exception as error:
         logger.exception(
