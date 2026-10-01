@@ -12,44 +12,12 @@
 
 
 /* =========================================================
-   1. Base general
+   1. Contenedor general
 ========================================================= */
-
-* {
-    box-sizing: border-box;
-}
-
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f6f8;
-    margin: 0;
-    color: #222;
-}
 
 .contenedor {
     max-width: 1500px;
     margin: 0 auto;
-}
-
-
-/* =========================================================
-   2. Encabezado del panel
-========================================================= */
-
-.panel-header,
-.encabezado {
-    margin-bottom: 18px;
-}
-
-.panel-header h1,
-.encabezado h1 {
-    margin-bottom: 6px;
-}
-
-.panel-header p,
-.encabezado p {
-    color: #666;
-    margin-top: 0;
 }
 
 
@@ -186,11 +154,9 @@ body {
 ========================================================= */
 
 .mensaje {
-    padding: 15px;
     background: #fff3cd;
     border: 1px solid #ffeeba;
     color: #856404;
-    border-radius: 8px;
     margin-bottom: 20px;
 }
 
@@ -246,10 +212,7 @@ body {
 }
 
 .tarjeta {
-    background: white;
     padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     min-width: 0;
 }
 
@@ -317,13 +280,9 @@ body {
 }
 
 .chip {
-    display: inline-flex;
-    align-items: center;
     justify-content: center;
-    border-radius: 999px;
     padding: 6px 10px;
     font-size: 12px;
-    font-weight: bold;
 }
 
 .chip-ok {
@@ -565,37 +524,8 @@ th.hora-diagonal > span {
    12. Botón Exportar Excel
 ========================================================= */
 
-.btn-exportar {
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 7px;
-    border: 1px solid #198754;
-    background-color: #198754;
-    color: white;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 12px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-
-    white-space: nowrap;
-    transition: all 0.2s ease;
-}
-
-.btn-exportar:hover {
-    background-color: #157347;
-    border-color: #146c43;
-    transform: translateY(-1px);
-}
-
 .btn-deshabilitado {
-    background: #9ca3af;
-    border-color: #9ca3af;
     pointer-events: none;
-    cursor: not-allowed;
     color: white;
 }
 

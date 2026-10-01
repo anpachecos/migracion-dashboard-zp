@@ -1,0 +1,90 @@
+/* =========================================================
+   Utilidades UI compartidas - Dashboard ZP
+   Primitivas de componente reutilizadas por los paneles.
+   Se carga desde base_dashboard.html justo después de
+   base_dashboard.css y antes del CSS de cada panel, para que
+   cada panel pueda sobreescribir sus detalles específicos.
+   ========================================================= */
+
+/* ---- Tarjetas ---- */
+.alerta-card,
+.tarjeta,
+.gps-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ---- Chips / etiquetas píldora ---- */
+.chip,
+.chip-alerta,
+.chip-estatus,
+.preferencia-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+/* ---- Mensajes de resultado ---- */
+.mensaje,
+.alertas-mensaje,
+.admin-mensaje {
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.88rem;
+}
+
+/* ---- Botón exportar ---- */
+.btn-exportar-alertas,
+.btn-exportar,
+.btn-exportar-gps {
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid #198754;
+    border-radius: 10px;
+    background: #198754;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(25, 135, 84, 0.18);
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease,
+        box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.btn-exportar-alertas svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.btn-exportar-alertas:hover,
+.btn-exportar:hover,
+.btn-exportar-gps:hover {
+    border-color: #146c43;
+    background: #157347;
+    color: #ffffff;
+    box-shadow: 0 6px 14px rgba(25, 135, 84, 0.22);
+    transform: translateY(-1px);
+}
+
+.btn-exportar-alertas:focus-visible {
+    outline: 3px solid rgba(25, 135, 84, 0.25);
+    outline-offset: 2px;
+}
+
+.btn-deshabilitado,
+.btn-exportar-gps-deshabilitado {
+    background: #9ca3af;
+    border-color: #9ca3af;
+    pointer-events: none;
+    cursor: not-allowed;
+    color: #ffffff;
+}
