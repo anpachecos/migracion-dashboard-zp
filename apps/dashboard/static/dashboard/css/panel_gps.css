@@ -121,8 +121,7 @@
 }
 
 .gps-btn-buscar,
-.gps-btn-hoy,
-.btn-exportar-gps {
+.gps-btn-hoy {
     height: 38px;
     padding: 0 12px;
     border-radius: 10px;
@@ -160,18 +159,7 @@
     color: #2563eb;
 }
 
-.btn-exportar-gps {
-    border: none;
-    background: #198754;
-    color: #ffffff;
-}
-
-.btn-exportar-gps:hover {
-    background: #157347;
-}
-
 .btn-exportar-gps-deshabilitado {
-    background: #9ca3af;
     pointer-events: none;
     cursor: not-allowed;
 }
@@ -349,9 +337,6 @@
 }
 
 .gps-card {
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
     padding: 16px;
 }
 
