@@ -128,7 +128,7 @@ apps/dashboard/
 | `views.py` | Contiene las vistas principales del dashboard. Recibe solicitudes web, valida permisos, llama a servicios, renderiza templates y gestiona acciones como exportaciones o comandos administrativos. Actualmente también contiene lógica auxiliar de exportación Excel que podría moverse a un servicio dedicado. | Vigente / refactorizar |
 | `urls.py` | Define las rutas internas de la app `dashboard`, incluyendo paneles principales, acciones administrativas y exportaciones Excel. | Vigente |
 | `models.py` | Define modelos Django. Actualmente contiene `LogImportacion`, usado en SQLite para logs internos, y los modelos de reglas/alertas/ubicaciones. El modelo de referencia sobre `VW_ESTATUS_ZP_DJANGO` se retiró en BKL-002C. | Vigente |
-| `context_processors.py` | Agrega datos comunes al layout general del dashboard, como la hora de renderizado, último dato recibido desde Oracle y última actualización de versión ZP. Usa caché para evitar consultas Oracle en cada petición. | Vigente / revisar simplificación |
+| `context_processors.py` | Agrega datos comunes al layout del dashboard. `metadatos_app` expone versión, entorno e identidad (corre también para anónimos, porque el login muestra la versión). `datos_actualizacion_dashboard` expone la antigüedad de los datos de Oracle como semáforo (`estado_frescura`) y usa caché para evitar consultas Oracle en cada petición. | Vigente |
 | `admin.py` | Configura qué modelos locales se muestran en el administrador de Django. Actualmente no registra modelos propios de la app. | Vigente / opcional |
 | `apps.py` | Configura la app `dashboard`. Si `DASHBOARD_SCHEDULER_ENABLED=True`, puede iniciar el scheduler interno al levantar Django. | Vigente / revisar en despliegue |
 | `tests.py` | Contiene pruebas unitarias básicas para funciones del dashboard, como context processor, filtros de alertas y permisos de edición de reglas. | Vigente / ampliar |
@@ -305,7 +305,7 @@ apps/dashboard/templates/dashboard/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.html` | Template base del dashboard. Define la estructura general, sidebar, navegación, estado del sistema, bloque de contenido, CSS y JS extra por página. El sidebar agrupa la navegación en tres bloques colapsables (`Operación`, `Reportes`, `Administración`) construidos con `<details>` nativos. El bloque `Reportes` completo se oculta con `{% puede_ver_transacciones user %}`. | Vigente |
+| `base_dashboard.html` | Plantilla base del dashboard. Sidebar derecho en columna fija: cabecera con título, ambiente e identidad; navegación agrupada en `<details>` (`Operación`, `Reportes`, `Administración`) con íconos; y al pie el estado de Oracle y el cierre de sesión. El estado son dos chips con punto de color y texto relativo, con la fecha absoluta en el `title`. No lleva botón de colapso. | Vigente |
 | `login.html` | Template de inicio de sesión. Permite ingresar al dashboard con usuario y contraseña de Django. | Vigente |
 | `panel_baterias.html` | Muestra búsqueda por AMID, horarios vigentes, filtro Horario Zona Paga, tarjetas, eventos oficiales, bloques y gráficos. | Vigente |
 | `panel_gps.html` | Muestra filtros, horario vigente, métricas, mapa Leaflet e historial plegable. Separa coordenadas válidas, `0,0` y bloques sin transmisión. | Vigente |
@@ -353,7 +353,7 @@ apps/dashboard/static/dashboard/css/
 
 | Archivo | Descripción | Estado |
 |---|---|---|
-| `base_dashboard.css` | Estilos generales compartidos, incluida la ayuda flotante de exploración vertical. | Vigente |
+| `base_dashboard.css` | Estilos generales compartidos, incluida la ayuda flotante de exploración vertical. El ancho del sidebar vive en la variable `--ancho-sidebar` (300px), que también la usan el margen del contenido y el desplazamiento del botón flotante. Sin barra de desplazamiento propia: se estira con `top`/`bottom`, lleva `overflow: hidden` y se comprime con `clamp()` según la altura de la ventana. | Vigente |
 | `login.css` | Estilos de la pantalla de login. | Vigente |
 | `panel_baterias.css` | Estilos del Panel Baterías, tarjeta de horarios y filtro de columnas. | Vigente |
 | `panel_gps.css` | Estilos del Panel GPS, tarjetas de estado, mapa, horarios e historial plegable. | Vigente |
@@ -384,7 +384,7 @@ apps/dashboard/static/dashboard/js/
 | `panel_alertas.js` | Maneja detalle de caídas y autocompletados de exclusiones con debounce, cancelación, caché local y chips removibles. | Vigente |
 | `panel_perfil.js` | Abre y carga el editor de reglas bajo demanda, administra pestañas, sincroniza controles y marca cambios locales. No consulta Oracle al escribir. | Vigente |
 | `scroll_explorar.js` | Control global accesible: muestra una ayuda flotante solo si queda contenido bajo la pantalla, avanza la vista y se oculta al llegar al final. | Vigente |
-| `sidebar.js` | Recuerda en `localStorage` qué grupos del sidebar dejó colapsados el usuario. El agrupamiento en sí no depende de este archivo: los `<details>` son nativos y funcionan sin JavaScript. | Vigente |
+| `sidebar.js` | Estado del sidebar en el navegador: recuerda en `localStorage` (`zp.sidebar.grupos`) qué grupos dejó plegados, recarga con el botón de refrescar, y actualiza cada 30 s el texto de antigüedad de los datos (y el `title` de cada chip) leyendo los umbrales que viajan en el DOM. El agrupamiento y los `<details>` son nativos: funcionan sin JavaScript. | Vigente |
 
 ---
 

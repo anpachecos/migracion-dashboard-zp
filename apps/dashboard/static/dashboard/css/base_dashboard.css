@@ -1,3 +1,8 @@
+:root {
+    --ancho-sidebar: 300px;
+    --sidebar-padding: 18px;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -16,24 +21,43 @@ body {
 .dashboard-content {
     min-height: 100vh;
     padding: 24px;
-    margin-right: 260px;
+    margin-right: var(--ancho-sidebar);
 }
 
 /* =========================
    Sidebar general
    ========================= */
 
+/* Columna fija a la derecha: cabecera arriba, navegación en el medio y
+   estado + pie anclados abajo. El alto se estira con top/bottom en vez de
+   un alto fijo, y `overflow: hidden` impide que aparezca una barra propia:
+   el contenido se comprime con clamp() y, si la ventana es muy baja, se
+   ocultan los bloques menos útiles (ver la escalera al final del archivo). */
+
 .dashboard-sidebar {
     position: fixed;
     top: 0;
     right: 0;
-    width: 260px;
-    height: 100vh;
-    padding: 24px 18px;
+    bottom: 0;
+    width: var(--ancho-sidebar);
+    padding: clamp(12px, 2.4vh, 24px) var(--sidebar-padding);
     background: #111827;
     color: #ffffff;
     box-shadow: -4px 0 14px rgba(0, 0, 0, 0.14);
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.sidebar-top {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.sidebar-body {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
@@ -43,7 +67,7 @@ body {
    ========================= */
 
 .sidebar-title-block {
-    margin-bottom: 24px;
+    margin-bottom: clamp(8px, 1.6vh, 16px);
 }
 
 .sidebar-title-block h2 {
@@ -61,13 +85,79 @@ body {
 }
 
 /* =========================
+   Entorno e identidad
+   ========================= */
+
+.sidebar-ambiente {
+    display: flex;
+    align-items: center;
+    margin: 0 0 clamp(6px, 1.2vh, 12px);
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.14);
+    color: #fcd34d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-align: center;
+}
+
+.sidebar-identity {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 9px;
+    align-items: center;
+    margin-bottom: clamp(6px, 1.2vh, 12px);
+}
+
+.sidebar-identity-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.22);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    color: #bfdbfe;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sidebar-identity-text {
+    min-width: 0;
+}
+
+.sidebar-identity-text strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-identity-text span {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px;
+    color: #94a3b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* =========================
    Navegación
    ========================= */
 
 .sidebar-nav {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: clamp(8px, 2vh, 24px);
 }
 
 .sidebar-group {
@@ -81,7 +171,7 @@ body {
     align-items: center;
     gap: 8px;
 
-    margin: 0 0 10px;
+    margin: 0 0 clamp(6px, 1vh, 10px);
     padding: 0;
     list-style: none;
     cursor: pointer;
@@ -114,24 +204,44 @@ body {
 
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: clamp(6px, 1.1vh, 10px);
 }
 
 .sidebar-link {
-    display: block;
-    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: clamp(8px, 1.3vh, 12px) 12px clamp(8px, 1.3vh, 12px) 11px;
+    border-left: 3px solid transparent;
     border-radius: 10px;
     color: #d1d5db;
     text-decoration: none;
-    font-size: 15px;
+    font-size: clamp(13px, 1.7vh, 15px);
     font-weight: 600;
     transition: 0.2s ease;
 }
 
-.sidebar-link:hover,
+.sidebar-link:hover {
+    background: rgba(37, 99, 235, 0.35);
+    color: #ffffff;
+}
+
 .sidebar-link.active {
     background: #2563eb;
+    border-left-color: #93c5fd;
     color: #ffffff;
+}
+
+.sidebar-link-icon {
+    flex: 0 0 auto;
+}
+
+.sidebar-link-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* =========================
@@ -139,11 +249,20 @@ body {
    ========================= */
 
 .sidebar-status-section {
-    margin-top: 24px;
+    margin-top: auto;
+    padding-top: clamp(10px, 2vh, 20px);
+}
+
+.sidebar-status-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
 }
 
 .sidebar-status-title {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 11px;
     font-weight: 800;
     color: #94a3b8;
@@ -151,74 +270,99 @@ body {
     letter-spacing: 0.08em;
 }
 
-.sidebar-status-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin: 0;
-}
-
-.sidebar-status-card {
-    display: grid;
-    grid-template-columns: 34px 1fr;
-    gap: 10px;
-    align-items: center;
-
-    padding: 10px;
-    border-radius: 14px;
-    background: rgba(15, 23, 42, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
-}
-
-.sidebar-status-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 11px;
-
+.sidebar-refresh {
     display: flex;
     align-items: center;
     justify-content: center;
-
-    font-size: 17px;
-    font-weight: 800;
-    background: rgba(255, 255, 255, 0.08);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: 0.2s ease;
 }
 
-.sidebar-status-text {
+.sidebar-refresh:hover {
+    background: rgba(37, 99, 235, 0.4);
+    color: #ffffff;
+}
+
+.sidebar-status-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0;
+}
+
+.sidebar-status-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.sidebar-status-punto {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #94a3b8;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+}
+
+.sidebar-status-texto {
     min-width: 0;
 }
 
-.sidebar-status-text span {
+.sidebar-status-texto span {
     display: block;
-    margin-bottom: 3px;
-    font-size: 11px;
-    line-height: 1.2;
+    font-size: 9.5px;
+    line-height: 1.15;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
     color: #aeb8c8;
 }
 
-.sidebar-status-text strong {
+.sidebar-status-texto strong {
     display: block;
-    font-size: 13px;
-    line-height: 1.25;
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.2;
     color: #ffffff;
     font-weight: 800;
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.sidebar-status-blue .sidebar-status-icon {
-    color: #60a5fa;
-    background: rgba(37, 99, 235, 0.16);
+/* Semáforo por antigüedad de los datos */
+
+.sidebar-status-ok .sidebar-status-punto {
+    background: #34d399;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
 }
 
-.sidebar-status-green .sidebar-status-icon {
-    color: #34d399;
-    background: rgba(16, 185, 129, 0.14);
+.sidebar-status-aviso .sidebar-status-punto {
+    background: #fbbf24;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 }
 
-.sidebar-status-purple .sidebar-status-icon {
-    color: #a78bfa;
-    background: rgba(124, 58, 237, 0.15);
+.sidebar-status-error .sidebar-status-punto {
+    background: #f87171;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+}
+
+.sidebar-status-sin-datos .sidebar-status-punto {
+    background: #94a3b8;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
 }
 
 /* =========================
@@ -255,12 +399,13 @@ body {
    ========================= */
 
 .sidebar-footer {
-    margin-top: 18px;
-    padding: 14px 12px;
+    flex: 0 0 auto;
+    margin-top: clamp(8px, 1.6vh, 18px);
+    padding: 12px;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    font-size: 10px;
+    font-size: 11px;
     color: #9ca3af;
     line-height: 1.5;
     text-align: center;
@@ -268,6 +413,23 @@ body {
 
 .sidebar-footer p {
     margin: 3px 0;
+}
+
+.sidebar-version {
+    font-weight: 700;
+    color: #cbd5e1;
+}
+
+/* =========================
+   Foco visible
+   ========================= */
+
+.sidebar-link:focus-visible,
+.sidebar-refresh:focus-visible,
+.sidebar-logout-button:focus-visible,
+.sidebar-group-title:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
 }
 
 /* =========================
@@ -320,10 +482,32 @@ body {
         padding: 10px;
     }
 
+    /* El pie antes se ocultaba junto con los créditos y con él se iba el
+       cierre de sesión. Ahora solo se ocultan los textos: el botón queda. */
+
     .sidebar-title-block,
     .sidebar-status-section,
-    .sidebar-footer {
+    .sidebar-ambiente,
+    .sidebar-identity {
         display: none;
+    }
+
+    .sidebar-footer {
+        margin-top: 8px;
+        padding: 6px;
+        background: transparent;
+        border: 0;
+    }
+
+    .sidebar-version,
+    .sidebar-credit {
+        display: none;
+    }
+
+    .sidebar-logout-form {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: 0;
     }
 
     .sidebar-nav {
@@ -338,97 +522,63 @@ body {
         padding: 10px;
         text-align: center;
     }
+
+    .sidebar-link-text {
+        display: inline;
+    }
+
+    .sidebar-link-icon {
+        display: none;
+    }
 }
 
 /* =========================
-   Ajuste sidebar en pantallas bajas
+   Escalera para ventanas bajas
    ========================= */
 
-.dashboard-sidebar {
-    gap: 0;
-}
+/* El sidebar no lleva barra de desplazamiento propia: se ajusta a la altura
+   de la ventana. Entre 700 y 600px eso lo resuelven los clamp() del bloque
+   anterior; por debajo de 600px hay que ceder contenido, y se cede en este
+   orden: primero el estado de Oracle, después la identidad y el ambiente, y
+   por último el subtítulo del título. La navegación y el cierre de sesión
+   nunca se van, porque sin ellos el sidebar deja de servir para navegar. */
 
-.sidebar-title-block,
-.sidebar-nav,
-.sidebar-status-section,
-.sidebar-footer {
-    flex-shrink: 0;
-}
-
-.sidebar-status-section {
-    margin-top: 22px;
-    margin-bottom: 18px;
-}
-
-@media (max-height: 780px) {
-    .dashboard-sidebar {
-        padding-top: 18px;
-        padding-bottom: 18px;
+@media (max-height: 620px) {
+    .sidebar-status-section {
+        display: none;
     }
+}
 
-    .sidebar-title-block {
-        margin-bottom: 18px;
+@media (max-height: 520px) {
+    .sidebar-identity,
+    .sidebar-ambiente {
+        display: none;
     }
+}
 
-    .sidebar-nav {
-        gap: 8px;
+@media (max-height: 430px) {
+    .sidebar-title-block p {
+        display: none;
     }
 
     .sidebar-link {
-        padding: 10px 12px;
-        font-size: 14px;
+        padding: 7px 10px 7px 9px;
+        font-size: 13px;
     }
 
-    .sidebar-status-section {
-        margin-top: 18px;
-        margin-bottom: 14px;
-    }
-
-    .sidebar-status-list {
-        gap: 8px;
-    }
-
-    .sidebar-status-card {
-        grid-template-columns: 30px 1fr;
-        padding: 8px;
-        border-radius: 12px;
-    }
-
-    .sidebar-status-icon {
-        width: 30px;
-        height: 30px;
-        border-radius: 10px;
-        font-size: 15px;
-    }
-
-    .sidebar-status-text span {
-        font-size: 10px;
-    }
-
-    .sidebar-status-text strong {
-        font-size: 12px;
+    .sidebar-group-items {
+        gap: 5px;
     }
 
     .sidebar-footer {
-        margin-top: 14px;
-        padding: 11px 10px;
-        font-size: 9px;
-    }
-
-    .sidebar-logout-form {
-        margin-top: 9px;
-        padding-top: 9px;
-    }
-
-    .sidebar-logout-button {
-        padding: 8px 9px;
-        font-size: 11px;
+        padding: 8px;
     }
 }
+
 /* Indicador global para descubrir contenido bajo el pliegue */
 .dashboard-scroll-explorar {
     position: fixed;
-    right: 284px;
+    right: calc(var(--ancho-sidebar) + 24px);
     bottom: 22px;
     z-index: 850;
     min-height: 42px;

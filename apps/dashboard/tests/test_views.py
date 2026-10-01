@@ -676,6 +676,172 @@ class SidebarGruposTests(TestCase):
         self.assertIn('aria-current="page"', contenido)
 
 
+class SidebarEstadosTests(TestCase):
+    """Lo que el sidebar comunica: versión, entorno, sesión y estado de datos.
+
+    La versión venía escrita a mano en el HTML, así que se quedaba vieja sin
+    que nadie lo notara. Ahora sale de `settings.VERSION_APP`.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth.models import Group
+
+        usuarios = get_user_model()
+        cls.usuario = usuarios.objects.create_user(
+            username="usuario_estados",
+            first_name="Antonia",
+            last_name="Pacheco",
+            password="clave-test",
+        )
+        cls.sonda = Group.objects.create(name="SONDA")
+        cls.usuario.groups.add(cls.sonda)
+        cls.admin = usuarios.objects.create_superuser(
+            username="admin_estados",
+            password="clave-test",
+        )
+
+    def setUp(self):
+        parche_carga = patch(
+            "apps.dashboard.context_processors.obtener_ultima_carga_datos_oracle",
+            return_value=None,
+        )
+        parche_version = patch(
+            "apps.dashboard.context_processors.obtener_ultima_version_zp_oracle",
+            return_value=None,
+        )
+        parche_carga.start()
+        parche_version.start()
+        self.addCleanup(parche_carga.stop)
+        self.addCleanup(parche_version.stop)
+
+    def contenido_de(self, url="dashboard:panel_baterias"):
+        response = self.client.get(reverse(url))
+        self.assertEqual(response.status_code, 200)
+        return " ".join(response.content.decode().split())
+
+    def test_el_pie_trae_la_version_de_settings(self):
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn(f"Versión {settings.VERSION_APP}", contenido)
+        self.assertNotIn("1.3.1", contenido)
+
+    def test_el_pie_ya_no_trae_una_version_fija(self):
+        """Regresión: el año venía escrito en el HTML y envejecía solo."""
+
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertNotIn("· 2026", contenido)
+
+    def test_el_badge_de_ambiente_aparece_fuera_de_produccion(self):
+        with override_settings(AMBIENTE="PRE"):
+            self.client.force_login(self.usuario)
+            contenido = self.contenido_de()
+
+        self.assertIn("PREPRODUCCIÓN", contenido)
+
+    def test_en_produccion_no_se_muestra_el_badge_de_ambiente(self):
+        with override_settings(AMBIENTE="PRODUCCION"):
+            self.client.force_login(self.usuario)
+            contenido = self.contenido_de()
+
+        self.assertNotIn("sidebar-ambiente", contenido)
+
+    def test_el_sidebar_muestra_el_rol_del_usuario(self):
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn("Antonia Pacheco", contenido)
+        self.assertIn("SONDA", contenido)
+
+    def test_el_sidebar_muestra_el_rol_del_superusuario(self):
+        self.client.force_login(self.admin)
+        contenido = self.contenido_de()
+
+        self.assertIn("admin_estados", contenido)
+
+    def test_sin_datos_el_estado_lo_dice_y_no_lo_inventa(self):
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn("sidebar-status-sin-datos", contenido)
+        self.assertIn("Sin datos", contenido)
+
+    def test_el_estado_usa_tiempo_relativo_y_no_la_hora_de_render(self):
+        """La tarjeta decía "última actualización" con la hora del render."""
+
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn("data-epoch-texto", contenido)
+        self.assertNotIn("Última actualización", contenido)
+
+    def test_el_cierre_de_sesion_sigue_en_el_html(self):
+        """Regresión: el CSS lo ocultaba bajo 900px y en móvil no había salida."""
+
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn(reverse("logout"), contenido)
+        self.assertIn("Cerrar sesión", contenido)
+
+    def test_el_boton_de_refrescar_esta_presente(self):
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertIn("data-sidebar-refresh", contenido)
+
+    def test_no_queda_rastro_del_colapso_a_rail(self):
+        """El sidebar ya no se colapsa: ni botón, ni clase, ni preferencia.
+
+        Se eliminó porque el rail obligaba a un ancho de 72px que hacía el
+        sidebar inservible y obligaba a guardar una preferencia en el
+        navegador que el usuario no pedía.
+        """
+
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        for rastro in ("data-sidebar-toggle", "sidebar-colapsado", "zp.sidebar.rail", "Colapsar"):
+            with self.subTest(rastro=rastro):
+                self.assertNotIn(rastro, contenido)
+
+    def test_no_se_imprime_ningun_comentario_de_plantilla(self):
+        """Regresión: Django no reconoce `{# #}` de varias líneas.
+
+        El lexer compila `tag_re` sin `re.DOTALL`, así que un comentario de dos
+        líneas no se tokeniza y Django lo imprime como texto plano en el
+        `<head>` de las seis pantallas que heredan de base_dashboard.html.
+        """
+
+        self.client.force_login(self.usuario)
+
+        for url in ("dashboard:inicio", "dashboard:panel_baterias", "dashboard:panel_alertas"):
+            with self.subTest(url=url):
+                contenido = self.contenido_de(url)
+
+                self.assertNotIn("{#", contenido)
+                self.assertNotIn("#}", contenido)
+
+    def test_el_estado_se_publica_en_dos_chips_en_fila(self):
+        """Los dos estados van en una fila; la fecha absoluta quedó en el title."""
+
+        self.client.force_login(self.usuario)
+        contenido = self.contenido_de()
+
+        self.assertEqual(contenido.count("sidebar-status-chip"), 2)
+        self.assertIn("data-epoch-absoluto", contenido)
+        self.assertNotIn("sidebar-status-card", contenido)
+        self.assertNotIn("sidebar-status-absoluto", contenido)
+
+    def test_el_login_muestra_la_version_tambien(self):
+        contenido = self.contenido_de("login")
+
+        self.assertIn(f"Versión {settings.VERSION_APP}", contenido)
+
+
 class LoginRecordarTests(TestCase):
     @classmethod
     def setUpTestData(cls):

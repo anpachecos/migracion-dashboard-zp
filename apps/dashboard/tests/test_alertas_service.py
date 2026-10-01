@@ -104,10 +104,15 @@ class AlertasServiceTests(SimpleTestCase):
         - sin estatus;
         - estatus antiguo;
         - estatus reciente.
+
+        El instante de referencia va fijo: entre las 00:00 y la 01:00 no hay
+        ningún momento que sea a la vez de hoy y de hace más de una hora, así
+        que un `datetime.now()` libre haría fallar el caso de "antiguo".
         """
+        ahora = datetime(2026, 10, 1, 10, 0)
 
         self.assertEqual(
-            calcular_estado_estatus(None),
+            calcular_estado_estatus(None, ahora=ahora),
             {
                 "estado_estatus": "sin_estatus",
                 "texto_estatus": "Sin estatus hoy",
@@ -115,10 +120,10 @@ class AlertasServiceTests(SimpleTestCase):
             },
         )
 
-        antigua = datetime.now() - timedelta(hours=2)
+        antigua = ahora - timedelta(hours=2)
 
         self.assertEqual(
-            calcular_estado_estatus(antigua),
+            calcular_estado_estatus(antigua, ahora=ahora),
             {
                 "estado_estatus": "estatus_antiguo",
                 "texto_estatus": "Hace más de 1 hora",
@@ -126,15 +131,36 @@ class AlertasServiceTests(SimpleTestCase):
             },
         )
 
-        reciente = datetime.now() - timedelta(minutes=10)
+        reciente = ahora - timedelta(minutes=10)
 
         self.assertEqual(
-            calcular_estado_estatus(reciente),
+            calcular_estado_estatus(reciente, ahora=ahora),
             {
                 "estado_estatus": "con_estatus",
                 "texto_estatus": "Con estatus",
                 "clase_estatus": "estatus-ok",
             },
+        )
+
+    def test_calcular_estado_estatus_ignora_un_estatus_de_ayer(self):
+        """Un estatus de ayer no es "de hoy", aunque se haya recibido hace poco."""
+
+        ahora = datetime(2026, 10, 1, 0, 30)
+        ayer = datetime(2026, 9, 30, 23, 50)
+
+        self.assertEqual(
+            calcular_estado_estatus(ayer, ahora=ahora)["estado_estatus"],
+            "sin_estatus",
+        )
+
+    def test_calcular_estado_estatus_sin_argumento_ahora_usa_la_hora_local(self):
+        """Sin `ahora` se mantiene el comportamiento de siempre."""
+
+        reciente = datetime.now() - timedelta(minutes=10)
+
+        self.assertEqual(
+            calcular_estado_estatus(reciente)["estado_estatus"],
+            "con_estatus",
         )
 
     def test_orden_predeterminado_prioriza_global_gps_bateria_y_estatus(self):

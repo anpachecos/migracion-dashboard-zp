@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <title>{% block title %}Dashboard Zonas Pagas{% endblock %}</title>
 
-    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=17">
+    <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=19">
     <link rel="stylesheet" href="{% static 'dashboard/css/utilidades.css' %}?v=1">
 
     {% block extra_css %}{% endblock %}
@@ -24,140 +24,180 @@
 
     <aside class="dashboard-sidebar">
 
-        <div class="sidebar-title-block">
-            <h2>Dashboard ZP</h2>
-            <p>Validadores MK 2.0</p>
+        <div class="sidebar-top">
+            <div class="sidebar-title-block">
+                <h2>Dashboard ZP</h2>
+                <p>Validadores MK 2.0</p>
+            </div>
+
+            {% if ambiente_es_preproduccion %}
+                <p class="sidebar-ambiente"
+                   data-sidebar-ambiente
+                   title="Estás viendo {{ ambiente_etiqueta }}, no producción">
+                    {{ ambiente_etiqueta }}
+                </p>
+            {% endif %}
+
+            {% if usuario_nombre %}
+                <div class="sidebar-identity">
+                    <span class="sidebar-identity-avatar" aria-hidden="true">{{ usuario_iniciales }}</span>
+                    <span class="sidebar-identity-text">
+                        <strong>{{ usuario_nombre }}</strong>
+                        <span>{{ usuario_rol }}</span>
+                    </span>
+                </div>
+            {% endif %}
         </div>
 
-        <nav class="sidebar-nav" aria-label="Secciones del dashboard">
+        <div class="sidebar-body">
 
-            <details class="sidebar-group" data-grupo="operacion" open
-                     {% if active_page == 'baterias' or active_page == 'gps' or active_page == 'alertas' %}data-activo="1"{% endif %}>
-                <summary class="sidebar-group-title">
-                    <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-                        <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Operación
-                </summary>
-                <ul class="sidebar-group-items">
-                    <li>
-                        <a href="{% url 'dashboard:panel_baterias' %}" class="sidebar-link {% if active_page == 'baterias' %}active{% endif %}"
-                           {% if active_page == 'baterias' %}aria-current="page"{% endif %}>
-                            Baterías
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{% url 'dashboard:panel_gps' %}" class="sidebar-link {% if active_page == 'gps' %}active{% endif %}"
-                           {% if active_page == 'gps' %}aria-current="page"{% endif %}>
-                            Ubicación GPS
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}"
-                           {% if active_page == 'alertas' %}aria-current="page"{% endif %}>
-                            Alertas
-                        </a>
-                    </li>
-                </ul>
-            </details>
+            <nav class="sidebar-nav" id="sidebar-nav" aria-label="Secciones del dashboard">
 
-            {% puede_ver_transacciones user as puede_ver_trx %}
-            {% if puede_ver_trx %}
-                <details class="sidebar-group" data-grupo="reportes" open
-                         {% if active_page == 'transacciones' %}data-activo="1"{% endif %}>
+                <details class="sidebar-group" data-grupo="operacion" open
+                         {% if active_page == 'baterias' or active_page == 'gps' or active_page == 'alertas' %}data-activo="1"{% endif %}>
                     <summary class="sidebar-group-title">
                         <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
                             <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        Reportes
+                        Operación
                     </summary>
                     <ul class="sidebar-group-items">
                         <li>
-                            <a href="{% url 'transacciones:informe_interno' %}" class="sidebar-link {% if active_page == 'transacciones' %}active{% endif %}"
-                               {% if active_page == 'transacciones' %}aria-current="page"{% endif %}>
-                                Transacciones
+                            <a href="{% url 'dashboard:panel_baterias' %}" class="sidebar-link {% if active_page == 'baterias' %}active{% endif %}"
+                               {% if active_page == 'baterias' %}aria-current="page"{% endif %}>
+                                <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                    <rect x="2.5" y="6.5" width="13" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                    <path d="M17.5 9.5 v1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                </svg>
+                                <span class="sidebar-link-text">Baterías</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'dashboard:panel_gps' %}" class="sidebar-link {% if active_page == 'gps' %}active{% endif %}"
+                               {% if active_page == 'gps' %}aria-current="page"{% endif %}>
+                                <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                    <path d="M10 17.5s5.5-5.3 5.5-9.3A5.5 5.5 0 0 0 4.5 8.2c0 4 5.5 9.3 5.5 9.3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                    <circle cx="10" cy="8.2" r="2.1" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                </svg>
+                                <span class="sidebar-link-text">Ubicación GPS</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'dashboard:panel_alertas' %}" class="sidebar-link {% if active_page == 'alertas' %}active{% endif %}"
+                               {% if active_page == 'alertas' %}aria-current="page"{% endif %}>
+                                <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                    <path d="M10 3.2 17.8 16.4H2.2L10 3.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                    <path d="M10 8.2v3.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                    <path d="M10 13.7v.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                </svg>
+                                <span class="sidebar-link-text">Alertas</span>
                             </a>
                         </li>
                     </ul>
                 </details>
-            {% endif %}
 
-            <details class="sidebar-group" data-grupo="administracion" open
-                     {% if active_page == 'perfil' %}data-activo="1"{% endif %}>
-                <summary class="sidebar-group-title">
-                    <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-                        <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Administración
-                </summary>
-                <ul class="sidebar-group-items">
-                    <li>
-                        <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}"
-                           {% if active_page == 'perfil' %}aria-current="page"{% endif %}>
-                            Perfil
-                        </a>
-                    </li>
-                </ul>
-            </details>
-        </nav>
+                {% puede_ver_transacciones user as puede_ver_trx %}
+                {% if puede_ver_trx %}
+                    <details class="sidebar-group" data-grupo="reportes" open
+                             {% if active_page == 'transacciones' %}data-activo="1"{% endif %}>
+                        <summary class="sidebar-group-title">
+                            <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                                <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Reportes
+                        </summary>
+                        <ul class="sidebar-group-items">
+                            <li>
+                                <a href="{% url 'transacciones:informe_interno' %}" class="sidebar-link {% if active_page == 'transacciones' %}active{% endif %}"
+                                   {% if active_page == 'transacciones' %}aria-current="page"{% endif %}>
+                                    <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                        <path d="M5 2.5h6.5L15 6v11.5H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                        <path d="M11.5 2.5V6H15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                        <path d="M7.5 10h5M7.5 13h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                    </svg>
+                                    <span class="sidebar-link-text">Transacciones</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </details>
+                {% endif %}
 
-        <section class="sidebar-status-section">
-            <p class="sidebar-status-title">Estado del sistema</p>
+                <details class="sidebar-group" data-grupo="administracion" open
+                         {% if active_page == 'perfil' %}data-activo="1"{% endif %}>
+                    <summary class="sidebar-group-title">
+                        <svg class="sidebar-group-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                            <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Administración
+                    </summary>
+                    <ul class="sidebar-group-items">
+                        <li>
+                            <a href="{% url 'dashboard:panel_perfil' %}" class="sidebar-link {% if active_page == 'perfil' %}active{% endif %}"
+                               {% if active_page == 'perfil' %}aria-current="page"{% endif %}>
+                                <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                    <circle cx="10" cy="6.8" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                    <path d="M4.2 16.8c.6-3.3 3-4.9 5.8-4.9s5.2 1.6 5.8 4.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                </svg>
+                                <span class="sidebar-link-text">Perfil</span>
+                            </a>
+                        </li>
+                    </ul>
+                </details>
+            </nav>
 
-            <div class="sidebar-status-list">
+            <section class="sidebar-status-section">
+                <div class="sidebar-status-heading">
+                    <p class="sidebar-status-title">Estado del sistema</p>
 
-                <div class="sidebar-status-card sidebar-status-blue">
-                    <div class="sidebar-status-icon">
-                        ↻
-                    </div>
-
-                    <div class="sidebar-status-text">
-                        <span>Última actualización</span>
-                        <strong>{{ ultima_actualizacion_dashboard|date:"d-m-Y H:i" }}</strong>
-                    </div>
+                    <button
+                        type="button"
+                        class="sidebar-refresh"
+                        data-sidebar-refresh
+                        title="Actualizar los datos ahora"
+                        aria-label="Actualizar los datos ahora"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+                            <path d="M12 7a5 5 0 1 1-1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                            <path d="M12.4 1.4v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
                 </div>
 
-                <div class="sidebar-status-card sidebar-status-green">
-                    <div class="sidebar-status-icon">
-                        ▤
+                <div class="sidebar-status-list" data-sidebar-reloj>
+
+                    <div class="sidebar-status-chip sidebar-status-{{ estado_carga_datos.estado }}"
+                         title="{{ ultima_carga_datos|date:'d-m-Y H:i'|default:'Sin dato registrado' }}"
+                         data-epoch="{% if estado_carga_datos.epoch %}{{ estado_carga_datos.epoch }}{% endif %}"
+                         data-epoch-absoluto="{{ ultima_carga_datos|date:'d-m-Y H:i'|default:'' }}"
+                         data-umbral-aviso="{{ estado_carga_datos.umbral_aviso }}"
+                         data-umbral-error="{{ estado_carga_datos.umbral_error }}">
+                        <span class="sidebar-status-punto" aria-hidden="true"></span>
+                        <span class="sidebar-status-texto">
+                            <span>Datos</span>
+                            <strong data-epoch-texto>{{ estado_carga_datos.texto }}</strong>
+                        </span>
                     </div>
 
-                    <div class="sidebar-status-text">
-                        <span>Último bloque con datos</span>
-                        <strong>
-                            {% if ultima_carga_datos %}
-                                {{ ultima_carga_datos|date:"d-m-Y H:i" }}
-                            {% else %}
-                                Sin datos
-                            {% endif %}
-                        </strong>
+                    <div class="sidebar-status-chip sidebar-status-{{ estado_version_zp.estado }}"
+                         title="{{ ultima_actualizacion_version_zp|date:'d-m-Y H:i'|default:'Sin dato registrado' }}"
+                         data-epoch="{% if estado_version_zp.epoch %}{{ estado_version_zp.epoch }}{% endif %}"
+                         data-epoch-absoluto="{{ ultima_actualizacion_version_zp|date:'d-m-Y H:i'|default:'' }}"
+                         data-umbral-aviso="{{ estado_version_zp.umbral_aviso }}"
+                         data-umbral-error="{{ estado_version_zp.umbral_error }}">
+                        <span class="sidebar-status-punto" aria-hidden="true"></span>
+                        <span class="sidebar-status-texto">
+                            <span>Versión ZP</span>
+                            <strong data-epoch-texto>{{ estado_version_zp.texto }}</strong>
+                        </span>
                     </div>
+
                 </div>
-
-                <div class="sidebar-status-card sidebar-status-purple">
-                    <div class="sidebar-status-icon">
-                        ⟡
-                    </div>
-
-                    <div class="sidebar-status-text">
-                        <span>Última versión</span>
-                        <strong>
-                            {% if ultima_actualizacion_version_zp %}
-                                {{ ultima_actualizacion_version_zp|date:"d-m-Y H:i" }}
-                            {% else %}
-                                Sin datos
-                            {% endif %}
-                        </strong>
-                    </div>
-                </div>
-
-            </div>
-        </section>
+            </section>
+        </div>
 
         <div class="sidebar-footer">
-            <p>Sistema de Monitoreo ZP</p>
-            <p>Desarrollado por Antonia Pacheco</p>
-            <p>Versión 1.3.1 · 2026</p>
+            <p class="sidebar-version">Versión {{ VERSION_APP }}</p>
+            <p class="sidebar-credit">Sistema de Monitoreo ZP · Antonia Pacheco</p>
 
             <form method="post" action="{% url 'logout' %}" class="sidebar-logout-form">
                 {% csrf_token %}
@@ -184,7 +224,7 @@
 
 {% block extra_js %}{% endblock %}
 <script src="{% static 'dashboard/js/scroll_explorar.js' %}?v=1"></script>
-<script src="{% static 'dashboard/js/sidebar.js' %}?v=1"></script>
+    <script src="{% static 'dashboard/js/sidebar.js' %}?v=3"></script>
 
 </body>
 </html>
