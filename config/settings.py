@@ -59,6 +59,41 @@ ALLOWED_HOSTS = [
 
 
 # =========================
+# Identidad de la aplicación
+# =========================
+
+# Versión mostrada al usuario. Es la única fuente de verdad: el pie del
+# sidebar y el login la toman de acá, no de una copia escrita en el HTML.
+# Subirla es parte del cambio, igual que en cualquier aplicación visible.
+VERSION_APP = "1.4.0"
+
+AMBIENTES_VALIDOS = ("DESARROLLO", "PRE", "PRODUCCION")
+
+
+def obtener_ambiente_desde_entorno():
+    """
+    Nombre del entorno donde corre la aplicación.
+
+    Se valida en vez de acceptarse cualquier texto porque el valor se
+    muestra en pantalla: una etiqueta equivocada induce a operar sobre
+    el entorno que no es. Mismo criterio fail-closed que DEBUG.
+    """
+
+    valor = os.getenv("AMBIENTE", "DESARROLLO").strip().upper()
+
+    if valor not in AMBIENTES_VALIDOS:
+        raise ImproperlyConfigured(
+            "AMBIENTE debe usar uno de estos valores: "
+            "DESARROLLO, PRE o PRODUCCION."
+        )
+
+    return valor
+
+
+AMBIENTE = obtener_ambiente_desde_entorno()
+
+
+# =========================
 # Aplicaciones instaladas
 # =========================
 
@@ -113,6 +148,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.dashboard.context_processors.metadatos_app",
                 "apps.dashboard.context_processors.datos_actualizacion_dashboard",
             ],
         },

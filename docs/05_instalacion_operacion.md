@@ -70,12 +70,16 @@ Django no arranca con valores faltantes.
 | `ORACLE_SERVICE_NAME` | Service name Oracle. |
 | `ORACLE_CLIENT_PATH` | Cliente para modo Thick, si aplica. |
 | `DASHBOARD_SCHEDULER_ENABLED` | `False` por defecto; requiere instancia única. |
+| `AMBIENTE` | `DESARROLLO` (por defecto), `PRE` o `PRODUCCION`. Se muestra como badge en el sidebar y en el login para no confundir un entorno con producción. |
 | `TRX_GRUPOS_PERMITIDOS` | Grupos de Django con acceso al módulo de transacciones. Vaciarlo deja la sección solo para superusuarios. |
 
 `.env.example` debe listar estas claves con valores vacíos o seguros.
 `DEBUG` acepta `true`, `1`, `yes`, `on`, `false`, `0`, `no` y `off`, sin
 distinguir mayúsculas/minúsculas y tolerando espacios externos. Si falta,
 queda en `False`; cualquier otro valor impide el arranque.
+`AMBIENTE` se valida igual: cualquier valor fuera de `DESARROLLO`, `PRE` o
+`PRODUCCION` impide el arranque, porque la etiqueta se muestra al usuario y
+una equivocada induce a operar sobre el entorno que no es.
 
 ## Inicialización
 

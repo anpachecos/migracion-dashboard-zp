@@ -148,7 +148,7 @@ def construir_condicion_estatus(estatus):
     return alertas_repository.construir_condicion_estatus(estatus)
 
 
-def calcular_estado_estatus(ultimo_estatus):
+def calcular_estado_estatus(ultimo_estatus, ahora=None):
     """
     Devuelve el estado visual para la celda de último estatus.
 
@@ -156,6 +156,10 @@ def calcular_estado_estatus(ultimo_estatus):
     - Con estatus: tiene estatus de hoy y fue recibido hace una hora o menos.
     - Hace más de 1 hora: tiene estatus de hoy, pero fue recibido hace más de una hora.
     - Sin estatus hoy: no tiene estatus o el último estatus no corresponde al día actual.
+
+    `ahora` permite fijar el instante de referencia. Sin él, entre las 00:00 y
+    la 01:00 no existe ningún momento que sea a la vez de hoy y de hace más de
+    una hora, y el resultado depende de la hora en que corra el proceso.
     """
 
     if ultimo_estatus is None:
@@ -165,7 +169,8 @@ def calcular_estado_estatus(ultimo_estatus):
             "clase_estatus": "estatus-sin",
         }
 
-    ahora = datetime.now()
+    if ahora is None:
+        ahora = datetime.now()
     inicio_hoy = datetime.combine(ahora.date(), datetime.min.time())
 
     if ultimo_estatus < inicio_hoy:
