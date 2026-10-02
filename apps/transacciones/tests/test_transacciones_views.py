@@ -360,6 +360,23 @@ class RenderTests(TestCase):
                 self.assertNotIn("trx-kpis", html)
                 self.assertNotIn("trx-tabla", html)
 
+    def test_ningun_comentario_de_template_llega_al_html(self):
+        """Django solo borra `{# #}` de una linea.
+
+        Un `{# #}` repartido en varias lineas no lo agarra el tokenizador y sale
+        al HTML tal cual, se lee como texto de la pagina. Para bloques va
+        `{% comment %}`, que si es multilinea. Esta prueba fija la diferencia.
+        """
+
+        for nombre, ruta in RUTAS:
+            with self.subTest(pestana=nombre):
+                html = self.client.get(ruta).content.decode()
+
+                self.assertNotIn("{#", html)
+                self.assertNotIn("#}", html)
+                self.assertNotIn("{% comment", html)
+                self.assertNotIn("{% endcomment", html)
+
 
 class RenderSinOracleTests(TestCase):
     """Con Oracle apagado las tres pantallas igual renderizan.

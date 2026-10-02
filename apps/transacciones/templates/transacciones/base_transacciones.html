@@ -1,6 +1,6 @@
 {% extends "dashboard/base_dashboard.html" %}
 
-{#
+{% comment %}
   Esqueleto del Monitor de Traspaso C2D.
 
   Extiende `dashboard/base_dashboard.html`, que es de donde vienen el layout, el
@@ -11,7 +11,11 @@
   scripts, y no escribe una sola regla de estilo. Solo conserva el encabezado,
   las tres pestanas y el punto de insercion del contenido, para que el diseno se
   construya desde cero encima de una estructura estable.
-#}
+
+  Ojo con los comentarios: `{# #}` solo se elimina si cabe en una linea. Uno
+  repartido en varias se escapa al HTML como texto. Para bloques va
+  `{% comment %}`, que si es multilinea.
+{% endcomment %}
 
 {% block title %}{{ titulo_pestana|default:"Monitor de Traspaso C2D" }} · Zonas Pagas{% endblock %}
 
@@ -24,10 +28,12 @@
     </header>
 
     <nav class="trx-pestanas" aria-label="Secciones del monitor">
-        {# Las etiquetas llegan desde `trx_service.ETIQUETAS_PESTANA`, y la del
-           corte se deriva de `trx_reglas.UMBRAL_CORTE_MINUTOS`. Sin `default:` a
-           proposito: el umbral no se escribe en ningun template, asi que si el
-           contexto faltara tiene que verse, no rellenarse con un numero fijo. #}
+        {% comment %}
+        Las etiquetas llegan desde `trx_service.ETIQUETAS_PESTANA`, y la del corte
+        se deriva de `trx_reglas.UMBRAL_CORTE_MINUTOS`. Sin `default:` a proposito:
+        el umbral no se escribe en ningun template, asi que si el contexto faltara
+        tiene que verse, no rellenarse con un numero fijo.
+        {% endcomment %}
         <a href="{% url 'transacciones:informe_interno' %}" data-trx-pestana="informe_interno"
            class="{% if pestana_activa == 'informe_interno' %}is-activa{% endif %}"
            {% if pestana_activa == 'informe_interno' %}aria-current="page"{% endif %}>
