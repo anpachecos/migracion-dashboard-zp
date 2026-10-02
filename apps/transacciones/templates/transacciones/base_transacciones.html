@@ -1,89 +1,54 @@
 {% extends "dashboard/base_dashboard.html" %}
 
-{% load static %}
+{#
+  Esqueleto del Monitor de Traspaso C2D.
 
-{% comment %}
-Base del módulo de Transacciones.
+  Extiende `dashboard/base_dashboard.html`, que es de donde vienen el layout, el
+  sidebar y el bloque de estado del sistema. Todo lo del monitor vive aqui y en
+  las tres pestanas.
 
-Extiende `dashboard/base_dashboard.html` para reutilizar el layout, el sidebar y
-el bloque de estado del sistema. Aquí solo se centraliza lo propio de TRX: el
-encabezado, la navegación interna entre pestañas y las zonas comunes de KPIs,
-gráficos, tabla y exportación.
+  Este archivo esta deliberadamente vacio de codigo: no carga hojas de estilo ni
+  scripts, y no escribe una sola regla de estilo. Solo conserva el encabezado,
+  las tres pestanas y el punto de insercion del contenido, para que el diseno se
+  construya desde cero encima de una estructura estable.
+#}
 
-Cada pestaña provee su propio contenido. Las zonas que aún no tienen
-implementación se dejan visibles como placeholder, nunca como dato inventado.
-{% endcomment %}
-
-{% block title %}{{ titulo_pestana }} · Transacciones{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'transacciones/css/transacciones.css' %}?v=1">
-{% endblock %}
+{% block title %}{{ titulo_pestana|default:"Monitor de Traspaso C2D" }} · Zonas Pagas{% endblock %}
 
 {% block content %}
-<div class="trx-page">
+<div class="trx" data-trx-raiz data-trx-pagina="{{ pestana_activa|default:'informe_interno' }}">
 
-    <header class="panel-header trx-header">
-        <h1>Transacciones</h1>
+    <header class="trx-cabecera">
+        <h1>Monitor de Traspaso C2D</h1>
         <p>{{ descripcion_pestana }}</p>
     </header>
 
-    <nav class="trx-pestanas" aria-label="Análisis de transacciones">
-        {% include "transacciones/partials/_pestanas.html" %}
+    <nav class="trx-pestanas" aria-label="Secciones del monitor">
+        {# Las etiquetas llegan desde `trx_service.ETIQUETAS_PESTANA`, y la del
+           corte se deriva de `trx_reglas.UMBRAL_CORTE_MINUTOS`. Sin `default:` a
+           proposito: el umbral no se escribe en ningun template, asi que si el
+           contexto faltara tiene que verse, no rellenarse con un numero fijo. #}
+        <a href="{% url 'transacciones:informe_interno' %}" data-trx-pestana="informe_interno"
+           class="{% if pestana_activa == 'informe_interno' %}is-activa{% endif %}"
+           {% if pestana_activa == 'informe_interno' %}aria-current="page"{% endif %}>
+            {{ etiquetas_pestana.informe_interno }}
+        </a>
+        <a href="{% url 'transacciones:mayor_15' %}" data-trx-pestana="mayor_15"
+           class="{% if pestana_activa == 'mayor_15' %}is-activa{% endif %}"
+           {% if pestana_activa == 'mayor_15' %}aria-current="page"{% endif %}>
+            {{ etiquetas_pestana.mayor_15 }}
+        </a>
+        <a href="{% url 'transacciones:rezagadas' %}" data-trx-pestana="rezagadas"
+           class="{% if pestana_activa == 'rezagadas' %}is-activa{% endif %}"
+           {% if pestana_activa == 'rezagadas' %}aria-current="page"{% endif %}>
+            {{ etiquetas_pestana.rezagadas }}
+        </a>
     </nav>
 
-    {% if mensaje %}
-        <p class="trx-aviso" role="status" data-trx-aviso>{{ mensaje }}</p>
-    {% endif %}
-
-    <section class="trx-bloque trx-bloque-filtros" aria-label="Filtros">
-        <h2 class="trx-bloque-titulo">Filtros</h2>
-        {% include "transacciones/partials/_filtros.html" %}
-    </section>
-
-    <section class="trx-bloque trx-bloque-kpis" aria-label="Indicadores">
-        <h2 class="trx-bloque-titulo">Indicadores</h2>
-        {% block trx_kpis %}
-            {% include "transacciones/partials/_kpis.html" %}
-        {% endblock %}
-    </section>
-
-    <section class="trx-bloque trx-bloque-graficos" aria-label="Gráficos">
-        <h2 class="trx-bloque-titulo">Gráficos</h2>
-        {% block trx_graficos %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
-
-    <section class="trx-bloque trx-bloque-tabla" aria-label="Detalle">
-        <h2 class="trx-bloque-titulo">Detalle</h2>
-        {% block trx_tabla %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
-
-    <section class="trx-bloque trx-bloque-exportacion" aria-label="Exportación">
-        <h2 class="trx-bloque-titulo">Exportación</h2>
-        {% block trx_exportacion %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
-
-    <section class="trx-bloque trx-bloque-notas" aria-label="Notas de avance">
-        <h2 class="trx-bloque-titulo">Próximas zonas</h2>
-        <ul class="trx-notas">
-            {% for zona in zonas_preparadas %}
-                <li class="trx-nota">
-                    <strong>{{ zona.titulo }}</strong>
-                    <span>{{ zona.descripcion }}</span>
-                </li>
-            {% endfor %}
-        </ul>
-    </section>
+    {# Punto de insercion. Cada pestana pone aqui su contenido y nada mas. #}
+    <main class="trx-vista" data-trx-vista>
+        {% block trx_contenido %}{% endblock %}
+    </main>
 
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{% static 'transacciones/js/transacciones.js' %}?v=1" defer></script>
 {% endblock %}
