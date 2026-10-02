@@ -1,11 +1,15 @@
 """
-Pruebas de las tres vistas del modulo de Transacciones.
+Pruebas de la vista del Monitor de Traspaso C2D.
 
-Este modulo esta en un esqueleto: las tres rutas existen, se autorizan y
-renderizan, pero el contenido visual se va a construir desde cero. Las pruebas
-cubren la estructura que no debe romperse al disenar el mockup (enrutado,
-permisos, sidebar y la presencia de los titulos) y deliberadamente no comprueban
-cifras ni markup, que todavia no existe.
+El modulo es una sola pagina con cuatro pestanas de estado de cliente, asi que
+la vista solo arma el armazon: no consulta la base y las cifras las pide el
+`dataService` del navegador. Estas pruebas fijan lo que no debe romperse al
+seguir disenando: el enrutado, el permiso, el enlace del sidebar, que el
+armazon y las cuatro secciones esten, y que el umbral de corte llegue desde
+`trx_reglas` en vez de estar escrito en el template.
+
+Las rutas que existian por pestana (`informe-interno`, `mayor-15`, `rezagadas`)
+se conservaron como redirecciones para no romper los enlaces ya compartidos.
 
 Las pruebas de la capa de datos viven en `test_trx_service`, `test_trx_reglas`,
 `test_trx_repository` e `test_informes_trx`.
@@ -22,10 +26,17 @@ from django.urls import reverse
 from apps.transacciones.permisos import MENSAJE_SIN_PERMISO
 from apps.transacciones.services import trx_reglas, trx_service
 
+# La pagina que renderiza.
 RUTAS = (
-    ("informe_interno", "/transacciones/informe-interno/"),
-    ("mayor_15", "/transacciones/mayor-15/"),
-    ("rezagadas", "/transacciones/rezagadas/"),
+    ("monitor", "/transacciones/monitor/"),
+)
+
+# Las rutas por pestana que quedaron como redireccion, con la pestana del
+# monitor a la que debe llevar cada una.
+RUTAS_LEGADAS = (
+    ("informe_interno", "/transacciones/informe-interno/", 0),
+    ("mayor_15", "/transacciones/mayor-15/", 2),
+    ("rezagadas", "/transacciones/rezagadas/", 3),
 )
 
 RAIZ = "/transacciones/"
@@ -39,9 +50,15 @@ CLOAVE = "clave-de-prueba-123"
 GRUPO_ADMIN = "Admin"
 GRUPO_SONDA = "SONDA"
 
-# El h1 vive en el esqueleto y no depende del contexto: si cambia, hay que
+# El h1 vive en el armazon y no depende del contexto: si cambia, hay que
 # actualizar la prueba a proposito, no por descuido.
 H1 = "Monitor de Traspaso C2D"
+
+# Las cuatro pestanas, en el orden en que aparecen.
+PESTANAS = ("Resumen mensual", "Resumen diario", "Dispositivos", "Rezagadas")
+
+# Monitor y rutas legadas: todas pasan por el mismo permiso.
+TODAS_LAS_RUTAS = RUTAS + tuple((nombre, ruta) for nombre, ruta, _ in RUTAS_LEGADAS)
 
 
 def crear_usuario_plano(username):
@@ -90,9 +107,16 @@ def crear_superusuario(username="super_test"):
 
 
 class UrlTests(TestCase):
-    def test_las_tres_rutas_resuelven(self):
+    def test_las_rutas_resuelven(self):
         for nombre, ruta in RUTAS:
             with self.subTest(pestana=nombre):
+                self.assertEqual(reverse(f"transacciones:{nombre}"), ruta)
+
+    def test_las_rutas_legadas_siguen_existiendo(self):
+        """Los enlaces ya compartidos no se rompen, ahora redirigen."""
+
+        for nombre, ruta, _ in RUTAS_LEGADAS:
+            with self.subTest(ruta=nombre):
                 self.assertEqual(reverse(f"transacciones:{nombre}"), ruta)
 
 
@@ -106,9 +130,9 @@ class AutorizacionTests(TestCase):
     def setUp(self):
         self.usuario = crear_usuario_plano("transacciones")
 
-    def test_las_tres_vistas_exigen_sesion(self):
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
+    def test_todas_las_vistas_exigen_sesion(self):
+        for nombre, ruta in TODAS_LAS_RUTAS:
+            with self.subTest(ruta=ruta):
                 respuesta = self.client.get(ruta)
 
                 self.assertEqual(respuesta.status_code, 302)
@@ -123,8 +147,8 @@ class AutorizacionTests(TestCase):
     def test_usuario_sin_rol_recibe_403(self):
         self.client.force_login(self.usuario)
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
+        for nombre, ruta in TODAS_LAS_RUTAS:
+            with self.subTest(ruta=ruta):
                 respuesta = self.client.get(ruta)
 
                 self.assertEqual(respuesta.status_code, 403)
@@ -174,7 +198,7 @@ class AutorizacionTests(TestCase):
             crear_en_grupo("Lab Dev", "otro_rol")
         )
 
-        respuesta = self.client.get(reverse("transacciones:informe_interno"))
+        respuesta = self.client.get(reverse("transacciones:monitor"))
 
         self.assertEqual(respuesta.status_code, 403)
 
@@ -189,7 +213,7 @@ class AutorizacionTests(TestCase):
             crear_en_grupo("Consultoria Operativa", "consultoria")
         )
 
-        respuesta = self.client.get(reverse("transacciones:informe_interno"))
+        respuesta = self.client.get(reverse("transacciones:monitor"))
 
         self.assertEqual(respuesta.status_code, 200)
 
@@ -199,7 +223,7 @@ class AutorizacionTests(TestCase):
         self.client.force_login(self.usuario)
 
         with mock.patch.object(trx_service, "obtener_dataset_base") as obtener:
-            respuesta = self.client.get(reverse("transacciones:informe_interno"))
+            respuesta = self.client.get(reverse("transacciones:monitor"))
 
         self.assertEqual(respuesta.status_code, 403)
         obtener.assert_not_called()
@@ -209,156 +233,200 @@ class RedireccionRaizTests(TestCase):
     def setUp(self):
         self.client.force_login(crear_sonda("sonda_raiz"))
 
-    def test_la_raiz_redirige_al_informe_interno(self):
+    def test_la_raiz_redirige_al_monitor(self):
         respuesta = self.client.get("/transacciones/")
 
         self.assertRedirects(
             respuesta,
-            reverse("transacciones:informe_interno"),
+            reverse("transacciones:monitor"),
             fetch_redirect_response=False,
+        )
+
+    def test_cada_ruta_legada_lleva_a_su_pestana(self):
+        """Enlace guardado a una pestana: abre esa pestana, no la primera."""
+
+        for nombre, ruta, numero in RUTAS_LEGADAS:
+            with self.subTest(ruta=ruta):
+                respuesta = self.client.get(ruta)
+
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertEqual(
+                    respuesta["Location"],
+                    reverse("transacciones:monitor") + f"?p={numero}",
+                )
+
+    def test_el_monitor_es_la_pestana_por_defecto(self):
+        """Sin query string arranca en el resumen mensual.
+
+        El HTML del servidor solo trae la primera marcada: mover la marca es
+        cosa del script, que la corre a partir del `p` de la URL.
+        """
+
+        html = self.client.get(
+            reverse("transacciones:monitor")
+        ).content.decode()
+
+        self.assertNotIn("?p=", html)
+        self.assertEqual(html.count('aria-selected="true"'), 1)
+        self.assertRegex(
+            html,
+            r'data-trx-tab="0" aria-selected="true"',
         )
 
 
 class RenderTests(TestCase):
-    """El esqueleto renderiza en las tres pestanas.
+    """El armazon del monitor renderiza con las cuatro secciones.
 
-    Lo unico que se fija es la estructura: que cada ruta use su template, que el
-    encabezado y las tres pestanas esten, y que la pestana activa se marque.
+    Lo que se fija es la estructura: que use su template, que el encabezado y
+    las cuatro pestanas esten, que la seccion de cada pestana exista aunque el
+    JS no haya corrido todavia, y que el umbral llegue desde el contexto.
     """
 
     def setUp(self):
         self.client.force_login(crear_sonda("sonda_render"))
 
-    def test_cada_pestana_usa_su_propio_template(self):
-        esperados = {
-            "informe_interno": "transacciones/informe_interno.html",
-            "mayor_15": "transacciones/mayor_15.html",
-            "rezagadas": "transacciones/rezagadas.html",
-        }
+    def test_usa_su_template_y_el_compartido(self):
+        respuesta = self.client.get(reverse("transacciones:monitor"))
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
+        self.assertTemplateUsed(respuesta, "transacciones/monitor.html")
+        self.assertTemplateUsed(
+            respuesta,
+            "transacciones/base_transacciones.html",
+        )
+        self.assertTemplateUsed(respuesta, "dashboard/base_dashboard.html")
 
-                self.assertTemplateUsed(respuesta, esperados[nombre])
-                self.assertTemplateUsed(
-                    respuesta,
-                    "transacciones/base_transacciones.html",
-                )
+    def test_muestra_el_encabezado(self):
+        respuesta = self.client.get(reverse("transacciones:monitor"))
 
-    def test_las_tres_pantallas_muestran_el_encabezado(self):
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
+        self.assertContains(respuesta, H1, status_code=200)
+        self.assertContains(respuesta, "<h1>", status_code=200)
 
-                self.assertContains(respuesta, H1, status_code=200)
-                self.assertContains(respuesta, "<h1>", status_code=200)
+    def test_las_cuatro_pestanas_estan_en_el_menu(self):
+        """El menu es boton, no enlace: la navegacion ya no cambia de URL.
 
-    def test_las_tres_pestanas_estan_en_el_menu(self):
-        """Las tres rutas tienen que quedar enlazadas desde cualquier pestana.
-
-        El menu vive en el esqueleto, asi que es la unica navegacion que
-        sobrevive al vaciado: si se cae, las tres rutas quedan huerfanas.
+        El filtro global vive en el shell, asi que esta es la unica navegacion
+        que sobrevive: si se cae, el monitor queda en una sola pestana.
         """
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-                for otro, ruta_otro in RUTAS:
-                    self.assertContains(
-                        respuesta,
-                        f'href="{ruta_otro}"',
-                    )
+        for numero, etiqueta in enumerate(PESTANAS):
+            with self.subTest(pestana=etiqueta):
+                self.assertIn(f'data-trx-tab="{numero}"', html)
+                self.assertIn(f">{etiqueta}<", html)
 
-    def test_cada_pestana_muestra_su_propio_titulo(self):
-        """El titulo de cada pestana sale del contexto, no de un literal.
+    def test_solo_una_pestana_queda_seleccionada(self):
+        """El nav marca la primera por defecto; el JS mueve la marca."""
 
-        Se importan las etiquetas de `trx_service` y `trx_reglas` en vez de
-        escribirlas aca, para que cambiar el umbral de corte no rompa la prueba.
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
+
+        self.assertEqual(html.count('aria-selected="true"'), 1)
+        self.assertEqual(html.count('aria-selected="false"'), 3)
+
+    def test_cada_pestana_tiene_su_seccion(self):
+        """Las cuatro secciones existen en el HTML aunque el JS no corra.
+
+        Es lo que evita el salto de layout: la seccion se pinta vacia y el JS la
+        llena. Si alguien borra una seccion del template, esta prueba lo dice.
         """
 
-        esperados = {
-            "informe_interno": trx_service.ETIQUETAS_PESTANA["informe_interno"],
-            "mayor_15": trx_reglas.ETIQUETA_ESTADO_UMBRAL,
-            "rezagadas": trx_service.ETIQUETAS_PESTANA["rezagadas"],
-        }
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
+        for numero in range(4):
+            with self.subTest(pestana=numero):
+                self.assertIn(f'id="trx-seccion-{numero}"', html)
+                self.assertIn(f'data-trx-seccion="{numero}"', html)
 
-                self.assertContains(
-                    respuesta,
-                    f"<h2>{esperados[nombre]}</h2>",
-                    status_code=200,
-                )
+    def test_las_secciones_distintas_de_la_primera_nacen_escondidas(self):
+        """Solo la mensual se muestra sin esperar al script.
 
-    def test_solo_una_pestana_queda_marcada_como_activa(self):
-        """El nav marca una sola pestaña activa: la de la ruta visitada.
-
-        Se comprueba `is-activa` y no `aria-current="page"`, porque el enlace del
-        sidebar tambi\u00e9n lleva `aria-current` en las tres rutas y contarlo global
-        dar\u00eda dos.
+        Con `hidden` en las otras tres no hay nada que parpadee mientras carga.
         """
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                html = self.client.get(ruta).content.decode()
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-                self.assertEqual(html.count('data-trx-pestana="'), 3)
-                self.assertEqual(html.count("is-activa"), 1)
+        for numero in (1, 2, 3):
+            with self.subTest(pestana=numero):
                 self.assertRegex(
                     html,
-                    rf'data-trx-pestana="{nombre}"\s+class="is-activa"',
+                    rf'data-trx-seccion="{numero}"[^>]*\shidden',
                 )
 
-    def test_las_pestanas_inactivas_no_cargan_la_marca(self):
-        for nombre, ruta in RUTAS:
-            for otro, _ in RUTAS:
-                if otro == nombre:
-                    continue
+    def test_los_filtros_globales_existen(self):
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-                with self.subTest(visita=nombre, inactiva=otro):
-                    html = self.client.get(ruta).content.decode()
+        for nombre in ("mes", "operador", "tipo"):
+            with self.subTest(filtro=nombre):
+                self.assertIn(f'data-trx-globales="{nombre}"', html)
 
-                    self.assertRegex(
-                        html,
-                        rf'data-trx-pestana="{otro}"\s+class=""',
-                    )
+        self.assertIn("data-trx-limpiar-globales", html)
 
-    def test_el_esqueleto_no_carga_assets_de_transacciones(self):
-        """Ni CSS ni JS propios: el modulo se arma desde cero.
+    def test_los_filtros_de_la_lista_solo_en_la_pestana_de_dispositivos(self):
+        """Buscador y chips son de esa pestana, no del armazon."""
 
-        Fija el punto de partida. Cuando se agreguen, esta prueba hay que
-        borrarla a proposito.
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
+
+        seccion = html.split('id="trx-seccion-2"')[1].split("</section>")[0]
+
+        self.assertIn("data-trx-buscar", seccion)
+        for chip in ("all", "bad", "crit", "rec", "lab"):
+            with self.subTest(chip=chip):
+                self.assertIn(f'data-trx-chip="{chip}"', seccion)
+
+    def test_el_umbral_llega_desde_el_contexto(self):
+        """El umbral se inyecta, no esta escrito en el HTML.
+
+        Se compara contra `trx_reglas` para que cambiarlo en la fuente no rompa
+        la prueba.
         """
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
-                html = respuesta.content.decode()
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-                self.assertNotIn("transacciones.css", html)
-                self.assertNotIn("transacciones/js/", html)
-                self.assertNotIn("mock.js", html)
+        self.assertIn(
+            'data-umbral-corte-min="{}"'.format(
+                trx_reglas.UMBRAL_CORTE_MINUTOS
+            ),
+            html,
+        )
 
-    def test_el_esqueleto_no_conserva_markup_legacy(self):
-        """Las zonas de la version anterior no deben quedar colgando.
+    def test_carga_los_assets_del_modulo(self):
+        """El orden importa: `mockData` antes que `dataService` y `app`."""
 
-        Si alguien reAgrega un include de `partials/` o un bloque `trx_*` viejo
-        sin querer, esta prueba lo delata.
-        """
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
-                html = respuesta.content.decode()
+        for activo in (
+            "transacciones/css/monitor_traspaso.css",
+            "transacciones/js/config.js",
+            "transacciones/js/mockData.js",
+            "transacciones/js/utils.js",
+            "transacciones/js/charts.js",
+            "transacciones/js/dataService.js",
+            "transacciones/js/app.js",
+        ):
+            with self.subTest(activo=activo):
+                self.assertIn(activo, html)
 
-                self.assertNotIn("partials/", html)
-                self.assertNotIn("trx-placeholder", html)
-                self.assertNotIn("trx-kpis", html)
-                self.assertNotIn("trx-tabla", html)
+        orden = [
+            html.index("js/" + nombre)
+            for nombre in (
+                "config.js",
+                "mockData.js",
+                "utils.js",
+                "charts.js",
+                "dataService.js",
+                "app.js",
+            )
+        ]
+
+        self.assertEqual(orden, sorted(orden))
+
+    def test_los_assets_salen_por_estatico(self):
+        """El modulo no debe abrir el arbol de archivos por su cuenta."""
+
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
+
+        self.assertNotIn("apps/transacciones/static", html)
+        self.assertNotIn("file://", html)
 
     def test_ningun_comentario_de_template_llega_al_html(self):
         """Django solo borra `{# #}` de una linea.
@@ -368,40 +436,49 @@ class RenderTests(TestCase):
         `{% comment %}`, que si es multilinea. Esta prueba fija la diferencia.
         """
 
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                html = self.client.get(ruta).content.decode()
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
 
-                self.assertNotIn("{#", html)
-                self.assertNotIn("#}", html)
-                self.assertNotIn("{% comment", html)
-                self.assertNotIn("{% endcomment", html)
+        self.assertNotIn("{#", html)
+        self.assertNotIn("#}", html)
+        self.assertNotIn("{% comment", html)
+        self.assertNotIn("{% endcomment", html)
+
+    def test_no_deja_markup_del_esqueleto_anterior(self):
+        """Las zonas de la version anterior no deben quedar colgando."""
+
+        html = self.client.get(reverse("transacciones:monitor")).content.decode()
+
+        self.assertNotIn("partials/", html)
+        self.assertNotIn("trx-placeholder", html)
 
 
 class RenderSinOracleTests(TestCase):
-    """Con Oracle apagado las tres pantallas igual renderizan.
+    """Con Oracle apagado el monitor igual renderiza.
 
-    El esqueleto no muestra cifras, pero el contexto igual pasa por los services:
-    que fallen al consultar no puede tumbar la pagina.
+    La vista no consulta la base, asi que un fallo de conexion no puede tirar
+    la pagina: los datos salen de `mockData.js` en el navegador.
     """
 
     def setUp(self):
         self.client.force_login(crear_sonda("sonda_sin_oracle"))
 
-    def test_las_tres_pantallas_responden_sin_oracle(self):
-        for nombre, ruta in RUTAS:
-            with self.subTest(pestana=nombre):
-                respuesta = self.client.get(ruta)
+    def test_el_monitor_responde_sin_oracle(self):
+        with mock.patch.object(
+            trx_service,
+            "obtener_dataset_base",
+            side_effect=AssertionError("la vista no debe consultar"),
+        ):
+            respuesta = self.client.get(reverse("transacciones:monitor"))
 
-                self.assertEqual(respuesta.status_code, 200)
-                self.assertContains(respuesta, H1)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, H1)
 
 
 class FiltrosTests(TestCase):
-    """Los services siguen validando la querystring aunque nadie la muestre.
+    """La querystring no puede romper el armazon.
 
-    El esqueleto todavia no dibuja filtros, pero el gate de los services no
-    puede romperse: un rango invalido tiene que seguir respondiendo 200.
+    El JS valida `p`, `fecha` y `mes` al leer la URL, pero el servidor tiene que
+    responder 200 igual: una URL vieja con parametros raros no debe ser un 500.
     """
 
     def setUp(self):
@@ -409,7 +486,7 @@ class FiltrosTests(TestCase):
 
     def test_rango_invalido_responde_igual(self):
         respuesta = self.client.get(
-            reverse("transacciones:informe_interno"),
+            reverse("transacciones:monitor"),
             {"fecha_desde": "2026-01-01", "fecha_hasta": "2026-08-27"},
         )
 
@@ -418,6 +495,11 @@ class FiltrosTests(TestCase):
     def test_filtros_que_bacan_del_oracle_no_rompen(self):
         for consulta in (
             {"fecha": "2026-08-27"},
+            {"mes": "2026-08"},
+            {"mes": "basura"},
+            {"p": "9"},
+            {"p": "-1"},
+            {"p": "abc"},
             {"origen": "bd"},
             {"origen": "invalido"},
             {"amid": "7500001"},
@@ -427,7 +509,7 @@ class FiltrosTests(TestCase):
         ):
             with self.subTest(consulta=consulta):
                 respuesta = self.client.get(
-                    reverse("transacciones:informe_interno"),
+                    reverse("transacciones:monitor"),
                     consulta,
                 )
 
@@ -455,7 +537,7 @@ class SidebarTests(TestCase):
         self.addCleanup(parche_carga.stop)
         self.addCleanup(parche_version.stop)
 
-        self.enlace = reverse("transacciones:informe_interno")
+        self.enlace = reverse("transacciones:monitor")
 
     def test_sonda_ve_el_enlace_una_sola_vez(self):
         self.client.force_login(crear_sonda("sonda_sidebar"))
@@ -519,7 +601,7 @@ class SidebarGrupoReportesTests(TestCase):
         self.addCleanup(parche_carga.stop)
         self.addCleanup(parche_version.stop)
 
-        self.enlace = reverse("transacciones:informe_interno")
+        self.enlace = reverse("transacciones:monitor")
 
     def test_autorizado_ve_el_grupo_completo(self):
         self.client.force_login(crear_sonda("sonda_grupo"))
@@ -549,10 +631,11 @@ class SidebarGrupoReportesTests(TestCase):
 
 
 class DatosNoInventadosTests(TestCase):
-    """El esqueleto no muestra cifras, y no debe empezar a hacerlo solo.
+    """El armazon no muestra cifras, y no debe empezar a hacerlo solo.
 
-    Con el dataset inyectado la pagina tiene que seguir igual de vacia: ningun
-    numero de la base puede aparecer sin que el diseno lo pida.
+    El monitor dibuja con `mockData.js` en el navegador. Si un dia se enchufa la
+    base, tiene que ser por el `dataService` y no colando una consulta en la
+    vista: estos datos jamas deben aparecer en el HTML del servidor.
     """
 
     def setUp(self):
@@ -586,12 +669,12 @@ class DatosNoInventadosTests(TestCase):
             "mensaje": "",
         }
 
-    def test_el_esqueleto_no_saca_cifras_de_la_base(self):
+    def test_el_monitor_no_saca_cifras_de_la_base(self):
         with mock.patch.object(
             trx_service, "obtener_dataset_base", return_value=self.comun
         ):
             respuesta = self.client.get(
-                reverse("transacciones:rezagadas"),
+                reverse("transacciones:monitor"),
                 {"fecha": "2026-08-27"},
             )
 

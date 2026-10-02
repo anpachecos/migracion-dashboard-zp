@@ -1,0 +1,174 @@
+{% extends "transacciones/base_transacciones.html" %}
+
+{% comment %}
+  Las cuatro pestañas del monitor.
+
+  Cada sección está en el HTML desde el arranque y se muestra o se esconde
+  según el estado; el script es el que las llena. Los encabezados y los
+  subtítulos viven acá porque son texto de interfaz, no datos: las cifras
+  siempre entran por el `dataService`.
+
+  Las zonas que el script vacía y reemplaza llevan `data-trx-zona`. Las que
+  solo se pintan una vez (el buscador, los chips, el salto a la lista) llevan
+  su propio atributo.
+{% endcomment %}
+
+{% block trx_contenido %}
+
+    {# --------------------------------------------------------- #}
+    {# Pestaña 1 · Resumen mensual                              #}
+    {# --------------------------------------------------------- #}
+    <section class="trx-seccion" id="trx-seccion-0" data-trx-seccion="0"
+             role="tabpanel" aria-labelledby="trx-tab-0" hidden>
+
+        <div data-trx-zona="mensual-kpis"></div>
+
+        <div class="trx-cols2">
+
+            <article class="trx-card">
+                <h2>Calendario de cumplimiento</h2>
+                <p class="trx-sub">% de trx llegadas en &lt; 5 min. Clic en un día para ver su detalle.</p>
+
+                <div data-trx-zona="mensual-calendario"></div>
+
+                <div class="trx-leyenda">
+                    <span><i style="background: var(--ok)"></i>&ge; 90 % (meta)</span>
+                    <span><i style="background: var(--wa)"></i>85–90</span>
+                    <span><i style="background: var(--er)"></i>&lt; 85</span>
+                    <span><i style="background: var(--sin)"></i>sin dato / bajo volumen</span>
+                </div>
+            </article>
+
+            <article class="trx-card">
+                <h2>Evolución mensual</h2>
+                <p class="trx-sub">Promedio de traspaso (barras, min) y % de incumplimiento (línea).</p>
+
+                <div data-trx-zona="mensual-evolucion"></div>
+
+                <div class="trx-leyenda">
+                    <span><i style="background: var(--ac)"></i>Prom. traspaso (min)</span>
+                    <span><i style="background: var(--er)"></i>% incumplimiento</span>
+                </div>
+            </article>
+
+        </div>
+
+        <article class="trx-card">
+            <h2>Cuadro diario del mes</h2>
+            <p class="trx-sub">Misma estructura que la hoja «Acumulado». Clic en una fila para abrir el día.</p>
+
+            <div class="trx-scroll-x">
+                <table class="trx-tabla" data-trx-zona="mensual-cuadro"></table>
+            </div>
+        </article>
+
+    </section>
+
+    {# --------------------------------------------------------- #}
+    {# Pestaña 2 · Resumen diario                               #}
+    {# --------------------------------------------------------- #}
+    <section class="trx-seccion" id="trx-seccion-1" data-trx-seccion="1"
+             role="tabpanel" aria-labelledby="trx-tab-1" hidden>
+
+        <div data-trx-zona="diario-kpis"></div>
+
+        <div class="trx-cols2">
+
+            <article class="trx-card">
+                <h2>Tiempo de traspaso por hora</h2>
+                <p class="trx-sub">Promedio en min según hora de llegada. Línea = umbral 5 min.</p>
+
+                <div data-trx-zona="diario-hora"></div>
+            </article>
+
+            <article class="trx-card">
+                <h2>¿Cuántos dispositivos están mal?</h2>
+                <p class="trx-sub" data-trx-zona="diario-severidad-sub"></p>
+
+                <div data-trx-zona="diario-severidad"></div>
+
+                <h2 style="margin-top: 18px;">Operador × hora</h2>
+                <p class="trx-sub" data-trx-zona="diario-calor-sub"></p>
+
+                <div class="trx-scroll-x">
+                    <div data-trx-zona="diario-calor"></div>
+                </div>
+            </article>
+
+        </div>
+
+        <article class="trx-card">
+            <div class="trx-encabezado">
+                <h2>Los 10 peores dispositivos del día</h2>
+                <button type="button" class="trx-enlace-salto" data-trx-ir-lista>
+                    Atajo a la lista completa (pestaña Dispositivos)
+                </button>
+            </div>
+
+            <div class="trx-scroll-x">
+                <table class="trx-tabla" data-trx-zona="diario-top"></table>
+            </div>
+        </article>
+
+    </section>
+
+    {# --------------------------------------------------------- #}
+    {# Pestaña 3 · Dispositivos                                 #}
+    {# --------------------------------------------------------- #}
+    <section class="trx-seccion" id="trx-seccion-2" data-trx-seccion="2"
+             role="tabpanel" aria-labelledby="trx-tab-2" hidden>
+
+        <article class="trx-card">
+
+            <div class="trx-filtros">
+                <input type="search"
+                       class="trx-buscar"
+                       data-trx-buscar
+                       placeholder="Buscar validador, ZP u operador…"
+                       aria-label="Buscar validador, ZP u operador">
+
+                <button type="button" class="trx-chip chip" data-trx-chip="all" aria-pressed="true">Todos</button>
+                <button type="button" class="trx-chip chip" data-trx-chip="bad" aria-pressed="false">Fuera de SLA (&gt; 5 min)</button>
+                {% comment %}
+                  La etiqueta del chip de corte la completa el script con el
+                  umbral que llega en `data-umbral-corte-min`. Escribir el
+                  número acá lo dejaría desincronizado de `trx_reglas`.
+                {% endcomment %}
+                <button type="button" class="trx-chip chip" data-trx-chip="crit" aria-pressed="false"><span data-trx-chip-crit></span></button>
+                <button type="button" class="trx-chip chip" data-trx-chip="rec" aria-pressed="false">Reincidentes (&ge; 5 días)</button>
+                <button type="button" class="trx-chip chip" data-trx-chip="lab" aria-pressed="false">En laboratorio</button>
+            </div>
+
+            {% comment %}
+              El contenedor de la tabla no trae nada adentro a proposito: el
+              script lo llena, sea con el esqueleto de carga, con las filas o
+              con el mensaje de vacio. La `<table>` la arma el script.
+            {% endcomment %}
+            <div class="trx-scroll-x" data-trx-zona="disp-tabla-zona"></div>
+
+            <div class="trx-paginacion" data-trx-zona="disp-paginacion"></div>
+
+        </article>
+
+        <article class="trx-card trx-ficha" data-trx-zona="disp-ficha" hidden></article>
+
+    </section>
+
+    {# --------------------------------------------------------- #}
+    {# Pestaña 4 · Rezagadas                                    #}
+    {# --------------------------------------------------------- #}
+    <section class="trx-seccion" id="trx-seccion-3" data-trx-seccion="3"
+             role="tabpanel" aria-labelledby="trx-tab-3" hidden>
+
+        <div data-trx-zona="rezagadas-kpis"></div>
+
+        <article class="trx-card">
+            <h2>Rezagadas por día de llegada</h2>
+            <p class="trx-sub">Cantidad de trx que llegaron ese día pero se generaron antes.</p>
+
+            <div data-trx-zona="rezagadas-grafico"></div>
+        </article>
+
+    </section>
+
+{% endblock %}

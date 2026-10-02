@@ -1,0 +1,834 @@
+﻿/* =========================================================
+   Monitor de Traspaso C2D
+   Tokens de color y componentes propios del monitor.
+
+   Los tokens viven acÃ¡ y en ningÃºn otro lado: los componentes
+   y los grÃ¡ficos SVG los leen con getComputedStyle, nunca con
+   un hex escrito a mano. Los valores salen de la paleta que ya
+   usa el dashboard (Tailwind slate/blue) para que el mÃ³dulo se
+   vea parte del mismo producto:
+
+     --bg   #f4f6f9   el body de base_dashboard.css
+     --card #ffffff   la tarjeta .tarjeta de utilidades.css
+     --tx   #111827   el color de texto del body
+     --mu   #64748b   slate-500, el gris de apoyo mÃ¡s usado
+     --bd   #e2e8f0   slate-200, el borde mÃ¡s usado
+     --ok   #15803d   --wa #d97706   --er #dc2626
+     --ac   #2563eb   blue-600, el acento del proyecto
+
+   Los fondos azules que sÃ­ usa el proyecto (#eff6ff en .chip-gps,
+   #dbeafe en .badge-estado.info y .preferencias-alertas) NO se
+   adoptan: son fondos de chip, badge y panel, y el accent se
+   reserva para texto, lÃ­neas y barras.
+
+   El proyecto es solo claro por decisiÃ³n propia, asÃ­ que no hay
+   bloque de tema oscuro. Para agregarlo despuÃ©s alcanza con
+   re-declarar el bloque de tokens de abajo.
+   ========================================================= */
+
+.trx {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --tx: #111827;
+    --mu: #64748b;
+    --bd: #e2e8f0;
+    --ok: #15803d;
+    --wa: #d97706;
+    --er: #dc2626;
+    --ac: #2563eb;
+
+    --ok-bg: #dcfce7;
+    --wa-bg: #fef3c7;
+    --er-bg: #fee2e2;
+
+    /* Escala de severidad, fija e independiente de la paleta: verde,
+       amarillo, naranja, rojo y el gris de "sin dato". */
+    --sev-ok: #2fae76;
+    --sev-1: #e9c53a;
+    --sev-2: #e8842f;
+    --sev-3: #d64545;
+    --sin: #8a94a3;
+
+    /* Medidas que comparten varios bloques. */
+    --radio-tarjeta: 12px;
+    --radio-control: 8px;
+    --hueco: 14px;
+
+    /* Tinte del esqueleto de carga: el mismo fondo de pagina un punto mÃ¡s
+       arriba, para que la barra se vea sin salirse de la paleta. */
+    --hueso: #eef1f5;
+
+    font-family: Arial, sans-serif;
+    color: var(--tx);
+}
+
+/* =========================================================
+   Estructura
+   ========================================================= */
+
+.trx-contenedor {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 20px;
+    /* min-width: 0 para que las grillas de adentro puedan encogerse
+       en vez de empujar el ancho de la pÃ¡gina. Es la misma defensa
+       que usa el sidebar. */
+    min-width: 0;
+}
+
+.trx-cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--bd);
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-tarjeta);
+    padding: 14px;
+}
+
+.trx-cabecera h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.trx-cabecera p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-globales {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.trx-globales label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--mu);
+    min-width: 0;
+}
+
+.trx-globales select {
+    height: 34px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-control);
+    background: var(--card);
+    color: var(--tx);
+    font: inherit;
+    font-size: 13px;
+}
+
+.trx-limpiar {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-control);
+    background: var(--card);
+    color: var(--mu);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.trx-limpiar:hover {
+    color: var(--tx);
+    border-color: var(--mu);
+}
+
+.trx-limpiar:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: 2px;
+}
+
+/* =========================================================
+   PestaÃ±as
+   ========================================================= */
+
+.trx-pestanas {
+    display: flex;
+    gap: 4px;
+    margin: 14px 0;
+    border-bottom: 1px solid var(--bd);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.trx-pestanas button {
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--mu);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.trx-pestanas button:hover {
+    color: var(--tx);
+}
+
+.trx-pestanas button[aria-selected="true"] {
+    color: var(--ac);
+    border-bottom-color: var(--ac);
+}
+
+.trx-pestanas button:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: -2px;
+    border-radius: var(--radio-control);
+}
+
+.trx-seccion[hidden] {
+    display: none;
+}
+
+.trx-seccion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hueco);
+    min-width: 0;
+}
+
+/* =========================================================
+   Migas de pan
+   ========================================================= */
+
+.trx-migas {
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-migas a {
+    color: var(--ac);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.trx-migas a:hover {
+    text-decoration: underline;
+}
+
+/* =========================================================
+   Tarjetas y grillas
+   ========================================================= */
+
+.trx-card {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-tarjeta);
+    padding: 14px;
+    min-width: 0;
+}
+
+.trx-card > h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.trx-sub {
+    margin: 3px 0 12px;
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+    gap: var(--hueco);
+}
+
+.trx-cols2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: var(--hueco);
+}
+
+/* =========================================================
+   KPIs
+   ========================================================= */
+
+.trx-kpi {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-tarjeta);
+    padding: 14px;
+    min-width: 0;
+}
+
+.trx-kpi-etiqueta {
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-kpi-valor {
+    margin-top: 6px;
+    font-size: 25px;
+    font-weight: 800;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+}
+
+.trx-kpi-detalle {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-kpi.es-ok .trx-kpi-valor { color: var(--ok); }
+.trx-kpi.es-wa .trx-kpi-valor { color: var(--wa); }
+.trx-kpi.es-er .trx-kpi-valor { color: var(--er); }
+
+/* =========================================================
+   Tablas
+   ========================================================= */
+
+.trx-scroll-x {
+    overflow-x: auto;
+    min-width: 0;
+}
+
+.trx-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.trx-tabla th,
+.trx-tabla td {
+    padding: 7px 9px;
+    text-align: left;
+    border-bottom: 1px solid var(--bd);
+    white-space: nowrap;
+}
+
+.trx-tabla th {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--mu);
+    border-bottom: 1px solid var(--bd);
+}
+
+.trx-tabla th.ordenable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.trx-tabla th.ordenable:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: -2px;
+}
+
+.trx-tabla td.texto-largo {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    max-width: 260px;
+}
+
+.trx-tabla tbody tr:hover {
+    background: var(--bg);
+}
+
+.trx-tabla tbody tr.es-fila {
+    cursor: pointer;
+}
+
+.trx-tabla tbody tr.es-fila:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: -2px;
+}
+
+tr.es-activo {
+    background: var(--bg);
+}
+
+.es-ok-txt { color: var(--ok); font-weight: 700; }
+.es-wa-txt { color: var(--wa); font-weight: 700; }
+.es-er-txt { color: var(--er); font-weight: 700; }
+.es-mu-txt { color: var(--mu); }
+
+/* Barra de 8 px que acompaÃ±a a los porcentajes y promedios. */
+.trx-minibarra {
+    display: inline-block;
+    height: 8px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 6px;
+    background: var(--mu);
+    /* El ancho lo pone el script en porcentaje del ancho de la celda, que en
+       una tabla siempre estÃ¡ definido. El tope evita que en columnas anchas
+       la barra ocupe media celda. */
+    max-width: 90px;
+}
+
+.trx-minibarra.es-ok { background: var(--ok); }
+.trx-minibarra.es-wa { background: var(--wa); }
+.trx-minibarra.es-er { background: var(--er); }
+
+/* =========================================================
+   Buscador y chips
+   ========================================================= */
+
+.trx-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.trx-buscar {
+    min-width: 240px;
+    flex: 1 1 240px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-control);
+    background: var(--card);
+    color: var(--tx);
+    font: inherit;
+    font-size: 13px;
+}
+
+.trx-buscar:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: 1px;
+}
+
+.trx-chip.chip {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--bd);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--mu);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.trx-chip.chip:hover {
+    color: var(--tx);
+}
+
+.trx-chip.chip[aria-pressed="true"] {
+    background: var(--tx);
+    border-color: var(--tx);
+    color: var(--card);
+}
+
+.trx-chip.chip:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: 2px;
+}
+
+/* =========================================================
+   PaginaciÃ³n
+   ========================================================= */
+
+.trx-paginacion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--mu);
+}
+
+.trx-paginacion-botones {
+    display: flex;
+    gap: 6px;
+}
+
+.trx-paginacion button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--bd);
+    border-radius: var(--radio-control);
+    background: var(--card);
+    color: var(--tx);
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.trx-paginacion button:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: 1px;
+}
+
+.trx-paginacion button:disabled {
+    cursor: not-allowed;
+    color: var(--card);
+}
+
+/* =========================================================
+   Estados: cargando, vacÃ­o y error
+   ========================================================= */
+
+.trx-estado.mensaje {
+    margin: 0;
+    font-size: 12px;
+    background: var(--bg);
+    color: var(--mu);
+}
+
+.trx-estado.es-error {
+    background: var(--er-bg);
+    color: var(--er);
+}
+
+.trx-estado button {
+    margin-left: 8px;
+    padding: 3px 10px;
+    border: 1px solid currentColor;
+    border-radius: var(--radio-control);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.trx-esqueleto {
+    height: 56px;
+    border-radius: var(--radio-control);
+    background: linear-gradient(90deg, var(--bg) 25%, var(--hueso) 37%, var(--bg) 63%);
+    background-size: 400% 100%;
+    animation: trx-pulso 1.3s ease-in-out infinite;
+}
+
+@keyframes trx-pulso {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .trx-esqueleto { animation: none; }
+}
+
+/* =========================================================
+   Calendario de cumplimiento
+   ========================================================= */
+
+.trx-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.trx-cal-grid .cal-dia-sem {
+    text-align: center;
+    font-size: 10px;
+    color: var(--mu);
+    padding-bottom: 2px;
+}
+
+.trx-cal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 38px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    color: var(--card);
+    font-size: 12px;
+    line-height: 1.15;
+}
+
+.trx-cal strong {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.trx-cal small {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.trx-cal.cal-ok { background: var(--ok); }
+.trx-cal.cal-wa { background: var(--wa); }
+.trx-cal.cal-er { background: var(--er); }
+
+.trx-cal.cal-sin {
+    background: var(--sin);
+    opacity: .35;
+    color: var(--card);
+    cursor: default;
+}
+
+.trx-cal:not(.cal-sin):hover {
+    filter: brightness(1.08);
+}
+
+.trx-cal:focus-visible {
+    outline: 2px solid var(--tx);
+    outline-offset: 1px;
+}
+
+.trx-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--mu);
+}
+
+.trx-leyenda span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.trx-leyenda i {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* =========================================================
+   Barra segmentada de severidad
+   ========================================================= */
+
+.trx-segmentos {
+    display: flex;
+    gap: 2px;
+    height: 26px;
+    margin: 4px 0 10px;
+}
+
+.trx-segmentos button {
+    min-width: 40px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--card);
+    cursor: pointer;
+    padding: 0;
+}
+
+.trx-segmentos button:focus-visible {
+    outline: 2px solid var(--tx);
+    outline-offset: 2px;
+}
+
+.seg-ok { background: var(--ok); }
+.seg-1 { background: var(--sev-1); }
+.seg-2 { background: var(--sev-2); }
+.seg-3 { background: var(--sev-3); }
+
+/* =========================================================
+   Mapa de calor
+   ========================================================= */
+
+.trx-heat {
+    display: grid;
+    grid-template-columns: 72px repeat(18, minmax(0, 1fr));
+    gap: 2px;
+    align-items: center;
+}
+
+.trx-heat .heat-op {
+    font-size: 10px;
+    color: var(--mu);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trx-heat .heat-hs {
+    text-align: center;
+    font-size: 9px;
+    color: var(--mu);
+}
+
+.trx-heat .heat-celda {
+    height: 20px;
+    border-radius: 2px;
+    border: 0;
+    padding: 0;
+    cursor: default;
+}
+
+/* =========================================================
+   Ficha de dispositivo
+   ========================================================= */
+
+.trx-ficha {
+    margin-top: var(--hueco);
+    scroll-margin-top: 20px;
+}
+
+.trx-ficha h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.trx-ficha-cabecera {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.trx-ficha-cabecera h3 {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.trx-cerrar {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--mu);
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.trx-cerrar:hover {
+    color: var(--tx);
+    border-color: var(--mu);
+}
+
+.trx-ficha-sub {
+    margin: 3px 0 12px;
+    font-size: 12px;
+    color: var(--mu);
+    overflow-wrap: anywhere;
+}
+
+.trx-tira {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 44px;
+    margin-top: 4px;
+}
+
+.trx-tira i {
+    flex: 1 1 0;
+    min-width: 2px;
+    border-radius: 2px 2px 0 0;
+    display: block;
+}
+
+.trx-lab {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+}
+
+.trx-lab li {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bd);
+}
+
+.trx-lab b {
+    color: var(--mu);
+    font-weight: 700;
+}
+
+.trx-lab span {
+    overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   GrÃ¡ficos SVG
+   ========================================================= */
+
+.trx-gfx {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+}
+
+.trx-gfx text {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    fill: var(--mu);
+}
+
+.trx-gfx .gfx-etiqueta {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.trx-vacio {
+    font-size: 12px;
+    color: var(--mu);
+}
+
+/* =========================================================
+   Cabecera de bloque con atajo
+   ========================================================= */
+
+.trx-encabezado {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.trx-enlace-salto {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ac);
+    background: none;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.trx-enlace-salto:focus-visible {
+    outline: 2px solid var(--ac);
+    outline-offset: 2px;
+}

@@ -302,7 +302,12 @@ class EtiquetasDerivadasDelUmbralTests(SimpleTestCase):
         umbral = trx_reglas.UMBRAL_CORTE_MINUTOS
         # El umbral no puede quedar pegado a una letra ni a otro dígito: así
         # "mayor_15" y "115" no cuentan, pero "> 15 min" sí.
-        patron_umbral = re.compile(rf"(?<![\w.,]){umbral}(?![\w.,])")
+        #
+        # El guion también queda como carácter pegado a la izquierda porque una
+        # fecha ISO no es el umbral: "2026-08-15" es el día quince del mes, no
+        # un número mágico escrito a mano. Sin esta salvedad los datos de
+        # referencia del monitor no podrían existir en los archivos js.
+        patron_umbral = re.compile(rf"(?<![\w.,-]){umbral}(?![\w.,])")
         excluidos = {Path(trx_reglas.__file__).resolve()}
         infracciones = []
 
@@ -339,6 +344,51 @@ class EtiquetasDerivadasDelUmbralTests(SimpleTestCase):
             "El umbral aparece escrito a mano fuera de trx_reglas:\n  - "
             + "\n  - ".join(infracciones),
         )
+
+    def test_el_guardian_permite_las_fechas_iso(self):
+        """La salvedad del guion no relaja lo que tiene que seguir saltando.
+
+        Se prueban los dos lados a la vez. Solo la fecha ISO queda cubierta,
+        porque es la única forma en que el umbral aparece precedido por un
+        guion; un "15" suelto seguido de coma, punto o letra tampoco es el
+        número mágico que se busca. Lo que tiene que seguir saltando es el 15
+        que funciona como cantidad.
+        """
+
+        umbral = trx_reglas.UMBRAL_CORTE_MINUTOS
+        patron = re.compile(rf"(?<![\w.,-]){umbral}(?![\w.,])")
+
+        # El día quince escrito como fecha no es el umbral a mano.
+        for texto in (
+            "2026-08-15",
+            "2026-{:02d}-01".format(umbral),
+            "2026-08-{:02d}T00:00".format(umbral),
+        ):
+            with self.subTest(texto=texto):
+                self.assertIsNone(patron.search(texto))
+
+        # Números pegados, decimales e identificadores tampoco son el umbral.
+        for texto in (
+            "mayor_15",
+            "115",
+            "015",
+            "1,15",
+            "1.15",
+        ):
+            with self.subTest(texto=texto):
+                self.assertIsNone(patron.search(texto))
+
+        # Y esto sí: el umbral escrito como cantidad, que es el defecto real.
+        for texto in (
+            "> 15 min",
+            "15 minutos",
+            "promedio de 15",
+            "15 o más",
+            "umbral 15",
+            "15%",
+        ):
+            with self.subTest(texto=texto):
+                self.assertIsNotNone(patron.search(texto))
 
     @staticmethod
     def _literales_visibles(ruta):

@@ -1,60 +1,112 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load static %}
 
 {% comment %}
-  Esqueleto del Monitor de Traspaso C2D.
+  Armazón del Monitor de Traspaso C2D.
 
-  Extiende `dashboard/base_dashboard.html`, que es de donde vienen el layout, el
-  sidebar y el bloque de estado del sistema. Todo lo del monitor vive aqui y en
-  las tres pestanas.
+  Extiende `dashboard/base_dashboard.html`, de donde vienen el layout, el
+  sidebar y el bloque de estado del sistema. Acá solo va lo que pertenece al
+  monitor: encabezado, filtros globales y las cuatro pestañas.
 
-  Este archivo esta deliberadamente vacio de codigo: no carga hojas de estilo ni
-  scripts, y no escribe una sola regla de estilo. Solo conserva el encabezado,
-  las tres pestanas y el punto de insercion del contenido, para que el diseno se
-  construya desde cero encima de una estructura estable.
-
-  Ojo con los comentarios: `{# #}` solo se elimina si cabe en una linea. Uno
+  Ojo con los comentarios: `{# #}` solo se elimina si cabe en una línea. Uno
   repartido en varias se escapa al HTML como texto. Para bloques va
-  `{% comment %}`, que si es multilinea.
+  `{% comment %}`, que sí es multilínea.
 {% endcomment %}
 
-{% block title %}{{ titulo_pestana|default:"Monitor de Traspaso C2D" }} · Zonas Pagas{% endblock %}
+{% block title %}Monitor de Traspaso C2D · Zonas Pagas{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'transacciones/css/monitor_traspaso.css' %}?v=1">
+{% endblock %}
 
 {% block content %}
-<div class="trx" data-trx-raiz data-trx-pagina="{{ pestana_activa|default:'informe_interno' }}">
+<div class="trx"
+     data-trx-raiz
+     data-umbral-corte-min="{{ umbral_corte_min }}">
 
-    <header class="trx-cabecera">
-        <h1>Monitor de Traspaso C2D</h1>
-        <p>{{ descripcion_pestana }}</p>
-    </header>
+    <div class="trx-contenedor">
 
-    <nav class="trx-pestanas" aria-label="Secciones del monitor">
+        <header class="trx-cabecera">
+            <div>
+                <h1>Monitor de Traspaso C2D</h1>
+                <p>Tiempo entre la transacción en el validador y su llegada al Sistema Central</p>
+            </div>
+
+            {% comment %}
+              Los tres filtros globales. El valor del operador no es su
+              etiqueta: la opción muestra "U19-US17 Conecta" pero el dato
+              viene como "U19-US17", así que el value va aparte.
+            {% endcomment %}
+            <div class="trx-globales">
+                <label>
+                    Mes
+                    <select data-trx-globales="mes">
+                        <option value="2026-08">Agosto 2026</option>
+                        <option value="2026-07">Julio 2026</option>
+                        <option value="2026-06">Junio 2026</option>
+                    </select>
+                </label>
+
+                <label>
+                    Operador
+                    <select data-trx-globales="operador">
+                        <option value="">Todos los operadores</option>
+                        <option value="U5-Metbus">U5-Metbus</option>
+                        <option value="U19-US17">U19-US17 Conecta</option>
+                    </select>
+                </label>
+
+                <label>
+                    Tipo
+                    <select data-trx-globales="tipo">
+                        <option value="">Todos los tipos</option>
+                        <option value="Parada">Parada</option>
+                        <option value="Intermodal">Intermodal</option>
+                        <option value="Fija">Fija</option>
+                    </select>
+                </label>
+
+                {% comment %}
+                  "Limpiar" devuelve los tres filtros globales a su valor por
+                  defecto. No toca la pestaña ni el filtro de la lista: limpiar
+                  la lista es otra acción, la del buscador de Dispositivos.
+                {% endcomment %}
+                <button type="button" class="trx-limpiar" data-trx-limpiar-globales>
+                    Limpiar filtros
+                </button>
+            </div>
+        </header>
+
         {% comment %}
-        Las etiquetas llegan desde `trx_service.ETIQUETAS_PESTANA`, y la del corte
-        se deriva de `trx_reglas.UMBRAL_CORTE_MINUTOS`. Sin `default:` a proposito:
-        el umbral no se escribe en ningun template, asi que si el contexto faltara
-        tiene que verse, no rellenarse con un numero fijo.
+          Las cuatro pestañas son estado del cliente: la URL lleva el número y
+          el script muestra la sección correspondiente. Por eso son botones y
+          no enlaces, y por eso no hay una vista por pestaña.
         {% endcomment %}
-        <a href="{% url 'transacciones:informe_interno' %}" data-trx-pestana="informe_interno"
-           class="{% if pestana_activa == 'informe_interno' %}is-activa{% endif %}"
-           {% if pestana_activa == 'informe_interno' %}aria-current="page"{% endif %}>
-            {{ etiquetas_pestana.informe_interno }}
-        </a>
-        <a href="{% url 'transacciones:mayor_15' %}" data-trx-pestana="mayor_15"
-           class="{% if pestana_activa == 'mayor_15' %}is-activa{% endif %}"
-           {% if pestana_activa == 'mayor_15' %}aria-current="page"{% endif %}>
-            {{ etiquetas_pestana.mayor_15 }}
-        </a>
-        <a href="{% url 'transacciones:rezagadas' %}" data-trx-pestana="rezagadas"
-           class="{% if pestana_activa == 'rezagadas' %}is-activa{% endif %}"
-           {% if pestana_activa == 'rezagadas' %}aria-current="page"{% endif %}>
-            {{ etiquetas_pestana.rezagadas }}
-        </a>
-    </nav>
+        <nav class="trx-pestanas" role="tablist" aria-label="Secciones del monitor">
+            <button type="button" role="tab" data-trx-tab="0" aria-selected="true"
+                    aria-controls="trx-seccion-0" id="trx-tab-0">Resumen mensual</button>
+            <button type="button" role="tab" data-trx-tab="1" aria-selected="false"
+                    aria-controls="trx-seccion-1" id="trx-tab-1">Resumen diario</button>
+            <button type="button" role="tab" data-trx-tab="2" aria-selected="false"
+                    aria-controls="trx-seccion-2" id="trx-tab-2">Dispositivos</button>
+            <button type="button" role="tab" data-trx-tab="3" aria-selected="false"
+                    aria-controls="trx-seccion-3" id="trx-tab-3">Rezagadas</button>
+        </nav>
 
-    {# Punto de insercion. Cada pestana pone aqui su contenido y nada mas. #}
-    <main class="trx-vista" data-trx-vista>
+        <nav class="trx-migas" data-trx-zona="migas" aria-label="Ruta de navegación"></nav>
+
         {% block trx_contenido %}{% endblock %}
-    </main>
 
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'transacciones/js/config.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/mockData.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/utils.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/charts.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/dataService.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/app.js' %}?v=1"></script>
+    <script>window.TRX_APP.iniciar();</script>
 {% endblock %}
