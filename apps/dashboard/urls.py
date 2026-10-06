@@ -53,4 +53,16 @@ urlpatterns = [
         views.exportar_alertas_excel,
         name="exportar_alertas_excel",
     ),
+    path("trabajos/crear/", views.crear_trabajo_archivo, name="crear_trabajo_archivo"),
+    path("trabajos/estado/", views.estado_trabajos_archivo, name="estado_trabajos_archivo"),
+    path(
+        "trabajos/<int:trabajo_id>/leer/",
+        views.leer_trabajo_archivo,
+        name="leer_trabajo_archivo",
+    ),
+    path(
+        "trabajos/<int:trabajo_id>/descargar/",
+        views.descargar_trabajo_archivo,
+        name="descargar_trabajo",
+    ),
 ]

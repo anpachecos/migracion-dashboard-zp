@@ -372,7 +372,7 @@ def _clase_estado(mayor_15, rezagada, datos_validos):
     return "trx-clase-ok"
 
 
-def obtener_dataset_base(filtros):
+def obtener_dataset_base(filtros, limite_filas=None):
     """
     Dataset común de TRX del rango, ya normalizado y con reglas aplicadas.
 
@@ -410,7 +410,7 @@ def obtener_dataset_base(filtros):
         resultado["consultado"] = True
         return resultado
 
-    maximo = min(
+    maximo = limite_filas or min(
         filtros["filas_por_pagina"],
         configuracion["maximo_filas_detalle"],
     )
@@ -433,6 +433,19 @@ def obtener_dataset_base(filtros):
     resultado["truncado"] = total > len(filas)
 
     return resultado
+
+
+def obtener_filtros_desde_parametros(parametros):
+    """Validate worker parameters using the same rules as the dashboard."""
+
+    from django.http import QueryDict
+
+    query = QueryDict("", mutable=True)
+    for clave, valor in (parametros or {}).items():
+        if valor is not None:
+            query[clave] = str(valor)
+
+    return obtener_filtros_trx(type("Request", (), {"GET": query})())
 
 
 def resumir_dataset(dataset):

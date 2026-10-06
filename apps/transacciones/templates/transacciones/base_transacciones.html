@@ -1,89 +1,112 @@
 {% extends "dashboard/base_dashboard.html" %}
-
 {% load static %}
 
 {% comment %}
-Base del módulo de Transacciones.
+  Armazón del Monitor de Traspaso C2D.
 
-Extiende `dashboard/base_dashboard.html` para reutilizar el layout, el sidebar y
-el bloque de estado del sistema. Aquí solo se centraliza lo propio de TRX: el
-encabezado, la navegación interna entre pestañas y las zonas comunes de KPIs,
-gráficos, tabla y exportación.
+  Extiende `dashboard/base_dashboard.html`, de donde vienen el layout, el
+  sidebar y el bloque de estado del sistema. Acá solo va lo que pertenece al
+  monitor: encabezado, filtros globales y las cuatro pestañas.
 
-Cada pestaña provee su propio contenido. Las zonas que aún no tienen
-implementación se dejan visibles como placeholder, nunca como dato inventado.
+  Ojo con los comentarios: `{# #}` solo se elimina si cabe en una línea. Uno
+  repartido en varias se escapa al HTML como texto. Para bloques va
+  `{% comment %}`, que sí es multilínea.
 {% endcomment %}
 
-{% block title %}{{ titulo_pestana }} · Transacciones{% endblock %}
+{% block title %}Monitor de Traspaso C2D · Zonas Pagas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'transacciones/css/transacciones.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'transacciones/css/monitor_traspaso.css' %}?v=3">
 {% endblock %}
 
 {% block content %}
-<div class="trx-page">
+<div class="trx"
+     data-trx-raiz
+     data-umbral-corte-min="{{ umbral_corte_min }}">
 
-    <header class="panel-header trx-header">
-        <h1>Transacciones</h1>
-        <p>{{ descripcion_pestana }}</p>
-    </header>
+    <div class="trx-contenedor">
 
-    <nav class="trx-pestanas" aria-label="Análisis de transacciones">
-        {% include "transacciones/partials/_pestanas.html" %}
-    </nav>
+        <header class="trx-cabecera">
+            <div>
+                <h1>Monitor de Traspaso C2D</h1>
+                <p>Tiempo entre la transacción en el validador y su llegada al Sistema Central</p>
+            </div>
 
-    {% if mensaje %}
-        <p class="trx-aviso" role="status" data-trx-aviso>{{ mensaje }}</p>
-    {% endif %}
+            {% comment %}
+              Los tres filtros globales. El valor del operador no es su
+              etiqueta: la opción muestra "U19-US17 Conecta" pero el dato
+              viene como "U19-US17", así que el value va aparte.
+            {% endcomment %}
+            <div class="trx-globales">
+                <label>
+                    Mes
+                    <select data-trx-globales="mes">
+                        <option value="2026-08">Agosto 2026</option>
+                        <option value="2026-07">Julio 2026</option>
+                        <option value="2026-06">Junio 2026</option>
+                    </select>
+                </label>
 
-    <section class="trx-bloque trx-bloque-filtros" aria-label="Filtros">
-        <h2 class="trx-bloque-titulo">Filtros</h2>
-        {% include "transacciones/partials/_filtros.html" %}
-    </section>
+                <label>
+                    Operador
+                    <select data-trx-globales="operador">
+                        <option value="">Todos los operadores</option>
+                        <option value="U5-Metbus">U5-Metbus</option>
+                        <option value="U19-US17">U19-US17 Conecta</option>
+                    </select>
+                </label>
 
-    <section class="trx-bloque trx-bloque-kpis" aria-label="Indicadores">
-        <h2 class="trx-bloque-titulo">Indicadores</h2>
-        {% block trx_kpis %}
-            {% include "transacciones/partials/_kpis.html" %}
-        {% endblock %}
-    </section>
+                <label>
+                    Tipo
+                    <select data-trx-globales="tipo">
+                        <option value="">Todos los tipos</option>
+                        <option value="Parada">Parada</option>
+                        <option value="Intermodal">Intermodal</option>
+                        <option value="Fija">Fija</option>
+                    </select>
+                </label>
 
-    <section class="trx-bloque trx-bloque-graficos" aria-label="Gráficos">
-        <h2 class="trx-bloque-titulo">Gráficos</h2>
-        {% block trx_graficos %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
+                {% comment %}
+                  "Limpiar" devuelve los tres filtros globales a su valor por
+                  defecto. No toca la pestaña ni el filtro de la lista: limpiar
+                  la lista es otra acción, la del buscador de Dispositivos.
+                {% endcomment %}
+                <button type="button" class="trx-limpiar" data-trx-limpiar-globales>
+                    Limpiar filtros
+                </button>
+            </div>
+        </header>
 
-    <section class="trx-bloque trx-bloque-tabla" aria-label="Detalle">
-        <h2 class="trx-bloque-titulo">Detalle</h2>
-        {% block trx_tabla %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
+        {% comment %}
+          Las cuatro pestañas son estado del cliente: la URL lleva el número y
+          el script muestra la sección correspondiente. Por eso son botones y
+          no enlaces, y por eso no hay una vista por pestaña.
+        {% endcomment %}
+        <nav class="trx-pestanas" role="tablist" aria-label="Secciones del monitor">
+            <button type="button" role="tab" data-trx-tab="0" aria-selected="true"
+                    aria-controls="trx-seccion-0" id="trx-tab-0">Resumen mensual</button>
+            <button type="button" role="tab" data-trx-tab="1" aria-selected="false"
+                    aria-controls="trx-seccion-1" id="trx-tab-1">Resumen diario</button>
+            <button type="button" role="tab" data-trx-tab="2" aria-selected="false"
+                    aria-controls="trx-seccion-2" id="trx-tab-2">Dispositivos</button>
+            <button type="button" role="tab" data-trx-tab="3" aria-selected="false"
+                    aria-controls="trx-seccion-3" id="trx-tab-3">Rezagadas</button>
+        </nav>
 
-    <section class="trx-bloque trx-bloque-exportacion" aria-label="Exportación">
-        <h2 class="trx-bloque-titulo">Exportación</h2>
-        {% block trx_exportacion %}
-            {% include "transacciones/partials/_placeholder.html" %}
-        {% endblock %}
-    </section>
+        <nav class="trx-migas" data-trx-zona="migas" aria-label="Ruta de navegación"></nav>
 
-    <section class="trx-bloque trx-bloque-notas" aria-label="Notas de avance">
-        <h2 class="trx-bloque-titulo">Próximas zonas</h2>
-        <ul class="trx-notas">
-            {% for zona in zonas_preparadas %}
-                <li class="trx-nota">
-                    <strong>{{ zona.titulo }}</strong>
-                    <span>{{ zona.descripcion }}</span>
-                </li>
-            {% endfor %}
-        </ul>
-    </section>
+        {% block trx_contenido %}{% endblock %}
 
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'transacciones/js/transacciones.js' %}?v=1" defer></script>
+    <script src="{% static 'transacciones/js/config.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/mockData.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/utils.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/charts.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/dataService.js' %}?v=1"></script>
+    <script src="{% static 'transacciones/js/app.js' %}?v=1"></script>
+    <script>window.TRX_APP.iniciar();</script>
 {% endblock %}

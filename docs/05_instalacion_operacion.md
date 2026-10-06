@@ -70,6 +70,10 @@ Django no arranca con valores faltantes.
 | `ORACLE_SERVICE_NAME` | Service name Oracle. |
 | `ORACLE_CLIENT_PATH` | Cliente para modo Thick, si aplica. |
 | `DASHBOARD_SCHEDULER_ENABLED` | `False` por defecto; requiere instancia única. |
+| `DASHBOARD_SCHEDULER_EMBEDDED` | `False`; el scheduler se ejecuta por `ejecutar_scheduler`. |
+| `DASHBOARD_LAUNCHER_MODE` | `development` o `production`. |
+| `DASHBOARD_WEB_HOST`, `DASHBOARD_WEB_PORT` | Host y puerto del servidor iniciado por el launcher. |
+| `DASHBOARD_LOG_DIR` | Carpeta privada de logs de web, worker, scheduler y launcher. |
 | `AMBIENTE` | `DESARROLLO` (por defecto), `PRE` o `PRODUCCION`. Se muestra como badge en el sidebar y en el login para no confundir un entorno con producción. |
 | `TRX_GRUPOS_PERMITIDOS` | Grupos de Django con acceso al módulo de transacciones. Vaciarlo deja la sección solo para superusuarios. |
 
@@ -91,6 +95,22 @@ python manage.py probar_oracle
 python manage.py createsuperuser
 python manage.py runserver
 ```
+
+Para desarrollo, el comando único recomendado es:
+
+```powershell
+python manage.py iniciar_dashboard
+```
+
+Inicia tres procesos separados, sin abrir tres terminales:
+
+- `runserver --noreload` para la web;
+- `procesar_trabajos` para exportaciones e importaciones Excel;
+- `ejecutar_scheduler` para las consultas Oracle.
+
+Los logs quedan en `logs/web.log`, `logs/worker.log`,
+`logs/scheduler.log` y `logs/launcher.log`. El launcher detiene los tres
+procesos al recibir `Ctrl+C`.
 
 ## Rutas
 
@@ -115,6 +135,9 @@ python manage.py runserver
 | `probar_oracle` | Vigente | Prueba conexión y registra resultado. |
 | `importar_ubicaciones_esperadas <xlsx>` | Vigente | Carga ubicaciones e historial. |
 | `registrar_estado_oracle` | Vigente | Registra estado Oracle en SQLite. |
+| `ejecutar_scheduler` | Vigente | Mantiene APScheduler Oracle como proceso independiente. |
+| `procesar_trabajos` | Vigente | Procesa la cola secuencial de archivos. |
+| `iniciar_dashboard` | Vigente | Inicia web, worker y scheduler desde una terminal. |
 | `limpiar_historial_ubicacion_oracle` | Vigente | Aplica retención al historial. |
 | `limpiar_tablas_sqlite_antiguas` | Deshabilitado | Era un `VACUUM` destructivo sobre `db.sqlite3`; quedó inerte porque esa base es la `default` de Django. |
 | `actualizar_validadores`, `cargar_validadores_limpios`, `limpiar_registros_antiguos` | Retirados (BKL-002C) | No hacían nada (imprimían un aviso) y su pertenencia al flujo SQLite antiguo estaba confirmada. |
@@ -152,6 +175,47 @@ La interfaz no calcula una vista previa de AMID afectados. Para incorporar esa f
 ## Despliegue y diagnóstico
 
 En producción: `DEBUG=False`, clave única, hosts restrictivos, `migrate`, `check --deploy`, pruebas, `collectstatic` y servidor WSGI para `config.wsgi:application`. Proteja `.env` y SQLite con ACL.
+
+### Actualizar PRO desde Git
+
+Antes de actualizar, detener el launcher y respaldar `db.sqlite3`, `.env`,
+`data/exports/` y `logs/`. Luego, desde la carpeta del proyecto:
+
+```powershell
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+venv\Scripts\python.exe -m pip install -r requirements.txt
+venv\Scripts\python.exe manage.py migrate
+venv\Scripts\python.exe manage.py check --deploy
+venv\Scripts\python.exe manage.py collectstatic --noinput
+```
+
+El `.env` de PRO debe contener, como mínimo:
+
+```text
+AMBIENTE=PRODUCCION
+DEBUG=False
+DASHBOARD_LAUNCHER_MODE=production
+DASHBOARD_SCHEDULER_ENABLED=False
+DASHBOARD_SCHEDULER_EMBEDDED=False
+DASHBOARD_LOG_DIR=D:\\DashboardZP\\logs
+PRIVATE_EXPORT_ROOT=D:\\DashboardZP\\data\\exports
+```
+
+Las credenciales Oracle de PRO no se copian desde PRE. Se conservan en el
+`.env` propio de PRO. `requirements.txt` incluye Waitress para el servidor WSGI
+y WhiteNoise para servir los archivos estáticos.
+
+Después se inicia todo con:
+
+```powershell
+venv\Scripts\python.exe manage.py iniciar_dashboard --modo production
+```
+
+El launcher inicia Waitress, `procesar_trabajos` y `ejecutar_scheduler`, cada
+uno con su propio log. No se debe dejar `DASHBOARD_SCHEDULER_EMBEDDED=True`, ya
+que crearía un segundo scheduler dentro del proceso web.
 
 - Fallo Oracle: revisar variables/red/service name y ejecutar `probar_oracle`.
 - SQLite bloqueado: revisar concurrencia y jobs duplicados.

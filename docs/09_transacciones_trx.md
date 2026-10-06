@@ -149,7 +149,7 @@ apps/transacciones/
 │   ├── informe_interno_service.py
 │   ├── mayor_15_service.py
 │   ├── rezagadas_service.py
-│   └── exportaciones_service.py # stubs: NotImplementedError
+│   └── exportaciones_service.py # builders XLSX para el worker
 ├── templates/transacciones/
 └── static/transacciones/
 ```
@@ -385,10 +385,201 @@ rezagada / `> 15 min`, precedencia de estados, formateo de duración,
 normalización de fila cruda, validación de filtros, flag maestro, contención de
 fallos de Oracle, SQL sin `SELECT *` y sin binds huérfanos, igualdad de filtros
 entre conteo y detalle, separación entre total real y total de la muestra, las
-tres vistas, y el comportamiento de las exportaciones no implementadas.
+tres vistas y la generación de XLSX.
 
 El acceso se cubre en `test_permisos.py` (la política sale de
 `TRX_GRUPOS_PERMITIDOS`, no del código; case-sensitivity; una sola consulta;
 fail-closed con lista vacía; y el parseo de la variable de entorno) y en
 `test_transacciones_views.py` (302 anónimo, 403 sin rol, 200 para
 sonda / admin / superusuario, y que el sidebar muestre u oculte el enlace).
+
+## Plantilla Excel (motor de formato)
+
+Arriba del contenido del monitor hay un **Centro de archivos** con dos grupos.
+El grupo de **Plantillas** tiene los botones **Exportar plantilla** e **Importar
+plantilla**. Los dos se ven siempre,
+también con `DEBUG=False` y sin ninguna plantilla capturada: subir la primera es
+precisamente lo que se hace desde ahí.
+
+El grupo de **Reportes Excel** muestra cuatro salidas: **Versión Zona Paga**,
+**Informe Interno TRX C2D**, **TRX >15 MIN** y **TRX REZAGADAS**. Las tres
+salidas de Transacciones tienen generadores registrados para el worker y cada
+una conserva sus parámetros de fecha en el trabajo persistente. Versión Zona
+Paga continúa siendo una salida pendiente de implementar.
+
+Los reportes de Transacciones se procesan en una cola persistente global. El
+usuario puede cambiar de página mientras el worker genera el archivo; el
+resultado aparece en la campana global y se descarga solo al pulsar el enlace.
+La importación y la exportación de plantillas también usan la cola persistente.
+La importación guarda primero el upload privado y responde `202`; el worker
+ejecuta después la extracción, validación y versionado. La exportación guarda
+el XLSX y deja el enlace en la campana.
+
+Cada botón abre un `<dialog>` nativo (el proyecto no tenía patrón de modal antes,
+así que se usa el del navegador). La lista de plantillas la pide
+`plantilla.js` a `GET /plantillas-excel/` al abrir el diálogo, no el HTML: si
+viviera en la página habría que recargarla para ver el resultado de una
+importación.
+
+### Exportar
+
+Lista las plantillas con su versión vigente y el archivo que descarga cada una. Si
+todavía no hay ninguna, el diálogo lo dice y recuerda que hay que importarla
+primero. El enlace se arma en el navegador reemplazando el id de relleno (`0`) de
+`data-url-exportar`, que la vista resuelve con `reverse` para no escribir la ruta
+a mano. La descarga del monitor agrega `keep_labels=0`: el archivo sale sin
+texto de cabeceras, leyendas ni datos, pero conserva los estilos para que luego
+otra función pueda llenar las celdas desde la base de datos. La API y el comando
+de administración no reciben esa opción automáticamente.
+
+### Importar
+
+Formulario `multipart/form-data` real, enviado con `fetch` y `new FormData` (el
+`{% csrf_token %}` va dentro, así que el token viaja solo). Dos destinos:
+
+| Destino | Qué manda | Qué hace |
+|---|---|---|
+| Actualizar una existente | `plantilla_id` | Crea la versión N+1 de esa plantilla |
+| Crear una nueva | `nombre` | Crea la plantilla si no existe |
+
+Si se elige "actualizar", el nombre del formulario se ignora y el nombre y el
+nombre de descarga **no cambian**: se decidían al crear la plantilla, y
+cambiarlos en cada captura haría que un enlace ya compartido bajara otro archivo.
+
+La casilla **"Dejar esta versión como la vigente"** viene marcada. Sin marcar, la
+versión queda en `BORRADOR` y no mueve `current_version`: la plantilla vigente
+sigue siendo la anterior y se puede volver a cualquiera desde el historial.
+
+Si se sube un archivo **idéntico** a uno ya capturado (mismo SHA-256), no se crea
+nada y la respuesta es **409** con un mensaje que dice en qué plantilla y versión
+está. El diálogo se queda abierto a propósito: lo que sirve es elegir otro
+destino, no repetir el intento.
+
+Si se escribe un nombre que ya existe estando en modo "crear nueva", no es un
+error: la respuesta llega con `creada: false` y el archivo se agrega como versión
+de esa plantilla.
+
+### Permisos
+
+| Acción | Quién |
+|---|---|
+| Listar y exportar | `TRX_GRUPOS_PERMITIDOS` (superusuario, `Admin`, `SONDA`) |
+| Importar (crear versiones) | `EXCEL_TEMPLATES_GRUPOS_CAPTURA` (superusuario, `Admin`) |
+
+Capturar exige un permiso aparte porque es **la única operación del módulo que
+escribe en la base**: creaba la versión nueva y la dejaba vigente. Una `SONDA` ve
+el monitor y descarga la plantilla que corresponde, pero no cambia cuál es. El
+mismo grupo va en el mensaje del 403, para no tener que adivinar cuál de los dos
+gates falló. Lista de grupos vacía ⇒ la captura queda solo para superusuarios.
+
+### Rutas
+
+| Ruta | Uso |
+|---|---|
+| `GET /plantillas-excel/` | Lista las plantillas con su versión vigente (JSON) |
+| `GET /plantillas-excel/<id>/exportar/` | Descarga la plantilla vacía |
+| `POST /plantillas-excel/capturar/` | Captura un `.xlsx` / `.xlsm` |
+
+### Opciones de exportación que hoy se rechazan
+
+`keep_formulas=1`, `data_rows_mode=prototype` y `unknown_role_as` distinto de
+`data` responden **400**: no se aceptan en silencio. El render escribe valores de
+celda, no fórmulas, y no replica filas tipo, así que devolver el archivo sin esas
+cosas haría creer al que pidió que la plantilla las trae. Ver
+`ExportOptions._rechazar_lo_no_soportado` en `apps/excel_templates/options.py`.
+
+### Cobertura de pruebas
+
+| Archivo | Qué fija |
+|---|---|
+| `apps/transacciones/tests/test_plantilla_ui.py` | Los dos botones siempre visibles, los dos diálogos, el token de CSRF en el formulario y que la lista no viaje en el HTML |
+| `apps/excel_templates/tests/test_captura_views.py` | Permisos (incluido que `SONDA` no captura), crear vs actualizar, borrador vs vigente, 409 por duplicado y el JSON que consume el diálogo |
+| `apps/excel_templates/tests/test_motor.py` | `TestArchivoDuplicado`, `TestCapturarConDestino` y el orden de validación del nombre |
+
+## Trabajos en segundo plano
+
+Las exportaciones pesadas de Transacciones usan el modelo global
+`dashboard.TrabajoArchivo`. SQLite solo guarda el estado y los metadatos; el
+Excel terminado queda en `PRIVATE_EXPORT_ROOT` (por defecto
+`data/exports/`), que no se sirve como contenido estático.
+
+### Worker
+
+En desarrollo o producción se inicia un único worker:
+
+```text
+python manage.py migrate
+python manage.py procesar_trabajos
+```
+
+El worker reclama un trabajo, confirma `PROCESANDO`, cierra la transacción y
+recién después consulta Oracle y genera el Excel. Nunca mantiene una
+transacción SQLite abierta durante la generación. Para probar una sola tarea:
+
+```text
+python manage.py procesar_trabajos --una-vez
+```
+
+Si el worker arranca después de una interrupción, los trabajos que quedaron en
+`PROCESANDO` pasan a `ERROR`; no se reanudan parcialmente.
+
+### Polling y descarga
+
+El layout global carga la campana y consulta:
+
+```text
+GET /trabajos/estado/
+```
+
+La respuesta solo contiene estados y metadatos. Cuando el trabajo está
+
+```text
+GET /trabajos/<id>/descargar/
+```
+
+Ese endpoint valida sesión, propietario, estado y existencia del archivo. La
+descarga ocurre únicamente al pulsar el enlace; el polling nunca obtiene el
+archivo ni dispara una descarga automática.
+
+### Expiración
+
+El plazo predeterminado es de 72 horas. La limpieza conserva el registro y
+elimina el archivo físico:
+
+```text
+python manage.py limpiar_trabajos_expirados
+```
+
+Se puede cambiar mediante:
+
+```text
+TRABAJOS_ARCHIVO_EXPIRACION_HORAS=72
+PRIVATE_EXPORT_ROOT=D:\\DashboardData\\exports
+```
+
+### Windows
+
+La aplicación web y el worker son procesos independientes. En una consola:
+
+```text
+venv\\Scripts\\python.exe manage.py runserver
+venv\\Scripts\\python.exe manage.py procesar_trabajos
+```
+
+Para producción con Waitress, el launcher inicia tres procesos independientes:
+Waitress, `manage.py procesar_trabajos` y `manage.py ejecutar_scheduler`. Todos
+comparten el mismo directorio del proyecto, `.env`, `db.sqlite3`,
+`PRIVATE_EXPORT_ROOT` y configuración Oracle.
+
+Una forma simple de ejecutarlo con NSSM es registrar como aplicación:
+
+```text
+Programa: C:\\ruta\\proyecto\\venv\\Scripts\\python.exe
+Argumentos: manage.py iniciar_dashboard --modo production
+Directorio: C:\\ruta\\proyecto
+```
+
+El usuario del servicio debe tener permisos de lectura y escritura sobre
+`db.sqlite3`, `PRIVATE_EXPORT_ROOT` y `DASHBOARD_LOG_DIR`. La limpieza puede
+programarse una vez al día con el Programador de tareas ejecutando
+`manage.py limpiar_trabajos_expirados`.

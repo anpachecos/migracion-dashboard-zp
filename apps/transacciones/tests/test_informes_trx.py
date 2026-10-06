@@ -295,12 +295,7 @@ class RezagadasTests(BaseInformeTests):
 
 
 class ExportacionesTests(SimpleTestCase):
-    """
-    Las exportaciones son la unica pieza deliberadamente no implementada.
-
-    Se fija el comportamiento para que no se puedan consumir por error ni
-    descubrirlas como operativas desde la interfaz.
-    """
+    """Los tres builders producen un XLSX básico aun sin filas."""
 
     CONSTRUCTORES = (
         "construir_excel_informe_interno",
@@ -308,18 +303,18 @@ class ExportacionesTests(SimpleTestCase):
         "construir_excel_rezagadas",
     )
 
-    def test_los_tres_excel_no_existen_aun(self):
+    def test_los_tres_excel_producen_xlsx(self):
         from apps.transacciones.services import exportaciones_service
 
         for nombre in self.CONSTRUCTORES:
             with self.subTest(funcion=nombre):
-                with self.assertRaises(NotImplementedError):
-                    getattr(exportaciones_service, nombre)([])
+                contenido = getattr(exportaciones_service, nombre)([])
+                self.assertTrue(contenido.startswith(b"PK"))
 
-    def test_la_interfaz_no_ofrece_descarga(self):
+    def test_la_interfaz_ofrece_descarga(self):
         from apps.transacciones.services import exportaciones_service
 
-        self.assertFalse(exportaciones_service.exportar_disponible())
+        self.assertTrue(exportaciones_service.exportar_disponible())
 
     def test_el_nombre_sugerido_incluye_el_rango(self):
         from apps.transacciones.services import exportaciones_service

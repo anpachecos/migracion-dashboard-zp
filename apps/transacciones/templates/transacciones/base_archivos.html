@@ -1,0 +1,34 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Centro de archivos · Zonas Pagas{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'transacciones/css/monitor_traspaso.css' %}?v=4">
+{% endblock %}
+
+{% block content %}
+<div class="trx trx-centro-pagina"
+     data-trx-raiz
+     data-umbral-corte-min="{{ umbral_corte_min }}">
+    <div class="trx-contenedor">
+        <header class="trx-cabecera trx-cabecera-archivos">
+            <div>
+                <p class="trx-kicker">Reportes / Centro de archivos</p>
+                <h1>Importar y exportar Excel</h1>
+                <p>Gestiona plantillas y solicita reportes sin bloquear el monitor de Transacciones.</p>
+            </div>
+            <a class="trx-btn" href="{% url 'transacciones:monitor' %}">Volver a Transacciones</a>
+        </header>
+
+        {% block archivos_contenido %}{% endblock %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'transacciones/js/archivos_trx.js' %}?v=3"></script>
+    <script src="{% static 'transacciones/js/plantilla.js' %}?v=6"></script>
+    <script>window.TRX_ARCHIVOS.iniciar();</script>
+    <script>window.TRX_PLANTILLA.iniciar();</script>
+{% endblock %}
