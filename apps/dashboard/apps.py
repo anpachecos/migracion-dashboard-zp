@@ -24,6 +24,9 @@ class DashboardConfig(AppConfig):
         se ejecuta con runserver en modo desarrollo.
         """
 
+        if not getattr(settings, "DASHBOARD_SCHEDULER_EMBEDDED", False):
+            return
+
         if os.environ.get("RUN_MAIN") != "true":
             return
 

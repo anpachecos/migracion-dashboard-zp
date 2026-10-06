@@ -7,8 +7,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
 from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.db.models import Q
+from django.http import FileResponse, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from apps.dashboard.services.alertas_service import (
@@ -43,8 +44,10 @@ from apps.dashboard.importacion.version_zp_validation import (
     VersionZPValidationError,
     validar_upload_basico,
 )
+from apps.transacciones.permisos import usuario_puede_ver_transacciones
 
-from .models import LogImportacion
+from .models import LogImportacion, TrabajoArchivo
+from .services.trabajos import crear_trabajo
 from .services.baterias_service import (
     construir_tabla_bateria,
     obtener_bloques_bateria_oracle,
@@ -57,6 +60,105 @@ from .services.normalizacion import obtener_ahora_referencia
 
 def usuario_es_admin(user):
     return user.is_superuser or user.groups.filter(name="Admin").exists()
+
+
+def _trabajo_visible_para_usuario(trabajo_id, user):
+    filtro = Q(usuario=user)
+    if usuario_es_admin(user):
+        filtro |= Q(pk=trabajo_id)
+    return get_object_or_404(TrabajoArchivo, Q(pk=trabajo_id) & filtro)
+
+
+@login_required
+def crear_trabajo_archivo(request):
+    """Queue a registered file generator and return immediately."""
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido."}, status=405)
+
+    tipo = request.POST.get("tipo", "").strip()
+    if tipo.startswith("TRX_") and not usuario_puede_ver_transacciones(request.user):
+        return JsonResponse({"error": "No tienes permisos para Transacciones."}, status=403)
+    texto_parametros = request.POST.get("parametros", "{}")
+    try:
+        import json
+
+        parametros = json.loads(texto_parametros)
+        if not isinstance(parametros, dict):
+            raise ValueError("Los parámetros deben ser un objeto JSON.")
+        trabajo = crear_trabajo(request.user, tipo, parametros)
+    except (ValueError, TypeError, json.JSONDecodeError) as error:
+        return JsonResponse({"error": str(error)}, status=400)
+
+    return JsonResponse({"id": trabajo.pk, "estado": trabajo.estado}, status=202)
+
+
+@login_required
+def estado_trabajos_archivo(request):
+    """Return lightweight task state; never include file contents."""
+
+    trabajos = TrabajoArchivo.objects.filter(usuario=request.user)[:50]
+    datos = []
+    for trabajo in trabajos:
+        datos.append(
+            {
+                "id": trabajo.pk,
+                "tipo": trabajo.tipo,
+                "estado": trabajo.estado,
+                "progreso": trabajo.progreso,
+                "mensaje": trabajo.error or trabajo.mensaje,
+                "nombre": trabajo.nombre_archivo,
+                "fecha": trabajo.fecha_solicitud.isoformat(),
+                "leido": trabajo.leido,
+                "descarga": (
+                    reverse("dashboard:descargar_trabajo", args=[trabajo.pk])
+                    if trabajo.estado == TrabajoArchivo.Estado.LISTO
+                    else None
+                ),
+            }
+        )
+
+    return JsonResponse(
+        {
+            "trabajos": datos,
+            "no_leidos": TrabajoArchivo.objects.filter(
+                usuario=request.user, leido=False
+            ).count(),
+        }
+    )
+
+
+@login_required
+def leer_trabajo_archivo(request, trabajo_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido."}, status=405)
+
+    trabajo = _trabajo_visible_para_usuario(trabajo_id, request.user)
+    trabajo.leido = True
+    trabajo.save(update_fields=["leido"])
+    return JsonResponse({"ok": True})
+
+
+@login_required
+def descargar_trabajo_archivo(request, trabajo_id):
+    trabajo = _trabajo_visible_para_usuario(trabajo_id, request.user)
+    if trabajo.estado != TrabajoArchivo.Estado.LISTO or not trabajo.archivo:
+        return HttpResponse("El archivo todavía no está disponible.", status=409)
+
+    try:
+        archivo = trabajo.archivo.open("rb")
+    except FileNotFoundError:
+        return HttpResponse("El archivo ya no existe.", status=410)
+
+    if not trabajo.leido:
+        trabajo.leido = True
+        trabajo.save(update_fields=["leido"])
+
+    return FileResponse(
+        archivo,
+        as_attachment=True,
+        filename=trabajo.nombre_archivo or "exportacion.xlsx",
+    )
 
 
 @login_required

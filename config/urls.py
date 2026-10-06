@@ -27,6 +27,14 @@ urlpatterns = [
         ),
     ),
 
+    path(
+        "plantillas-excel/",
+        include(
+            ("apps.excel_templates.urls", "excel_templates"),
+            namespace="excel_templates",
+        ),
+    ),
+
     path("", include(("apps.dashboard.urls", "dashboard"), namespace="dashboard")),
     path(
         "password_change/",

@@ -1,5 +1,12 @@
 from django.conf import settings
 from django.db import models
+from uuid import uuid4
+
+
+def trabajo_archivo_upload_to(instance, filename):
+    """Keep generated files private and prevent filename collisions."""
+
+    return f"{instance.pk or uuid4()}/{filename}"
 
 
 class LogImportacion(models.Model):
@@ -72,6 +79,54 @@ class LogImportacion(models.Model):
 
     def __str__(self):
         return f"{self.origen} - {self.estado} - {self.fecha_inicio}"
+
+
+class TrabajoArchivo(models.Model):
+    """Persistent, sequential work item for server-generated files."""
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "PENDIENTE", "Pendiente"
+        PROCESANDO = "PROCESANDO", "Procesando"
+        LISTO = "LISTO", "Listo"
+        ERROR = "ERROR", "Error"
+        EXPIRADO = "EXPIRADO", "Expirado"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="trabajos_archivo",
+    )
+    tipo = models.CharField(max_length=80)
+    estado = models.CharField(
+        max_length=20,
+        choices=Estado.choices,
+        default=Estado.PENDIENTE,
+    )
+    parametros_json = models.JSONField(default=dict)
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_inicio = models.DateTimeField(null=True, blank=True)
+    fecha_fin = models.DateTimeField(null=True, blank=True)
+    progreso = models.PositiveSmallIntegerField(default=0)
+    mensaje = models.TextField(blank=True, default="")
+    archivo_entrada = models.FileField(upload_to=trabajo_archivo_upload_to, blank=True)
+    archivo = models.FileField(upload_to=trabajo_archivo_upload_to, blank=True)
+    nombre_archivo = models.CharField(max_length=255, blank=True, default="")
+    fecha_expiracion = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True, default="")
+    leido = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-fecha_solicitud"]
+        indexes = [
+            models.Index(fields=["estado", "fecha_solicitud"]),
+            models.Index(fields=["usuario", "leido", "fecha_solicitud"]),
+            models.Index(fields=["fecha_expiracion"]),
+        ]
+        verbose_name = "Trabajo de archivo"
+        verbose_name_plural = "Trabajos de archivo"
+
+    def __str__(self):
+        return f"{self.tipo} #{self.pk} ({self.estado})"
 
 class AlertaAmidExcluido(models.Model):
     """AMID que un usuario decidi\u00f3 ocultar del panel de alertas."""

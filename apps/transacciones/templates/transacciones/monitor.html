@@ -15,9 +15,232 @@
 
 {% block trx_contenido %}
 
+    {% comment %}
+      El centro de archivos vive en /transacciones/centro-archivos/. Este
+      bloque antiguo se conserva temporalmente como referencia durante la
+      migración del mockup, pero no pertenece al monitor.
+    {% endcomment %}
+    {% if False %}
+
+    <section class="trx-card trx-centro-archivos"
+             data-trx-archivos
+             data-trx-plantilla
+             data-url-plantillas="{{ url_plantillas }}"
+             data-url-capturar="{{ url_capturar }}"
+             data-url-exportar="{{ url_exportar_base }}">
+        <div class="trx-centro-archivos-cabecera">
+            <div>
+                <p class="trx-kicker">Centro de archivos</p>
+                <h2>Importar y exportar Excel</h2>
+                <p class="trx-sub">Las plantillas y los reportes se procesan por separado para que cada salida pueda tener sus propios filtros.</p>
+            </div>
+            <span class="trx-centro-estado"
+                  data-trx-archivos-estado
+                  data-trx-plantilla-aviso>Listo para trabajar</span>
+        </div>
+
+        <div class="trx-centro-grid">
+            <section class="trx-archivo-grupo trx-archivo-grupo-plantillas">
+                <div class="trx-archivo-grupo-cabecera">
+                    <div>
+                        <span class="trx-archivo-indice">01</span>
+                        <h3>Plantillas</h3>
+                    </div>
+                    <span class="trx-sub">Formato guardado</span>
+                </div>
+                <p class="trx-sub">Importa una plantilla o descarga una copia vacía con sus estilos para llenarla desde la base de datos.</p>
+                <div class="trx-archivo-acciones">
+                    <button type="button" class="trx-btn trx-btn-acento" data-trx-plantilla-importar>
+                        Importar plantilla
+                    </button>
+                    <button type="button" class="trx-btn" data-trx-plantilla-exportar>
+                        Exportar plantilla
+                    </button>
+                </div>
+            </section>
+
+            <section class="trx-archivo-grupo trx-archivo-grupo-reportes">
+                <div class="trx-archivo-grupo-cabecera">
+                    <div>
+                        <span class="trx-archivo-indice">02</span>
+                        <h3>Reportes Excel</h3>
+                    </div>
+                    <span class="trx-sub">Mockup de exportación</span>
+                </div>
+                <p class="trx-sub">Cada reporte tendrá sus propios parámetros de período y filtros antes de generar el archivo.</p>
+                <div class="trx-reportes-grid">
+                    <button type="button" class="trx-reporte-accion" data-trx-reporte="version_zona_paga">
+                        <span class="trx-reporte-titulo">Versión Zona Paga</span>
+                        <span class="trx-reporte-meta">Parámetros propios</span>
+                    </button>
+                    <button type="button" class="trx-reporte-accion" data-trx-reporte="informe_interno">
+                        <span class="trx-reporte-titulo">Informe Interno TRX C2D</span>
+                        <span class="trx-reporte-meta">Diario o rango</span>
+                    </button>
+                    <button type="button" class="trx-reporte-accion" data-trx-reporte="mayor_15">
+                        <span class="trx-reporte-titulo">TRX &gt;{{ umbral_corte_min }} MIN</span>
+                        <span class="trx-reporte-meta">Filtro propio</span>
+                    </button>
+                    <button type="button" class="trx-reporte-accion" data-trx-reporte="rezagadas">
+                        <span class="trx-reporte-titulo">TRX REZAGADAS</span>
+                        <span class="trx-reporte-meta">Filtro propio</span>
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <div class="trx-cola-archivos" data-trx-cola hidden>
+            <div class="trx-cola-cabecera">
+                <div>
+                    <p class="trx-kicker">Actividad en segundo plano</p>
+                    <h3>Trabajos recientes</h3>
+                </div>
+                <button type="button" class="trx-btn trx-btn-sutil" data-trx-cola-limpiar>Limpiar</button>
+            </div>
+            <div class="trx-cola-lista" data-trx-cola-lista></div>
+        </div>
+    </section>
+
+    {# ------------------------------------------------------------- #}
+    {# Diálogo · Descargar la plantilla vacía                       #}
+    {# ------------------------------------------------------------- #}
+    <dialog class="trx-dialog" data-trx-dlg-exportar aria-labelledby="trx-dlg-exportar-titulo">
+        <form method="dialog" class="trx-dialog-form">
+            <h2 id="trx-dlg-exportar-titulo">Exportar plantilla vacía</h2>
+            <p class="trx-sub">El formato se conserva completo; solo se vacían los datos.</p>
+        </form>
+
+        <div class="trx-dialog-cuerpo" data-trx-dlg-exportar-lista></div>
+
+        <form method="dialog" class="trx-dialog-pie">
+            <button type="submit" class="trx-btn" data-trx-cerrar>Cerrar</button>
+        </form>
+    </dialog>
+
+    {# ------------------------------------------------------------- #}
+    {# Diálogo · Subir un Excel como plantilla                     #}
+    {# ------------------------------------------------------------- #}
+    <dialog class="trx-dialog" data-trx-dlg-importar aria-labelledby="trx-dlg-importar-titulo">
+        <form method="dialog" class="trx-dialog-form">
+            <h2 id="trx-dlg-importar-titulo">Importar plantilla</h2>
+            <p class="trx-sub">El archivo se captura como una versión nueva. Las anteriores
+                quedan guardadas y se puede volver a cualquiera.</p>
+        </form>
+
+        {% comment %}
+          El destino va en `plantilla_id` o, si se elige "crear una nueva", en
+          el campo de nombre. El `{% csrf_token %}` va dentro del form a proposito:
+          `plantilla.js` manda el form entero con `new FormData`, asi que el token
+          viaja sin que haya que leerlo a mano del DOM.
+        {% endcomment %}
+        <form class="trx-dialog-cuerpo trx-dialog-form-captura"
+              id="trx-form-importar"
+              method="post"
+              action="{{ url_capturar }}"
+              enctype="multipart/form-data"
+              data-trx-form-importar>
+            {% csrf_token %}
+
+            <fieldset class="trx-dialog-destino">
+                <legend>A qué plantilla</legend>
+                <div data-trx-dlg-destino-lista></div>
+            </fieldset>
+
+            <label class="trx-campo">
+                Nombre de la plantilla nueva
+                <input type="text"
+                       name="nombre"
+                       data-trx-nuevo-nombre
+                       placeholder="Se rellena con el nombre del archivo"
+                       autocomplete="off">
+            </label>
+
+            <label class="trx-campo">
+                Archivo .xlsx o .xlsm
+                <input type="file" name="archivo" accept=".xlsx,.xlsm" required
+                       data-trx-archivo>
+            </label>
+
+            <label class="trx-check">
+                <input type="checkbox" name="publicar" value="1"
+                       data-trx-publicar checked>
+                Dejar esta versión como la vigente
+            </label>
+
+            <p class="trx-dialog-error" data-trx-error role="alert" hidden></p>
+        </form>
+
+        <div class="trx-dialog-pie">
+            <button type="button" class="trx-btn" data-trx-cerrar>Cancelar</button>
+            {% comment %}
+              `form=` asocia el boton al formulario de arriba sin anidarlos, y
+              por eso la validacion nativa (`required` del archivo) sigue
+              funcionando: el submit se intercepta en `plantilla.js`.
+            {% endcomment %}
+            <button type="submit" form="trx-form-importar" class="trx-btn trx-btn-acento"
+                    data-trx-enviar>Importar</button>
+        </div>
+    </dialog>
+
+    <dialog class="trx-dialog trx-dialog-reporte" data-trx-dlg-reporte
+            aria-labelledby="trx-dlg-reporte-titulo">
+        <form method="dialog" class="trx-dialog-form">
+            <p class="trx-kicker">Parámetros del reporte</p>
+            <h2 id="trx-dlg-reporte-titulo" data-trx-reporte-titulo>Exportar reporte</h2>
+            <p class="trx-sub" data-trx-reporte-descripcion>
+                Define el período y los filtros propios de esta salida.
+            </p>
+        </form>
+
+        <form class="trx-dialog-cuerpo trx-dialog-form-reporte" data-trx-form-reporte>
+            <label class="trx-campo">
+                Periodicidad
+                <select data-trx-reporte-periodicidad>
+                    <option value="diaria">Diaria</option>
+                    <option value="quincenal">Quincenal</option>
+                    <option value="mensual">Mensual</option>
+                    <option value="rango">Rango de fechas</option>
+                </select>
+            </label>
+
+            <div class="trx-reporte-fechas">
+                <label class="trx-campo">
+                    Desde
+                    <input type="date" data-trx-reporte-desde>
+                </label>
+                <label class="trx-campo">
+                    Hasta
+                    <input type="date" data-trx-reporte-hasta>
+                </label>
+            </div>
+
+            <div class="trx-reporte-filtros-mockup">
+                <span class="trx-sub">Filtros propios del reporte</span>
+                <label class="trx-check">
+                    <input type="checkbox" data-trx-reporte-operador>
+                    Aplicar filtro de operador
+                </label>
+                <label class="trx-check">
+                    <input type="checkbox" data-trx-reporte-tipo>
+                    Aplicar filtro de tipo de TRX
+                </label>
+            </div>
+        </form>
+
+        <div class="trx-dialog-error" data-trx-reporte-aviso hidden></div>
+        <div class="trx-dialog-pie">
+            <button type="button" class="trx-btn" data-trx-reporte-cerrar>Cancelar</button>
+            <button type="button" class="trx-btn trx-btn-acento" data-trx-reporte-enviar>
+                Poner en cola
+            </button>
+        </div>
+    </dialog>
+
     {# --------------------------------------------------------- #}
     {# Pestaña 1 · Resumen mensual                              #}
     {# --------------------------------------------------------- #}
+    {% endif %}
+
     <section class="trx-seccion" id="trx-seccion-0" data-trx-seccion="0"
              role="tabpanel" aria-labelledby="trx-tab-0" hidden>
 

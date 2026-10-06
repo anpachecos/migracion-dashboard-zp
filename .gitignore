@@ -88,6 +88,8 @@ uploads/
 # Exportaciones y otros resultados generados
 outputs/
 exports/
+data/exports/
+logs/
 reportes_generados/
 archivos_temporales/
 
@@ -157,3 +159,6 @@ oracle/diagnostics/output/
 # Archivos locales de trabajo
 oracle/notas/Queries_TRX_C2D_guia_Antonia_V2.sql
 /docs/BKL-017_Diagnostico_Pruebas_Caracterizacion.docx
+# Archivos Excel de plantillas (no versionar el fixture de ejemplo)
+/fixtures/ZONA_PAGA_V764_MARTES.XLSX
+

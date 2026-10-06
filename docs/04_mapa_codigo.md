@@ -130,7 +130,7 @@ apps/dashboard/
 | `models.py` | Define modelos Django. Actualmente contiene `LogImportacion`, usado en SQLite para logs internos, y los modelos de reglas/alertas/ubicaciones. El modelo de referencia sobre `VW_ESTATUS_ZP_DJANGO` se retiró en BKL-002C. | Vigente |
 | `context_processors.py` | Agrega datos comunes al layout del dashboard. `metadatos_app` expone versión, entorno e identidad (corre también para anónimos, porque el login muestra la versión). `datos_actualizacion_dashboard` expone la antigüedad de los datos de Oracle como semáforo (`estado_frescura`) y usa caché para evitar consultas Oracle en cada petición. | Vigente |
 | `admin.py` | Configura qué modelos locales se muestran en el administrador de Django. Actualmente no registra modelos propios de la app. | Vigente / opcional |
-| `apps.py` | Configura la app `dashboard`. Si `DASHBOARD_SCHEDULER_ENABLED=True`, puede iniciar el scheduler interno al levantar Django. | Vigente / revisar en despliegue |
+| `apps.py` | Configura la app `dashboard`. El scheduler embebido queda desactivado por defecto; las tareas Oracle se inician con `ejecutar_scheduler`. | Vigente / revisar en despliegue |
 | `tests.py` | Contiene pruebas unitarias básicas para funciones del dashboard, como context processor, filtros de alertas y permisos de edición de reglas. | Vigente / ampliar |
 | `__init__.py` | Indica que la carpeta es un paquete Python. No requiere cambios. | Vigente |
 
@@ -140,7 +140,7 @@ apps/dashboard/
 - La vista Oracle `VW_ESTATUS_ZP_DJANGO` se consulta por SQL directo desde los servicios; dejó de tener modelo Django en BKL-002C.
 - `context_processors.py` usa caché para no consultar Oracle en cada petición. Se puede simplificar si se elimina la lógica de precarga en segundo plano.
 - `admin.py` está vacío porque no hay modelos propios registrados en el administrador de Django. Si más adelante se quiere revisar `LogImportacion` desde `/admin`, se puede registrar ahí.
-- `apps.py` puede iniciar el scheduler interno. Antes de usarlo en despliegue, se debe revisar que no active tareas antiguas o innecesarias.
+- `apps.py` solo puede iniciar el scheduler embebido si se habilita explícitamente `DASHBOARD_SCHEDULER_EMBEDDED=True`; el flujo normal usa `ejecutar_scheduler`.
 - La carga de ubicaciones esperadas actualmente se realiza desde el panel Perfil mediante subida manual de Excel, no desde un archivo fijo programado en el scheduler.
 - `tests.py` ya contiene pruebas básicas, pero todavía no cubre todo el sistema. Se recomienda ampliarlas progresivamente.
 ---

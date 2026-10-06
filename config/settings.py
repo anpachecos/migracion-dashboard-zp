@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     # App propia
     "apps.dashboard.apps.DashboardConfig",
     "apps.transacciones.apps.TransaccionesConfig",
+    "apps.excel_templates.apps.ExcelTemplatesConfig",
 ]
 
 
@@ -209,8 +210,35 @@ USE_TZ = True
 # Archivos estáticos
 # =========================
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Generated workbooks are never served as static or media URLs. Downloads go
+# through an authenticated Django view.
+PRIVATE_EXPORT_ROOT = Path(
+    os.getenv("PRIVATE_EXPORT_ROOT", str(BASE_DIR / "data" / "exports"))
+)
+if not PRIVATE_EXPORT_ROOT.is_absolute():
+    PRIVATE_EXPORT_ROOT = BASE_DIR / PRIVATE_EXPORT_ROOT
+# Django's default FileSystemStorage is used only for private job artifacts.
+MEDIA_ROOT = PRIVATE_EXPORT_ROOT
+TRABAJOS_ARCHIVO_EXPIRACION_HORAS = int(
+    os.getenv("TRABAJOS_ARCHIVO_EXPIRACION_HORAS", "72")
+)
+TRABAJOS_WORKER_INTERVALO_SEGUNDOS = float(
+    os.getenv("TRABAJOS_WORKER_INTERVALO_SEGUNDOS", "3")
+)
+TRX_EXPORT_MAX_FILAS = int(os.getenv("TRX_EXPORT_MAX_FILAS", "100000"))
+
+DASHBOARD_LOG_DIR = Path(
+    os.getenv("DASHBOARD_LOG_DIR", str(BASE_DIR / "logs"))
+)
+if not DASHBOARD_LOG_DIR.is_absolute():
+    DASHBOARD_LOG_DIR = BASE_DIR / DASHBOARD_LOG_DIR
+
+DASHBOARD_SCHEDULER_EMBEDDED = os.getenv(
+    "DASHBOARD_SCHEDULER_EMBEDDED", "False"
+).strip().lower() in {"true", "1", "yes", "on"}
 
 
 # =========================
@@ -329,5 +357,22 @@ TRX_MODO_FECHA_BASE = os.getenv("TRX_MODO_FECHA_BASE", "trx")
 TRX_GRUPOS_PERMITIDOS = tuple(
     grupo.strip()
     for grupo in os.getenv("TRX_GRUPOS_PERMITIDOS", "Admin,SONDA").split(",")
+    if grupo.strip()
+)
+
+
+# =========================
+# Motor de plantillas Excel
+# =========================
+
+# Grupos autorizados a **subir** plantillas (crear versiones nuevas).
+# Ver y exportar sigue con `TRX_GRUPOS_PERMITIDOS`, que incluye `SONDA`.
+# Subir es la unica operacion del modulo que escribe en la base, asi que se
+# separa del gate de lectura: una SONDA puede descargar la plantilla vigente
+# pero no puede cambiar cual es. Mismas reglas de `TRX_GRUPOS_PERMITIDOS`:
+# case-sensitive y lista vacia deja la captura solo para superusuarios.
+EXCEL_TEMPLATES_GRUPOS_CAPTURA = tuple(
+    grupo.strip()
+    for grupo in os.getenv("EXCEL_TEMPLATES_GRUPOS_CAPTURA", "Admin").split(",")
     if grupo.strip()
 )

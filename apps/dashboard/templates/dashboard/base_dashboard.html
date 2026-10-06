@@ -9,12 +9,14 @@
 
     <link rel="stylesheet" href="{% static 'dashboard/css/base_dashboard.css' %}?v=19">
     <link rel="stylesheet" href="{% static 'dashboard/css/utilidades.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'dashboard/css/trabajos_archivo.css' %}?v=1">
 
     {% block extra_css %}{% endblock %}
     <link rel="icon" type="image/png" href="{% static 'dashboard/img/zp3.png' %}">
 </head>
 
-<body>
+<body data-trabajos-estado-url="{% url 'dashboard:estado_trabajos_archivo' %}"
+      data-trabajos-crear-url="{% url 'dashboard:crear_trabajo_archivo' %}">
 
 <div class="dashboard-layout">
 
@@ -45,6 +47,25 @@
                         <strong>{{ usuario_nombre }}</strong>
                         <span>{{ usuario_rol }}</span>
                     </span>
+                    <div class="dashboard-notificaciones" data-trabajos-notificaciones>
+                        <button type="button" class="dashboard-campana" data-trabajos-toggle
+                                aria-expanded="false" aria-controls="trabajos-panel"
+                                title="Notificaciones" aria-label="Notificaciones">
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <strong data-trabajos-badge hidden>0</strong>
+                        </button>
+                        <section id="trabajos-panel" class="dashboard-trabajos-panel" data-trabajos-panel hidden>
+                            <div class="dashboard-trabajos-panel-cabecera">
+                                <strong>Trabajos de archivos</strong>
+                                <button type="button" data-trabajos-cerrar aria-label="Cerrar">×</button>
+                            </div>
+                            <div data-trabajos-lista>
+                                <p class="dashboard-trabajos-vacio">No hay trabajos recientes.</p>
+                            </div>
+                        </section>
+                    </div>
                 </div>
             {% endif %}
         </div>
@@ -116,6 +137,16 @@
                                         <path d="M7.5 10h5M7.5 13h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
                                     </svg>
                                     <span class="sidebar-link-text">Transacciones</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'transacciones:centro_archivos' %}" class="sidebar-link {% if active_page == 'centro_archivos' %}active{% endif %}"
+                                   {% if active_page == 'centro_archivos' %}aria-current="page"{% endif %}>
+                                    <svg class="sidebar-link-icon" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                        <path d="M3 6.5h5l1.5 2H17v8H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                        <path d="M3 6.5V4h5l1.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                    </svg>
+                                    <span class="sidebar-link-text">Centro de archivos</span>
                                 </a>
                             </li>
                         </ul>
@@ -222,9 +253,12 @@
     <span class="dashboard-scroll-explorar-flecha" aria-hidden="true">↓</span>
 </button>
 
+<div class="dashboard-toast" data-trabajos-toast hidden role="status"></div>
+
 {% block extra_js %}{% endblock %}
 <script src="{% static 'dashboard/js/scroll_explorar.js' %}?v=1"></script>
-    <script src="{% static 'dashboard/js/sidebar.js' %}?v=3"></script>
+<script src="{% static 'dashboard/js/sidebar.js' %}?v=3"></script>
+<script src="{% static 'dashboard/js/trabajos_archivo.js' %}?v=1"></script>
 
 </body>
 </html>

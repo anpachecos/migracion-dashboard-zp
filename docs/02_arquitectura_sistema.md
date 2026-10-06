@@ -77,7 +77,11 @@ Reúne datos del usuario, logs, carga de ubicaciones y reglas. Solo permite clav
 
 ## Segundo plano
 
-`APScheduler` solo se inicia con `DASHBOARD_SCHEDULER_ENABLED=True`; por defecto está apagado. Como vive dentro del proceso web, varios workers pueden duplicar jobs. Debe garantizarse una instancia única o usarse un scheduler externo.
+`APScheduler` se ejecuta como proceso independiente mediante
+`python manage.py ejecutar_scheduler`. `DASHBOARD_SCHEDULER_EMBEDDED` queda
+desactivado por defecto para evitar que el proceso web duplique jobs. El
+launcher `python manage.py iniciar_dashboard` inicia web, worker y scheduler
+desde una sola terminal, pero conserva procesos separados.
 
 ## Límites
 
